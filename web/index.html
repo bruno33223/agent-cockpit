@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Cockpit - Telemetria & Orquestração Multiagente</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-badge">COCKPIT</div>
+      <div class="brand-text">
+        <span class="brand-title">AGENT COCKPIT</span>
+        <span class="brand-sub">Telemetry & Governance v2.0</span>
+      </div>
+      <div class="conn-pill" id="ws-status">
+        <span class="pulse-led online"></span>
+        <span class="conn-text" id="ws-status-text">WS Conectado</span>
+      </div>
+    </div>
+
+    <!-- MAIN NAVIGATION TABS -->
+    <nav class="topbar-nav">
+      <button class="nav-tab active" data-view="view-overview">
+        <span class="tab-icon">📊</span>
+        <span>Visão Geral</span>
+      </button>
+      <button class="nav-tab" data-view="view-flow">
+        <span class="tab-icon">⚡</span>
+        <span>Fluxo & Kanban</span>
+      </button>
+      <button class="nav-tab" data-view="view-graph" id="nav-tab-graph">
+        <span class="tab-icon">🕸️</span>
+        <span>Code Graph</span>
+      </button>
+      <button class="nav-tab" data-view="view-gauntlet">
+        <span class="tab-icon">📜</span>
+        <span>Gauntlet Log</span>
+      </button>
+    </nav>
+
+    <div class="topbar-actions">
+      <div class="epic-indicator" title="Épico atualmente sincronizado">
+        <span class="epic-tag">ÉPICO</span>
+        <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
+      </div>
+      <button class="action-btn secondary" id="btn-test-cycle" title="Simular avanço de pulso da frota">Simular Pulso</button>
+      <button class="action-btn danger" id="btn-reset" title="Restaurar estado padrão">Resetar</button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE WRAPPER -->
+  <div class="workspace-wrapper">
+    <!-- LEFT: DYNAMIC VIEW CONTAINER -->
+    <div class="view-viewport">
+
+      <!-- VIEW 1: OVERVIEW DASHBOARD -->
+      <section class="tab-view active" id="view-overview">
+        <div class="overview-container">
+          <!-- KPI METRICS ROW -->
+          <div class="kpi-grid">
+            <div class="kpi-card highlight">
+              <div class="kpi-header">
+                <span class="kpi-title">Tokens Economizados</span>
+                <span class="kpi-badge green">98% Redução</span>
+              </div>
+              <div class="kpi-value" id="kpi-tokens">12.000</div>
+              <div class="kpi-desc">Via protocolo de ponteiro JSON & offload de contexto</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Taxa de Aprovação (1ª Tentativa)</span>
+                <span class="kpi-badge cyan">Gauntlet Quality</span>
+              </div>
+              <div class="kpi-value" id="kpi-first-pass">100%</div>
+              <div class="kpi-desc">Fatias aprovadas sem necessidade de refatoração</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Fatias Concluídas</span>
+                <span class="kpi-badge purple">Spec-Driven</span>
+              </div>
+              <div class="kpi-value" id="kpi-completed-slices">0 / 3</div>
+              <div class="kpi-desc">Progresso do Master Blueprint atual</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Auditorias Realizadas</span>
+                <span class="kpi-badge amber">Harsh Critics</span>
+              </div>
+              <div class="kpi-value" id="kpi-verdicts-count">0</div>
+              <div class="kpi-desc">Vereditos formais registrados no log</div>
+            </div>
+          </div>
+
+          <!-- SYSTEM STATUS & HERO BANNER -->
+          <div class="system-status-banner">
+            <div class="status-banner-left">
+              <span class="status-indicator-badge">SISTEMA ATIVO</span>
+              <h2 id="overview-epic-goal">Nenhum épico carregado. Conecte o Antigravity via MCP para inicializar.</h2>
+              <p class="status-meta">Orquestrador Staff Engineer pronto para coordenar fatias verticais e despachar a frota 3x3.</p>
+            </div>
+            <div class="status-banner-right">
+              <button class="hero-action-btn" onclick="switchTab('view-flow')">Ver Fluxograma ➔</button>
+            </div>
+          </div>
+
+          <!-- FLEET CARDS IN OVERVIEW -->
+          <div class="overview-fleet-grid">
+            <div class="overview-section-title">Status da Frota 3x3 (Pares Emparelhados)</div>
+            <div class="fleet-cards-row" id="overview-fleet-row">
+              <!-- Gerado via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: FLOWCHART & MICRO-KANBAN -->
+      <section class="tab-view" id="view-flow">
+        <div class="flow-container">
+          <div class="flow-toolbar">
+            <div class="toolbar-title-group">
+              <h2>Fluxograma de Fatias Verticais</h2>
+              <span class="toolbar-desc">Cada nó opera como um micro-kanban de ciclo fechado (Builder ➔ Critic ➔ Aprovado)</span>
+            </div>
+            <div class="kanban-legend">
+              <span class="leg-item"><span class="leg-color backlog"></span> Backlog</span>
+              <span class="leg-item"><span class="leg-color executing"></span> Builder</span>
+              <span class="leg-item"><span class="leg-color reviewing"></span> Critic</span>
+              <span class="leg-item"><span class="leg-color rejected"></span> Rejeitado</span>
+              <span class="leg-item"><span class="leg-color approved"></span> Aprovado</span>
+            </div>
+          </div>
+
+          <!-- FLOW NODES CANVAS -->
+          <div class="nodes-canvas" id="nodes-canvas"></div>
+
+          <!-- FINAL GATEKEEPER CARD -->
+          <div class="gatekeeper-card">
+            <div class="gatekeeper-header">
+              <div class="gatekeeper-icon">🛡️</div>
+              <div class="gatekeeper-info">
+                <h3>Gate de Integração Final (Orquestrador)</h3>
+                <p>Auditoria global de coesão, contratos e integração ponta a ponta</p>
+              </div>
+              <span class="gatekeeper-badge pending" id="gate-status">EM ANDAMENTO</span>
+            </div>
+            <div class="gatekeeper-progress-row">
+              <div class="progress-track">
+                <div class="progress-fill" id="global-progress-fill" style="width: 0%"></div>
+              </div>
+              <span class="progress-label" id="approved-slices-count">0 / 3</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: INTERACTIVE CODE GRAPH -->
+      <section class="tab-view" id="view-graph">
+        <div class="code-graph-container">
+          <div class="graph-toolbar">
+            <div class="graph-title-group">
+              <h2>Code Graph (Grafo de Dependências AST)</h2>
+              <span class="graph-desc">Análise de símbolos e conexões C#, Python e TS em milissegundos com ZERO consumo de tokens</span>
+            </div>
+            <div class="graph-search-box">
+              <input type="text" id="graph-search" placeholder="Filtrar classe ou arquivo...">
+              <button class="action-btn secondary" id="btn-refresh-graph">Recarregar Grafo</button>
+            </div>
+          </div>
+
+          <div class="graph-workspace">
+            <!-- CANVAS DO GRAFO -->
+            <div class="canvas-viewport" id="canvas-viewport">
+              <canvas id="graph-canvas"></canvas>
+              <div class="graph-overlay-hint">Clique em um nó para inspecionar o raio de impacto arquitetural</div>
+            </div>
+
+            <!-- DETALHES DO NÓ SELECIONADO -->
+            <div class="graph-inspector-panel" id="graph-inspector">
+              <div class="inspector-empty" id="inspector-empty">
+                <span>👈 Selecione um arquivo no grafo para ver suas dependências e raio de impacto</span>
+              </div>
+              <div class="inspector-content" id="inspector-content" style="display: none;">
+                <div class="inspector-badge" id="inspector-type">CSHARP</div>
+                <h3 id="inspector-filename">InputManager.cs</h3>
+                <p class="inspector-path" id="inspector-path">Core/InputManager.cs</p>
+
+                <div class="inspector-metrics-row">
+                  <div><span class="im-lbl">Linhas:</span> <strong id="inspector-lines">240</strong></div>
+                  <div><span class="im-lbl">Risco de Impacto:</span> <strong class="risk-badge low" id="inspector-risk">LOW</strong></div>
+                </div>
+
+                <div class="inspector-section">
+                  <h4>Símbolos & Classes Definidas</h4>
+                  <ul class="inspector-list" id="inspector-symbols"></ul>
+                </div>
+
+                <div class="inspector-section">
+                  <h4>Arquivos Dependentes Afetados</h4>
+                  <ul class="inspector-list highlight" id="inspector-dependents"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: GAUNTLET AUDIT LOG -->
+      <section class="tab-view" id="view-gauntlet">
+        <div class="gauntlet-view-container">
+          <div class="gauntlet-header">
+            <h2>Gauntlet Audit Log</h2>
+            <span class="gauntlet-desc">Registro histórico imutável das rodadas adversárias da banca revisora</span>
+          </div>
+          <div class="gauntlet-timeline-full" id="gauntlet-full-list">
+            <!-- Gerado via JS -->
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT SIDEBAR: TELEMETRY & HUMAN STEERING -->
+    <aside class="workspace-sidebar">
+      <!-- PARES 3x3 -->
+      <div class="sidebar-block fleet-block">
+        <div class="block-header">
+          <span class="block-title">Frota 3x3 (Ao Vivo)</span>
+          <span class="block-badge">Topologia Fixa</span>
+        </div>
+        <div class="sidebar-pairs-list" id="pairs-container">
+          <!-- Pares renderizados via JS -->
+        </div>
+      </div>
+
+      <!-- HUMAN STEERING CHAT -->
+      <div class="sidebar-block chat-block">
+        <div class="block-header">
+          <span class="block-title">Direcionamento (Steering)</span>
+          <span class="block-badge live">MCP Live</span>
+        </div>
+        <div class="steering-chat-feed" id="chat-messages"></div>
+        <form class="steering-form" id="chat-form">
+          <input type="text" id="chat-input" placeholder="Direcionar o orquestrador..." autocomplete="off">
+          <button type="submit" class="steering-send-btn">Enviar</button>
+        </form>
+      </div>
+    </aside>
+  </div>
+
+  <!-- INSPECTOR DRAWER -->
+  <div class="drawer-backdrop" id="drawer-backdrop">
+    <div class="drawer-panel" id="drawer-panel">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <span class="drawer-badge" id="drawer-slice-id">SLICE-1</span>
+          <h2 id="drawer-title">Título da Fatia Vertical</h2>
+        </div>
+        <button class="drawer-close-btn" id="drawer-close">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-tabs">
+          <button class="drawer-tab active" data-tab="tab-spec">Master Blueprint</button>
+          <button class="drawer-tab" data-tab="tab-criteria">Critérios de Aceite</button>
+          <button class="drawer-tab" data-tab="tab-gauntlet">Gauntlet Log</button>
+        </div>
+        <div class="drawer-tab-content active" id="tab-spec">
+          <div class="markdown-view" id="drawer-spec-content"></div>
+        </div>
+        <div class="drawer-tab-content" id="tab-criteria">
+          <div class="markdown-view" id="drawer-criteria-content"></div>
+        </div>
+        <div class="drawer-tab-content" id="tab-gauntlet">
+          <div class="gauntlet-timeline" id="drawer-gauntlet-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

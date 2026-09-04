@@ -1,0 +1,49 @@
+﻿# Agent Cockpit - Runtime & Dev Artifacts
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# IDE & OS
+.vscode/
+.idea/
+*.suo
+*.user
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Agent Cockpit runtime state (should NOT be committed)
+workflow_state.json
+
+# Packaged distributions (rebuilt by CI or install.bat)
+agent-cockpit.zip
+agent-cockpit.rar
+antigravity-skills-pack.zip
+antigravity-skills-pack.rar
+
+# Logs
+*.log
+uvicorn*.log
+
+# Compiled blueprints output (user-specific, project-level)
+01_*/
+02_*/
+03_*/
