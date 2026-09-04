@@ -1083,6 +1083,78 @@ function selectGraphNode(node) {
         depList.innerHTML = '<li style="color: var(--text-muted)">Nenhum arquivo dependente direto</li>';
       }
     });
+
+  // Carrega nota Obsidian do vault (cockpit-agent/vault)
+  const noteEditor = document.getElementById('inspector-note-editor');
+  const noteStatus = document.getElementById('note-save-status');
+  if (noteEditor) {
+    noteEditor.value = 'Carregando anotação de cockpit-agent/vault...';
+    if (noteStatus) noteStatus.textContent = '';
+
+    const targetRoot = (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+    const noteUrl = targetRoot ? `/api/vault/note?file=${encodeURIComponent(node.id)}&root=${encodeURIComponent(targetRoot)}` : `/api/vault/note?file=${encodeURIComponent(node.id)}`;
+
+    fetch(noteUrl)
+      .then(r => r.json())
+      .then(data => {
+        if (data.found) {
+          noteEditor.value = data.notes || '';
+          noteEditor.placeholder = 'Digite anotações arquiteturais que serão salvas no .md...';
+        } else {
+          noteEditor.value = '';
+          noteEditor.placeholder = 'Nenhuma anotação anterior. Digite aqui e clique em Salvar Nota.';
+        }
+      })
+      .catch(() => {
+        noteEditor.value = '';
+        noteEditor.placeholder = 'Erro ao carregar nota do vault.';
+      });
+  }
+}
+
+// Botão Salvar Nota do Vault
+const btnSaveNote = document.getElementById('btn-save-note');
+if (btnSaveNote) {
+  btnSaveNote.addEventListener('click', () => {
+    if (!selectedGraphNode) return;
+    const noteEditor = document.getElementById('inspector-note-editor');
+    const noteStatus = document.getElementById('note-save-status');
+    if (!noteEditor) return;
+
+    const content = noteEditor.value.trim();
+    const targetRoot = (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+
+    btnSaveNote.disabled = true;
+    btnSaveNote.textContent = 'Salvando...';
+
+    fetch('/api/vault/note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file: selectedGraphNode.id,
+        content: content,
+        root: targetRoot
+      })
+    })
+    .then(r => r.json())
+    .then(res => {
+      btnSaveNote.disabled = false;
+      btnSaveNote.textContent = 'Salvar Nota';
+      if (res.status === 'ok') {
+        if (noteStatus) {
+          noteStatus.textContent = '✓ Salvo em cockpit-agent/vault!';
+          setTimeout(() => { if (noteStatus) noteStatus.textContent = ''; }, 3500);
+        }
+      } else {
+        alert(res.message || 'Erro ao salvar nota.');
+      }
+    })
+    .catch(err => {
+      btnSaveNote.disabled = false;
+      btnSaveNote.textContent = 'Salvar Nota';
+      alert('Erro na requisição: ' + err);
+    });
+  });
 }
 
 if (btnRefreshGraph) {

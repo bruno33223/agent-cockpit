@@ -2,7 +2,7 @@ import os
 import sys
 import json
 import asyncio
-from typing import List
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -178,12 +178,36 @@ def post_approve_gate(payload: GateApprovalPayload):
     return db.approve_gate(payload.gate, payload.approved_by)
 
 @app.get("/api/handoff")
-def get_handoff():
+def get_handoff(root: Optional[str] = None):
     import workflow_lock
-    data = workflow_lock.read_latest_handoff(".")
+    target_root = root or db.get_project_root() or "."
+    data = workflow_lock.read_latest_handoff(target_root)
     if not data:
         return {"status": "NO_HANDOFF_FOUND", "content": "# Nenhum HANDOFF.md encontrado\nExecute a tool MCP `generate_handoff` na conclusão do Épico."}
     return data
+
+@app.get("/api/vault/note")
+def get_vault_note(file: str, root: Optional[str] = None):
+    from code_graph import get_file_vault_note
+    target_root = root or db.get_project_root() or "."
+    return get_file_vault_note(target_root, file)
+
+class VaultNotePayload(BaseModel):
+    file: str
+    content: str
+    root: Optional[str] = None
+
+@app.post("/api/vault/note")
+def post_vault_note(payload: VaultNotePayload):
+    from code_graph import save_file_vault_note
+    target_root = payload.root or db.get_project_root() or "."
+    return save_file_vault_note(target_root, payload.file, payload.content)
+
+@app.post("/api/vault/sync")
+def post_vault_sync(payload: Optional[ProjectRootPayload] = None):
+    from code_graph import get_graph_elements_for_ui
+    target_root = (payload and payload.path) or db.get_project_root() or "."
+    return get_graph_elements_for_ui(target_root)
 
 # Monta arquivos estáticos do dashboard visual
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))

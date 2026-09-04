@@ -950,6 +950,66 @@ body {
   color: var(--text-primary);
 }
 
+.vault-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan-bright);
+  background: var(--cyan-dim);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.inspector-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.inspector-section-header h4 {
+  margin-bottom: 0;
+}
+
+.btn-sm {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+#inspector-note-editor {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  resize: vertical;
+  min-height: 110px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+#inspector-note-editor:focus {
+  border-color: var(--cyan-bright);
+}
+
+.note-save-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--green-bright);
+  margin-top: 4px;
+  min-height: 14px;
+}
+
 /* VIEW 4: GAUNTLET VIEW */
 .gauntlet-view-container {
   padding: 24px;

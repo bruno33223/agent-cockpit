@@ -208,8 +208,14 @@ def handle_tool_call(name: str, args: dict) -> dict:
             import workflow_lock
             bp_dir = args.get("blueprint_dir")
             if not bp_dir:
-                found = workflow_lock.find_latest_blueprint_dir(".")
-                bp_dir = found if found else f"01_{args.get('epic_name', 'epic').lower().replace(' ', '_')}"
+                found = workflow_lock.find_latest_blueprint_dir(proj_root)
+                bp_dir = found if found else os.path.join(workflow_lock.get_blueprints_base_dir(proj_root), f"01_{args.get('epic_name', 'epic').lower().replace(' ', '_')}")
+            elif not os.path.isabs(bp_dir):
+                norm = bp_dir.replace('\\', '/')
+                if not norm.startswith("cockpit-agent/"):
+                    bp_dir = os.path.join(workflow_lock.get_blueprints_base_dir(proj_root), bp_dir)
+                else:
+                    bp_dir = os.path.join(proj_root, bp_dir)
             lock_path = workflow_lock.create_blueprint_lock(
                 blueprint_dir=bp_dir,
                 epic_name=args.get("epic_name", ""),

@@ -115,6 +115,18 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 
 ---
 
+## 🪐 REGRA DE OURO 6: DIRETÓRIO PADRONIZADO `./cockpit-agent` & OBSIDIAN VAULT
+
+> [!CRITICAL]
+> **PROIBIDO ESPALHAR BLUEPRINTS E NOTAS NA RAIZ DO REPOSITÓRIO ALVO**
+> Todos os arquivos de inteligência e governança do Cockpit devem residir obrigatoriamente sob `./cockpit-agent/`:
+> 
+> 1. **Master Blueprints & Locks:** Salvos exclusivamente em `./cockpit-agent/blueprints/{NN_nome_epico}/MASTER_BLUEPRINT.md` e `blueprint.lock.json`.
+> 2. **Obsidian Vault (Dieta de Contexto Zero-Token):** Antes de alterar código, os Subagentes devem consultar as notas em `./cockpit-agent/vault/{caminho_arquivo}.md` para inspecionar dependências, contratos e raio de impacto sem gastar tokens lendo arquivos desnecessários.
+> 3. **Living Documentation:** Ao concluir uma fatia vertical aprovada no Gauntlet, o Subagente deve atualizar a seção `<!-- COCKPIT_NOTES_START -->` do arquivo `.md` correspondente no vault com as decisões arquiteturais consolidadas.
+
+---
+
 ## 1. Topologia Operacional Fixa: Regra dos 3 Subagentes (3x3 Emparelhados)
 
 > [!IMPORTANT]

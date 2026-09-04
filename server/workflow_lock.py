@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import json
 import time
@@ -98,16 +98,53 @@ def write_handoff_document(
 
     return handoff_path
 
-def find_latest_blueprint_dir(base_dir: str = ".") -> Optional[str]:
-    """Encontra a pasta de blueprint numerada mais recente (ex: 02_..., 01_...)."""
+import shutil
+
+def migrate_legacy_blueprints(base_dir: str = ".") -> List[str]:
+    """Copia pastas legadas de blueprints numeradas (ex: 04_...) para cockpit-agent/blueprints/."""
+    base_dir = os.path.abspath(base_dir)
+    target_base = os.path.join(base_dir, "cockpit-agent", "blueprints")
+    os.makedirs(target_base, exist_ok=True)
+    migrated = []
     try:
-        dirs = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d)) and re.match(r"^\d\d_", d)]
-        if not dirs:
-            return None
-        dirs.sort(reverse=True)
-        return os.path.abspath(os.path.join(base_dir, dirs[0]))
+        for item in os.listdir(base_dir):
+            src = os.path.join(base_dir, item)
+            if os.path.isdir(src) and re.match(r"^\d\d_", item):
+                dst = os.path.join(target_base, item)
+                if not os.path.exists(dst):
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                    migrated.append(item)
     except Exception:
-        return None
+        pass
+    return migrated
+
+def get_blueprints_base_dir(base_dir: str = ".") -> str:
+    """Retorna o diretório oficial padronizado para blueprints: cockpit-agent/blueprints."""
+    bp_dir = os.path.join(os.path.abspath(base_dir), "cockpit-agent", "blueprints")
+    os.makedirs(bp_dir, exist_ok=True)
+    migrate_legacy_blueprints(base_dir)
+    return bp_dir
+
+def find_latest_blueprint_dir(base_dir: str = ".") -> Optional[str]:
+    """
+    Encontra a pasta de blueprint numerada mais recente (ex: 04_..., 01_...).
+    Verifica primeiro em cockpit-agent/blueprints/ e depois na raiz (retrocompatibilidade).
+    """
+    migrate_legacy_blueprints(base_dir)
+    candidate_bases = [
+        os.path.join(base_dir, "cockpit-agent", "blueprints"),
+        base_dir
+    ]
+    for c_dir in candidate_bases:
+        if os.path.exists(c_dir):
+            try:
+                dirs = [d for d in os.listdir(c_dir) if os.path.isdir(os.path.join(c_dir, d)) and re.match(r"^\d\d_", d)]
+                if dirs:
+                    dirs.sort(reverse=True)
+                    return os.path.abspath(os.path.join(c_dir, dirs[0]))
+            except Exception:
+                pass
+    return None
 
 def read_latest_handoff(base_dir: str = ".") -> Optional[Dict[str, Any]]:
     """Lê o último HANDOFF.md disponível no repositório."""

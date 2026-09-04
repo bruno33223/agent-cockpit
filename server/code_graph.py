@@ -101,7 +101,7 @@ def scan_codebase_graph(root_dir: str, max_files: int = 500) -> Dict[str, Any]:
     files_map: Dict[str, Any] = {}
     symbol_to_files: Dict[str, List[str]] = {}
 
-    ignored_dirs = {'.git', 'bin', 'obj', 'node_modules', '.venv', 'venv', '__pycache__', '.agents', '.gemini', 'dist', 'build', '.idea', '.vscode'}
+    ignored_dirs = {'.git', 'bin', 'obj', 'node_modules', '.venv', 'venv', '__pycache__', '.agents', '.gemini', 'dist', 'build', '.idea', '.vscode', 'cockpit-agent', '.cockpit-agent', 'agent-cockpit'}
 
     count = 0
     for root, dirs, files in os.walk(root_dir):
@@ -244,9 +244,211 @@ def get_graph_elements_for_ui(root_dir: str = ".") -> Dict[str, Any]:
             "imports": info.get("imports", [])
         })
 
+    # Sincroniza automaticamente o Obsidian Vault em cockpit-agent/vault/
+    vault_dir = sync_obsidian_vault(root_dir, files_map, impact_map, node_degrees)
+
     return {
         "nodes": nodes,
         "edges": edges,
         "total_nodes": len(nodes),
-        "total_edges": len(edges)
+        "total_edges": len(edges),
+        "vault_path": os.path.relpath(vault_dir, root_dir).replace('\\', '/')
     }
+
+def sync_obsidian_vault(
+    root_dir: str,
+    files_map: Dict[str, Any],
+    impact_map: Dict[str, Set[str]],
+    node_degrees: Dict[str, int]
+) -> str:
+    """
+    Gera e mantém sincronizado o Obsidian Vault em {root_dir}/cockpit-agent/vault/.
+    Cria arquivos .md com YAML Frontmatter, wikilinks [[...]] e preserva anotações humanas/agentes.
+    Garante também a criação da pasta de blueprints em {root_dir}/cockpit-agent/blueprints/.
+    """
+    root_dir = os.path.abspath(root_dir)
+    cockpit_dir = os.path.join(root_dir, "cockpit-agent")
+    vault_dir = os.path.join(cockpit_dir, "vault")
+    blueprints_dir = os.path.join(cockpit_dir, "blueprints")
+
+    os.makedirs(vault_dir, exist_ok=True)
+    os.makedirs(blueprints_dir, exist_ok=True)
+
+    # Configuração básica do Obsidian para reconhecer wikilinks nativos
+    obsidian_conf_dir = os.path.join(vault_dir, ".obsidian")
+    os.makedirs(obsidian_conf_dir, exist_ok=True)
+    app_json = os.path.join(obsidian_conf_dir, "app.json")
+    if not os.path.exists(app_json):
+        try:
+            with open(app_json, "w", encoding="utf-8") as f:
+                f.write('{"useMarkdownLinks": false}\n')
+        except Exception:
+            pass
+
+    clusters_count: Dict[str, int] = {}
+    top_hubs: List[Dict[str, Any]] = []
+
+    for file_path, info in files_map.items():
+        ext = os.path.splitext(file_path)[1].lower().replace('.', '')
+        parts = file_path.split('/')
+        cluster = parts[0] if len(parts) > 1 else "Raiz"
+        clusters_count[cluster] = clusters_count.get(cluster, 0) + 1
+
+        deg = node_degrees.get(file_path, 0)
+        dependents = sorted(list(set(impact_map.get(file_path, []))))
+        impact_risk = "LOW" if len(dependents) <= 1 else ("MEDIUM" if len(dependents) <= 4 else "HIGH")
+        lines = info.get("lines", 0)
+
+        top_hubs.append({
+            "path": file_path,
+            "label": os.path.basename(file_path),
+            "degree": deg,
+            "dependents_count": len(dependents),
+            "cluster": cluster
+        })
+
+        md_file_path = os.path.join(vault_dir, f"{file_path}.md")
+        os.makedirs(os.path.dirname(md_file_path), exist_ok=True)
+
+        existing_notes = ""
+        if os.path.exists(md_file_path):
+            try:
+                with open(md_file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                m = re.search(r"<!-- COCKPIT_NOTES_START -->(.*?)<!-- COCKPIT_NOTES_END -->", content, re.DOTALL)
+                if m:
+                    existing_notes = m.group(1).strip()
+            except Exception:
+                pass
+
+        if not existing_notes:
+            existing_notes = "_Nenhuma anotação adicionada ainda. Registre aqui decisões arquiteturais ou contratos deste arquivo._"
+
+        symbols = sorted(list(set(info.get("defined_symbols", []))))
+        symbols_md = "\n".join([f"- `{s}`" for s in symbols]) if symbols else "- _Nenhum símbolo específico exportado_"
+
+        dependents_md = "\n".join([f"- [[{d}.md|{os.path.basename(d)}]]" for d in dependents]) if dependents else "- _Nenhum arquivo dependente direto_"
+
+        imports = sorted(list(set(info.get("imports", []))))
+        imports_md = "\n".join([f"- `{imp}`" for imp in imports]) if imports else "- _Nenhum import rastreado_"
+
+        md_content = f"""---
+file: {file_path}
+cluster: {cluster}
+language: {ext}
+lines: {lines}
+impact_risk: {impact_risk}
+degree: {deg}
+tags:
+  - cluster/{cluster}
+  - lang/{ext}
+  - risk/{impact_risk.lower()}
+---
+
+# {os.path.basename(file_path)}
+
+> 📍 **Caminho:** `{file_path}` | 📏 **Linhas:** {lines} | ⚠️ **Risco de Impacto:** `{impact_risk}` | 🪐 **Cluster:** `{cluster}`
+
+## 🧩 Símbolos Exportados
+{symbols_md}
+
+## 🔗 Dependências Reversas (Arquivos Afetados por Alterações Aqui)
+{dependents_md}
+
+## 📦 Importações & Usings Declarados
+{imports_md}
+
+## 📝 Notas & Decisões Arquiteturais (Cockpit Agent)
+<!-- COCKPIT_NOTES_START -->
+{existing_notes}
+<!-- COCKPIT_NOTES_END -->
+"""
+        try:
+            with open(md_file_path, "w", encoding="utf-8") as f:
+                f.write(md_content)
+        except Exception:
+            pass
+
+    # Gera INDEX.md mestre no Vault
+    top_hubs.sort(key=lambda x: (x["dependents_count"], x["degree"]), reverse=True)
+    hubs_md = "\n".join([f"- [[{h['path']}.md|{h['label']}]] (`{h['cluster']}`) — {h['dependents_count']} dependentes diretos" for h in top_hubs[:15]])
+    clusters_md = "\n".join([f"- **{c}**: {cnt} arquivos" for c, cnt in sorted(clusters_count.items(), key=lambda x: x[1], reverse=True)])
+
+    index_path = os.path.join(vault_dir, "INDEX.md")
+    index_content = f"""---
+tags:
+  - cockpit/index
+---
+
+# 🛸 Cockpit Agent - Knowledge Graph Index
+
+> **Projeto:** `{os.path.basename(root_dir)}`
+> **Total de Arquivos Mapeados:** {len(files_map)}
+> **Total de Conexões:** {sum(node_degrees.values()) // 2}
+> **Obsidian Vault:** `./cockpit-agent/vault`
+> **Master Blueprints:** `./cockpit-agent/blueprints`
+
+---
+
+## 🪐 Módulos / Clusters Arquiteturais
+{clusters_md}
+
+---
+
+## ⚡ Top 15 Hubs de Maior Impacto Arquitetural
+{hubs_md}
+"""
+    try:
+        with open(index_path, "w", encoding="utf-8") as f:
+            f.write(index_content)
+    except Exception:
+        pass
+
+    return vault_dir
+
+def get_file_vault_note(root_dir: str, file_path: str) -> Dict[str, Any]:
+    """Retorna o conteúdo da nota Markdown no vault para o arquivo especificado."""
+    root_dir = os.path.abspath(root_dir)
+    md_path = os.path.join(root_dir, "cockpit-agent", "vault", f"{file_path}.md")
+    if not os.path.exists(md_path):
+        return {"found": False, "content": "", "path": md_path}
+    try:
+        with open(md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        m = re.search(r"<!-- COCKPIT_NOTES_START -->(.*?)<!-- COCKPIT_NOTES_END -->", content, re.DOTALL)
+        notes = m.group(1).strip() if m else ""
+
+        return {
+            "found": True,
+            "full_content": content,
+            "notes": notes,
+            "path": md_path
+        }
+    except Exception as e:
+        return {"found": False, "content": "", "error": str(e), "path": md_path}
+
+def save_file_vault_note(root_dir: str, file_path: str, notes_content: str) -> Dict[str, Any]:
+    """Atualiza a seção de anotações do arquivo no vault preservando o esqueleto."""
+    root_dir = os.path.abspath(root_dir)
+    md_path = os.path.join(root_dir, "cockpit-agent", "vault", f"{file_path}.md")
+    if not os.path.exists(md_path):
+        return {"status": "error", "message": f"Nota não encontrada em {md_path}"}
+    try:
+        with open(md_path, "r", encoding="utf-8") as f:
+            existing = f.read()
+
+        start_tag = "<!-- COCKPIT_NOTES_START -->"
+        end_tag = "<!-- COCKPIT_NOTES_END -->"
+        if start_tag in existing and end_tag in existing:
+            prefix = existing.split(start_tag)[0] + start_tag + "\n"
+            suffix = "\n" + end_tag + existing.split(end_tag)[1]
+            new_full = prefix + notes_content.strip() + suffix
+        else:
+            new_full = existing + f"\n\n## 📝 Notas & Decisões Arquiteturais (Cockpit Agent)\n{start_tag}\n{notes_content.strip()}\n{end_tag}\n"
+
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(new_full)
+        return {"status": "ok", "path": md_path}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
