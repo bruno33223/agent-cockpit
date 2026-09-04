@@ -24,11 +24,10 @@ Quando o usuário disser:
 > **1. O ORQUESTRADOR NUNCA CODA DIRETAMENTE:**
 > O Orquestrador está **TERMINANTEMENTE PROIBIDO** de utilizar `write_to_file` ou `replace_file_content` para implementar a aplicação. Toda codificação deve ser feita pelos subagentes executores via `invoke_subagent`.
 > 
-> **2. PROIBIDA A EXPLORAÇÃO BRUTA DE ARQUIVOS (DIETA ZERO-TOKEN):**
-> É **TERMINANTEMENTE PROIBIDO** sair fazendo dezenas de `grep_search` e abrindo múltiplos arquivos de código com `view_file` para "entender a situação".
-> O fluxo OBRIGATÓRIO de entendimento é:
-> - Chamar `query_symbol_impact` e `analyze_codebase_graph` no MCP para obter o grafo de dependências com custo zero de tokens.
-> - Consultar `./cockpit-agent/vault/INDEX.md` ou as notas específicas `./cockpit-agent/vault/{arquivo}.md` (que já trazem classes, métodos e dependências resumidas).
+> **2. DIVISÃO ESTRITA DE LEITURA (VAULT PARA ORQUESTRADOR, CÓDIGO PARA BUILDERS):**
+> - **O Orquestrador lê EXCLUSIVAMENTE notas `.md` do Vault:** Consulta apenas `query_symbol_impact`/`analyze_codebase_graph` e as notas em `./cockpit-agent/vault/{arquivo}.md` (que já trazem classes, métodos, contratos e dependências).
+> - **PROIBIÇÃO TOTAL DE LEITURA DE CÓDIGO FONTE PELO ORQUESTRADOR:** O Orquestrador está **TERMINANTEMENTE PROIBIDO** de usar `view_file` em arquivos de código de produção (`.cs`, `.ts`, `.py`, `.js`, etc.).
+> - **Quem lê o código de produção?** Exclusivamente os Subagentes Executores (Builders) após serem despachados via `invoke_subagent`. Eles lerão as linhas específicas em seus contextos isolados.
 > 
 > **3. PROIBIDO EXECUTAR BUILDS OU TESTES NO TERMINAL RAW:**
 > É **PROIBIDO** executar `dotnet run`, `dotnet test`, `pytest` ou `npm test` diretamente via `run_command`. Isso cospe centenas de linhas de lixo e polui a janela de contexto.
