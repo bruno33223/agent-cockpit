@@ -459,49 +459,35 @@ setInterval(async () => {
 }, 2000);
 
 // 5. INTERACTIVE CODE GRAPH (CANVAS 2D)
-const projectPathInput = document.getElementById('project-path-input');
-const btnScanProject = document.getElementById('btn-scan-project');
+function getActiveProjectRoot() {
+  return localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+}
+
+function deselectGraphNode() {
+  selectedGraphNode = null;
+  drawGraph();
+
+  if (inspectorEmpty) inspectorEmpty.style.display = 'flex';
+  if (inspectorContent) inspectorContent.style.display = 'none';
+
+  const noteEditor = document.getElementById('inspector-note-editor');
+  if (noteEditor) noteEditor.value = '';
+  const noteStatus = document.getElementById('note-save-status');
+  if (noteStatus) noteStatus.textContent = '';
+}
 
 function initOrRefreshGraph(customRoot = null) {
-  const targetRoot = (typeof customRoot === 'string' && customRoot.trim()) ? customRoot.trim() : (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
-  if (projectPathInput && targetRoot) {
-    projectPathInput.value = targetRoot;
-  }
+  const targetRoot = (typeof customRoot === 'string' && customRoot.trim()) ? customRoot.trim() : getActiveProjectRoot();
   const url = targetRoot ? `/api/graph?root=${encodeURIComponent(targetRoot)}` : '/api/graph';
   fetch(url)
     .then(r => r.json())
     .then(data => {
       graphData = data;
-      // Reseta zoom e pan para centralizar a visão do grafo
-      graphZoom = 1;
-      graphPanX = 0;
-      graphPanY = 0;
-      selectedGraphNode = null;
-      hoveredGraphNode = null;
+      deselectGraphNode();
+      activeClusterFilter = null;
       setupCanvasGraph();
     })
     .catch(err => console.error('Erro carregando /api/graph:', err));
-}
-
-if (btnScanProject) {
-  btnScanProject.addEventListener('click', () => {
-    const path = projectPathInput.value.trim();
-    if (!path) return;
-    localStorage.setItem('cockpit_target_project', path);
-    fetch('/api/project_root', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path })
-    })
-    .then(r => r.json())
-    .then(res => {
-      if (res.status === 'ok') {
-        initOrRefreshGraph(path);
-      } else {
-        alert(res.message || 'Erro ao definir pasta.');
-      }
-    });
-  });
 }
 
 let graphNodes = [];
@@ -565,6 +551,9 @@ function renderClusterFilterPills(nodes) {
   container.querySelectorAll('.cluster-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       const targetCluster = pill.getAttribute('data-cluster');
+      // Desseleciona qualquer nó ativo para permitir filtrar o cluster limpo
+      deselectGraphNode();
+
       if (targetCluster === 'ALL' || activeClusterFilter === targetCluster) {
         activeClusterFilter = null;
       } else {
@@ -934,15 +923,28 @@ if (graphCanvas) {
     drawGraph();
   }, { passive: false });
 
+  let mouseDownScreenX = 0;
+  let mouseDownScreenY = 0;
+  let hasDraggedMouse = false;
+
   graphCanvas.addEventListener('mousedown', (e) => {
     const rect = graphCanvas.getBoundingClientRect();
     const x = (e.clientX - rect.left - graphPanX) / graphZoom;
     const y = (e.clientY - rect.top - graphPanY) / graphZoom;
 
+    mouseDownScreenX = e.clientX;
+    mouseDownScreenY = e.clientY;
+    hasDraggedMouse = false;
+
     const clicked = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 5);
     if (clicked) {
       draggedGraphNode = clicked;
-      selectGraphNode(clicked);
+      // Toggle de foco: se clicar no mesmo nó que já estava selecionado, DESFOCA / DESSELECIONA!
+      if (selectedGraphNode && selectedGraphNode.id === clicked.id) {
+        deselectGraphNode();
+      } else {
+        selectGraphNode(clicked);
+      }
     } else {
       isGraphPanning = true;
       startPanX = e.clientX - graphPanX;
@@ -951,6 +953,10 @@ if (graphCanvas) {
   });
 
   window.addEventListener('mousemove', (e) => {
+    if (Math.hypot(e.clientX - mouseDownScreenX, e.clientY - mouseDownScreenY) > 4) {
+      hasDraggedMouse = true;
+    }
+
     if (isGraphPanning) {
       graphPanX = e.clientX - startPanX;
       graphPanY = e.clientY - startPanY;
@@ -979,6 +985,10 @@ if (graphCanvas) {
   });
 
   window.addEventListener('mouseup', () => {
+    // Se clicou no fundo vazio do canvas e NÃO arrastou: DESFOCA / DESSELECIONA!
+    if (isGraphPanning && !hasDraggedMouse) {
+      deselectGraphNode();
+    }
     isGraphPanning = false;
     draggedGraphNode = null;
     if (graphCanvas) graphCanvas.style.cursor = 'grab';
@@ -1091,7 +1101,7 @@ function selectGraphNode(node) {
     noteEditor.value = 'Carregando anotação de cockpit-agent/vault...';
     if (noteStatus) noteStatus.textContent = '';
 
-    const targetRoot = (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+    const targetRoot = getActiveProjectRoot();
     const noteUrl = targetRoot ? `/api/vault/note?file=${encodeURIComponent(node.id)}&root=${encodeURIComponent(targetRoot)}` : `/api/vault/note?file=${encodeURIComponent(node.id)}`;
 
     fetch(noteUrl)
@@ -1122,7 +1132,7 @@ if (btnSaveNote) {
     if (!noteEditor) return;
 
     const content = noteEditor.value.trim();
-    const targetRoot = (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+    const targetRoot = getActiveProjectRoot();
 
     btnSaveNote.disabled = true;
     btnSaveNote.textContent = 'Salvando...';
