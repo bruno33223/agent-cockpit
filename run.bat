@@ -1,2 +1,2 @@
-﻿@echo off
-call "%~dp0start_cockpit.bat"
+@echo off
+call "%~dp0start_cockpit.bat" %*
