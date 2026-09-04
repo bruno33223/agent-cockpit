@@ -184,11 +184,25 @@
             </div>
           </div>
 
+          <!-- CLUSTER FILTER STRIP -->
+          <div class="graph-filter-strip">
+            <span class="filter-strip-label">Clusters:</span>
+            <div class="filter-pills-container" id="cluster-pills-container">
+              <!-- Renderizado dinamicamente via JS -->
+            </div>
+          </div>
+
           <div class="graph-workspace">
             <!-- CANVAS DO GRAFO -->
             <div class="canvas-viewport" id="canvas-viewport">
               <canvas id="graph-canvas"></canvas>
-              <div class="graph-overlay-hint">Clique em um nó para inspecionar o raio de impacto arquitetural</div>
+              <div class="graph-canvas-controls">
+                <button id="btn-zoom-in" title="Aproximar (+)">+</button>
+                <button id="btn-zoom-out" title="Afastar (−)">−</button>
+                <button id="btn-zoom-fit" title="Enquadrar Grafo (Reset)">⛶</button>
+              </div>
+              <div class="graph-stats-badge" id="graph-stats-badge">0 nós • 0 conexões</div>
+              <div class="graph-overlay-hint">Passe o mouse ou clique para inspecionar • Arraste para mover • Roda para zoom</div>
             </div>
 
             <!-- DETALHES DO NÓ SELECIONADO -->
@@ -326,6 +340,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.2"></script>
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>
