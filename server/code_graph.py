@@ -31,6 +31,9 @@ def extract_file_info(file_path: str) -> Dict[str, Any]:
     imports_usings: Set[str] = set()
     function_calls: Set[str] = set()
 
+    # Métodos e propriedades públicas
+    public_members: List[str] = []
+
     # C# (.cs)
     namespace_name = ""
     if ext == '.cs':
@@ -45,6 +48,14 @@ def extract_file_info(file_path: str) -> Dict[str, Any]:
             sym = m.group(1)
             if len(sym) >= 3 and sym not in BUILTIN_IGNORE:
                 defined_symbols.add(sym)
+        # Métodos públicos C#: public [async] [static] [override] [virtual] Type Name(...)
+        for m in re.finditer(r'^\s*public\s+(?:(?:static|async|override|virtual|abstract|sealed)\s+)*([A-Za-z0-9_<>\[\]]+)\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)', content, re.MULTILINE):
+            ret_type, name, params = m.group(1), m.group(2), m.group(3).strip()
+            # Ignora construtores simples ou palavras-chave comuns
+            if name not in BUILTIN_IGNORE and not name.startswith("get_") and not name.startswith("set_"):
+                # Encurta parâmetros para legibilidade
+                params_clean = re.sub(r'\s+', ' ', params)
+                public_members.append(f"{name}({params_clean}) -> {ret_type}")
 
     # Python (.py)
     elif ext == '.py':
@@ -58,10 +69,12 @@ def extract_file_info(file_path: str) -> Dict[str, Any]:
             sym = m.group(1)
             if len(sym) >= 3 and sym not in BUILTIN_IGNORE:
                 defined_symbols.add(sym)
-        for m in re.finditer(r'^\s*def\s+([A-Za-z0-9_]+)', content, re.MULTILINE):
-            sym = m.group(1)
-            if len(sym) >= 3 and sym not in BUILTIN_IGNORE:
-                defined_symbols.add(sym)
+        for m in re.finditer(r'^\s*def\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)(?:\s*->\s*([A-Za-z0-9_\[\],\s]+))?:', content, re.MULTILINE):
+            name, params, ret = m.group(1), m.group(2).strip(), (m.group(3) or "").strip()
+            if not name.startswith("__") and name not in BUILTIN_IGNORE:
+                ret_str = f" -> {ret}" if ret else ""
+                params_clean = re.sub(r'\s+', ' ', params)
+                public_members.append(f"{name}({params_clean}){ret_str}")
 
     # JS / TS (.js, .ts, .jsx, .tsx)
     elif ext in {'.js', '.ts', '.jsx', '.tsx'}:
@@ -69,14 +82,16 @@ def extract_file_info(file_path: str) -> Dict[str, Any]:
         for m in re.finditer(r'import\s+.*?from\s+[\'"](.*?)[\'"]', content):
             imports_usings.add(m.group(1))
         # classes, interfaces, types, functions
-        for m in re.finditer(r'\b(?:class|interface|type)\s+([A-Za-z0-9_]+)', content):
+        for m in re.finditer(r'\b(?:export\s+)?(?:class|interface|type)\s+([A-Za-z0-9_]+)', content):
             sym = m.group(1)
             if len(sym) >= 3 and sym not in BUILTIN_IGNORE:
                 defined_symbols.add(sym)
-        for m in re.finditer(r'\b(?:function|const|let)\s+([A-Za-z0-9_]+)', content):
-            sym = m.group(1)
-            if len(sym) >= 3 and sym not in BUILTIN_IGNORE:
-                defined_symbols.add(sym)
+        for m in re.finditer(r'\b(?:export\s+)?(?:function|const)\s+([A-Za-z0-9_]+)\s*(?:=\s*(?:async\s*)?\(([^)]*)\)|\(([^)]*)\))', content):
+            name = m.group(1)
+            params = (m.group(2) or m.group(3) or "").strip()
+            if len(name) >= 3 and name not in BUILTIN_IGNORE:
+                defined_symbols.add(name)
+                public_members.append(f"{name}({params})")
 
     # Inclui o próprio nome base do arquivo como símbolo de primeira classe
     base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -85,6 +100,7 @@ def extract_file_info(file_path: str) -> Dict[str, Any]:
 
     return {
         "defined_symbols": sorted(list(defined_symbols)),
+        "public_members": public_members[:25],
         "imports": sorted(list(imports_usings)),
         "namespace": namespace_name,
         "lines": content.count('\n') + 1,
@@ -332,6 +348,9 @@ def sync_obsidian_vault(
         imports = sorted(list(set(info.get("imports", []))))
         imports_md = "\n".join([f"- `{imp}`" for imp in imports]) if imports else "- _Nenhum import rastreado_"
 
+        members = info.get("public_members", [])
+        members_md = "\n".join([f"- `{m}`" for m in members]) if members else "- _Nenhum método ou membro público detectado_"
+
         md_content = f"""---
 file: {file_path}
 cluster: {cluster}
@@ -351,6 +370,9 @@ tags:
 
 ## 🧩 Símbolos Exportados
 {symbols_md}
+
+## ⚙️ Métodos Públicos & Assinaturas
+{members_md}
 
 ## 🔗 Dependências Reversas (Arquivos Afetados por Alterações Aqui)
 {dependents_md}

@@ -60,17 +60,17 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 >     {
 >       "TypeName": "self",
 >       "Role": "Executor 1 - Fatia 1 (Contratos/Infra)",
->       "Prompt": "Execute a Fatia 1. Chame a tool MCP get_slice_spec(slice_id='slice-1') para ler os seus critérios..."
+>       "Prompt": "Execute a Fatia 1. Chame a tool MCP get_slice_spec(slice_id='slice-1') para ler os seus critérios. Implemente apenas os arquivos sob seu LOCK. Ao concluir, atualize a seção <!-- COCKPIT_NOTES_START --> das notas em cockpit-agent/vault/ dos arquivos modificados com as decisões tomadas. Retorne estritamente o micro-JSON: {\"status\": \"DELIVERED\", \"slice_id\": \"slice-1\", \"files_count\": N}"
 >     },
 >     {
 >       "TypeName": "self",
 >       "Role": "Executor 2 - Fatia 2 (Dominio/Logica)",
->       "Prompt": "Execute a Fatia 2. Chame a tool MCP get_slice_spec(slice_id='slice-2') para ler os seus critérios..."
+>       "Prompt": "Execute a Fatia 2. Chame a tool MCP get_slice_spec(slice_id='slice-2') para ler os seus critérios. Implemente apenas os arquivos sob seu LOCK. Ao concluir, atualize a seção <!-- COCKPIT_NOTES_START --> das notas em cockpit-agent/vault/ dos arquivos modificados com as decisões tomadas. Retorne estritamente o micro-JSON: {\"status\": \"DELIVERED\", \"slice_id\": \"slice-2\", \"files_count\": N}"
 >     },
 >     {
 >       "TypeName": "self",
 >       "Role": "Executor 3 - Fatia 3 (UI/Integracao)",
->       "Prompt": "Execute a Fatia 3. Chame a tool MCP get_slice_spec(slice_id='slice-3') para ler os seus critérios..."
+>       "Prompt": "Execute a Fatia 3. Chame a tool MCP get_slice_spec(slice_id='slice-3') para ler os seus critérios. Implemente apenas os arquivos sob seu LOCK. Ao concluir, atualize a seção <!-- COCKPIT_NOTES_START --> das notas em cockpit-agent/vault/ dos arquivos modificados com as decisões tomadas. Retorne estritamente o micro-JSON: {\"status\": \"DELIVERED\", \"slice_id\": \"slice-3\", \"files_count\": N}"
 >     }
 >   ]
 > }
