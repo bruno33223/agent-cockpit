@@ -1,4 +1,4 @@
-﻿# 🚀 Guia Rápido: Como Instalar e Usar o Agent Cockpit
+# 🚀 Guia Rápido: Como Instalar e Usar o Agent Cockpit
 
 Bem-vindo ao **Agent Cockpit**! Este pacote transforma a forma como a IA desenvolve código no seu computador, criando um ecossistema offline de **telemetria visual em tempo real**, **grafo de dependências de custo zero** e **orquestração de agentes com testes automatizados**.
 
@@ -58,7 +58,7 @@ Ative a skill /cockpit e orquestre a implementação deste épico usando a skill
 ## 🛠️ Resolução de Problemas Comuns
 
 - **"O comando python não foi encontrado":** Reinstale o Python marcando a opção *"Add python.exe to PATH"*.
-- **"Porta 8765 já em uso":** Se você já tinha uma instância aberta, feche a janela preta do terminal anterior antes de abrir novamente.
+- **"Porta 8765 já em uso":** O inicializador detecta e reinicia automaticamente instâncias antigas do Cockpit. Se a porta estiver ocupada por outro aplicativo alheio (ex: Docker, PostgreSQL), o Cockpit avisa e **não encerra** o outro programa por segurança. Você pode iniciá-lo em outra porta facilmente com: `python run_cockpit.py --port 8766`.
 - **Configuração Manual do MCP (caso use Cursor ou outro cliente):**
   Adicione no seu `mcp_config.json`:
   ```json
