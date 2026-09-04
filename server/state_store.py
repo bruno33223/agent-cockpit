@@ -363,6 +363,57 @@ class StateStore:
             state = self.get_state()
             return state.get("project_root")
 
+    def prune_session_context(self, retain_last_messages: int = 3, retain_last_verdicts: int = 6) -> Dict[str, Any]:
+        """Compacta o contexto em memória: consolida mensagens antigas e logs intermediários,
+
+        mantendo apenas o status consolidado do Épico, os nós ativos e orientando o descarte de histórico detalhado.
+        """
+        with self.lock:
+            state = self.get_state()
+            
+            # 1. Compacta steering_messages antigas
+            all_msgs = state.get("steering_messages", [])
+            pruned_msgs_count = max(0, len(all_msgs) - retain_last_messages)
+            if pruned_msgs_count > 0:
+                summary_msg = {
+                    "id": f"msg-pruned-summary",
+                    "sender": "SYSTEM",
+                    "text": f"[CONTEXT_PRUNED] {pruned_msgs_count} mensagens de direcionamento anteriores foram consolidadas e arquivadas.",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "consumed": True
+                }
+                state["steering_messages"] = [summary_msg] + all_msgs[-retain_last_messages:]
+
+            # 2. Compacta o gauntlet_log de tentativas passadas (mantém apenas as mais recentes)
+            all_verdicts = state.get("gauntlet_log", [])
+            pruned_verdicts_count = max(0, len(all_verdicts) - retain_last_verdicts)
+            if pruned_verdicts_count > 0:
+                state["gauntlet_log"] = all_verdicts[-retain_last_verdicts:]
+
+            # 3. Garante que os nós mantenham apenas o feedback condensado mais recente
+            for node in state.get("nodes", []):
+                fb = node.get("latest_feedback", "")
+                if len(fb) > 300:
+                    node["latest_feedback"] = fb[:297] + "..."
+
+            self._save_state(state)
+
+        self._notify("CONTEXT_PRUNED", {
+            "pruned_messages": pruned_msgs_count,
+            "pruned_verdicts": pruned_verdicts_count,
+            "timestamp": time.strftime("%H:%M:%S")
+        })
+        self._notify("STATE_FULL", state)
+
+        return {
+            "status": "PRUNED",
+            "epic_name": state.get("epic", {}).get("name"),
+            "pruned_messages_count": pruned_msgs_count,
+            "pruned_verdicts_count": pruned_verdicts_count,
+            "active_nodes_count": len(state.get("nodes", [])),
+            "recommendation_for_agent": "Descarte do contexto ativo os turnos de depuração e transcrições de comandos passados. Mantenha em foco estritamente o MASTER_BLUEPRINT.md atual e o estado dos nós do grafo."
+        }
+
     def reset_state(self) -> Dict[str, Any]:
         with self.lock:
             state = default_initial_state()

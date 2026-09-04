@@ -79,6 +79,7 @@ Quando o usuário disser:
    - Registra veredito via `log_critique_verdict` e no histórico.
    - Retorno do Crítico: micro-JSON `{"status": "VERDICT", "slice_id": "slice-N", "verdict": "APROVADO"|"REJEITADO", "attempt": N}`.
 
-### Etapa 4: Finalização & Handoff
+### Etapa 4: Finalização, Compactação de Contexto & Handoff
 1. Quando todas as 3 fatias forem aprovadas, o Orquestrador audita a coesão global e chama `generate_handoff` no MCP.
-2. Emite exclusivamente o micro-ponteiro de conclusão no chat.
+2. Chama a tool MCP `context_pruner` para consolidar o histórico de mensagens e logs intermediários no servidor, limpando o contexto para o próximo ciclo.
+3. Emite exclusivamente o micro-ponteiro de conclusão no chat.

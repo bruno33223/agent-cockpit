@@ -190,6 +190,17 @@ TOOLS_DEFINITIONS = [
                 "gate_name": {"type": "string", "description": "Nome do portão ('gate_plan_approved', 'gate_ship_approved').", "default": "gate_ship_approved"}
             }
         }
+    },
+    {
+        "name": "context_pruner",
+        "description": "Compacta o contexto da sessão no servidor consolidando marcos concluídos e orienta o cliente MCP a descartar transcrições detalhadas de tarefas passadas, retendo apenas o MASTER_BLUEPRINT.md e os nós ativos.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "retain_last_messages": {"type": "integer", "description": "Quantidade de mensagens recentes de chat a reter (padrão: 3).", "default": 3},
+                "retain_last_verdicts": {"type": "integer", "description": "Quantidade de vereditos recentes do Gauntlet a reter (padrão: 6).", "default": 6}
+            }
+        }
     }
 ]
 
@@ -365,6 +376,12 @@ def handle_tool_call(name: str, args: dict) -> dict:
         gate_name = args.get("gate_name", "gate_ship_approved")
         status = db.get_gate_status(gate_name)
         return {"content": [{"type": "text", "text": json.dumps(status, indent=2, ensure_ascii=False)}]}
+
+    elif name == "context_pruner":
+        retain_msgs = args.get("retain_last_messages", 3)
+        retain_verdicts = args.get("retain_last_verdicts", 6)
+        res = db.prune_session_context(retain_last_messages=retain_msgs, retain_last_verdicts=retain_verdicts)
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
     else:
         return {"isError": True, "content": [{"type": "text", "text": f"Ferramenta desconhecida: {name}"}]}

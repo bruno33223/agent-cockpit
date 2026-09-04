@@ -119,28 +119,27 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 >    - Apenas as falhas reais (arquivo, linha exata, valor esperado vs recebido) são destiladas e devolvidas em um JSON compacto de 5 a 10 linhas.
 ---
 
-## 🏛️ REGRA DE OURO 5: DEFINIÇÃO ARQUITETURAL EXPLÍCITA NA BLUEPRINT (KISS, CLEAN, SOLID)
+## 🏛️ REGRA DE OURO 5: CALIBRAÇÃO ARQUITETURAL (KISS SOBERANO VS. A ARMADILHA DO SOLID)
 
 > [!CRITICAL]
-> **PROIBIDO DEIXAR DIRETRIZES ARQUITETURAIS IMPLÍCITAS**
-> O Orquestrador atua como o Staff Engineer / Arquiteto do sistema. É sua responsabilidade indelegável estabelecer a arquitetura antes que qualquer código seja escrito. Se a arquitetura ficar implícita ou for deixada à imaginação dos subagentes, o Builder produzirá código desordenado ou com over-engineering, e o Harsh Critic do Gauntlet não terá parâmetros objetivos para auditar.
->
-> **O `MASTER_BLUEPRINT.md` DEVE OBRIGATORIAMENTE CONTER A SEÇÃO: `### Diretrizes Arquiteturais & Padrões (KISS, Clean Architecture, SOLID)`:**
-> 1. **KISS & Pragmatismo Radical (Anti-Overengineering):**
->    - Proibido criar abstrações para requisitos hipotéticos futuros, fábricas desnecessárias ou indireção sem valor imediato.
->    - A implementação deve ser direta, legível e econômica.
-> 2. **Clean Architecture & Isolamento de Domínio:**
->    - Modelos e regras de negócio essenciais (Domain) devem ser puros e isolados de frameworks, bancos de dados, I/O e interfaces de usuário.
->    - As dependências apontam exclusivamente para dentro (Dependency Rule).
-> 3. **SOLID Aplicado:**
->    - *SRP (Single Responsibility):* Cada módulo ou classe deve ter uma única razão clara para ser modificada.
->    - *OCP (Open/Closed):* Código estável existente não é refatorado destrutivamente; novas capacidades são adicionadas por extensão e hooks.
->    - *LSP (Liskov Substitution):* Implementações cumprem rigorosamente contratos de base sem quebrar invariantes.
->    - *ISP (Interface Segregation):* Interfaces enxutas e focadas estritamente nas necessidades do consumidor.
->    - *DIP (Dependency Inversion):* Acoplamento em fronteiras através de contratos e abstrações, nunca em classes concretas de baixo nível.
-> 4. **Por que essa definição pertence ao Orquestrador?**
->    - O **`spec-orchestrator`** é quem desenha a solução e estabelece o contrato.
->    - O **`gauntlet-loop`** atua como a banca de auditoria: o Harsh Critic avalia o código construído contra exatamente essas diretrizes formalizadas no blueprint, eliminando qualquer subjetividade.
+> **A ARMADILHA DO SOLID VS. KISS NA IA (PROIBIÇÃO DE SOBRE-ENGENHARIA):**
+> Quando LLMs recebem instruções genéricas de "Design Patterns" e "SOLID", o vício mais comum é a sobre-engenharia: criar 4 camadas de abstração, Factories desnecessárias, interfaces sem implementação alternativa e injeção de dependência inflada para salvar um simples registro no banco ou desenhar um card.
+> 
+> **COMO CALIBRAR O ORQUESTRADOR PARA MÁXIMA VELOCIDADE E CONVERGÊNCIA EM 1-2 ITERAÇÕES:**
+> 1. **Force o KISS como Regra Soberana:**
+>    - Abstrações e interfaces SÓ DEVEM EXISTIR se houver variação real ou múltipla de comportamento em tempo de execução.
+>    - Se um caso de uso possui apenas uma implementação concreta, use código direto (ex: Repository/Controller/Service direto sem interfaces intermediárias cosméticas).
+>    - Proibido criar fábricas, adaptadores ou indireções sem valor imediato mensurável.
+> 2. **Gere o Esqueleto de Contratos Primeiro:**
+>    - No início do épico, o Orquestrador define apenas os modelos essenciais, migrações/esquema de banco e os contratos fundamentais de entrada e saída da API.
+> 3. **Separação Estrita de Camadas e Domínio:**
+>    - O Master Blueprint governa a lógica e fluxo da aplicação.
+>    - Scripts operacionais, infraestrutura, Docker, orquestração de containers ou VPS são tratados como scripts de apoio/automação utilitária — NUNCA tente forçá-los dentro dos padrões de design da aplicação.
+> 4. **Critério Objetivo do Harsh Critic:**
+>    - O Revisor (Harsh Critic) deve rejeitar sumariamente qualquer classe, fábrica ou camada de abstração que não resolva um requisito explícito da fatia vertical.
+> 
+> **COMPACTAÇÃO DE CONTEXTO DE SESSÃO (`context_pruner`):**
+> Conforme o Orquestrador conclui marcos ou épicos, ele deve acionar a tool MCP `context_pruner` para consolidar mensagens e logs passados no servidor, mantendo na memória estritamente o `MASTER_BLUEPRINT.md` ativo e os nós do grafo, evitando estouro de contexto.
 
 ---
 
