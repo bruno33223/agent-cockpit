@@ -1,4 +1,4 @@
-﻿# Agent Cockpit - Runtime & Dev Artifacts
+# Agent Cockpit - Runtime & Dev Artifacts
 
 # Python
 __pycache__/
@@ -47,3 +47,5 @@ uvicorn*.log
 01_*/
 02_*/
 03_*/
+cockpit-agent/
+
