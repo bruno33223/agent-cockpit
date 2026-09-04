@@ -137,6 +137,54 @@ TOOLS_DEFINITIONS = [
             },
             "required": ["test_command"]
         }
+    },
+    {
+        "name": "generate_handoff",
+        "description": "Gera e salva o arquivo padronizado HANDOFF.md na pasta da blueprint numerada e registra no Cockpit, consolidando a entrega e liberando a IA para emitir apenas um ponteiro compacto no chat.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "blueprint_dir": {"type": "string", "description": "Caminho da pasta da blueprint (ex: '01_tiro_carregado')."},
+                "epic_name": {"type": "string", "description": "Nome do Épico entregue."},
+                "summary": {"type": "string", "description": "Resumo técnico da implementação."},
+                "files_touched": {"type": "array", "items": {"type": "string"}, "description": "Lista dos arquivos criados ou modificados."},
+                "tests_passed": {"type": "boolean", "description": "Se os testes passaram com sucesso."},
+                "remaining_risks": {"type": "array", "items": {"type": "string"}, "description": "Riscos ou notas arquiteturais remanescentes."},
+                "next_steps": {"type": "string", "description": "Instrução cirúrgica para a próxima sessão."}
+            },
+            "required": ["blueprint_dir", "epic_name", "summary", "files_touched", "tests_passed"]
+        }
+    },
+    {
+        "name": "read_last_handoff",
+        "description": "Lê o último documento HANDOFF.md gerado no projeto para retomada instantânea de contexto em uma nova sessão sem precisar ler dezenas de arquivos de código.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "base_dir": {"type": "string", "description": "Diretório base do projeto (padrão: .)."}
+            }
+        }
+    },
+    {
+        "name": "get_slice_spec",
+        "description": "Retorna exclusivamente a especificação e critérios de aceitação de uma única fatia vertical (ex: slice-1), poupando 70-80% dos tokens de briefing dos subagentes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {"type": "string", "description": "Identificador da fatia (ex: 'slice-1', 'slice-2', 'slice-3')."}
+            },
+            "required": ["slice_id"]
+        }
+    },
+    {
+        "name": "check_human_gate",
+        "description": "Verifica se um portão humano de autorização (ex: 'gate_ship_approved') foi aprovado pelo usuário no dashboard do Cockpit.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "gate_name": {"type": "string", "description": "Nome do portão ('gate_plan_approved', 'gate_ship_approved').", "default": "gate_ship_approved"}
+            }
+        }
     }
 ]
 
@@ -147,7 +195,23 @@ def handle_tool_call(name: str, args: dict) -> dict:
             goal=args.get("goal", ""),
             vertical_slices=args.get("vertical_slices", [])
         )
-        return {"content": [{"type": "text", "text": f"Épico '{args.get('epic_name')}' sincronizado com sucesso no dashboard ({len(res.get('nodes', []))} nós atualizados)."}]}
+        try:
+            import workflow_lock
+            bp_dir = args.get("blueprint_dir")
+            if not bp_dir:
+                found = workflow_lock.find_latest_blueprint_dir(".")
+                bp_dir = found if found else f"01_{args.get('epic_name', 'epic').lower().replace(' ', '_')}"
+            lock_path = workflow_lock.create_blueprint_lock(
+                blueprint_dir=bp_dir,
+                epic_name=args.get("epic_name", ""),
+                goal=args.get("goal", ""),
+                slices=args.get("vertical_slices", [])
+            )
+            lock_msg = f" | Lock declarativo gerado em: {os.path.basename(lock_path)}"
+        except Exception as e:
+            lock_msg = f" | Aviso lock: {e}"
+
+        return {"content": [{"type": "text", "text": f"Épico '{args.get('epic_name')}' sincronizado no dashboard ({len(res.get('nodes', []))} nós atualizados){lock_msg}."}]}
 
     elif name == "update_agent_pulse":
         db.update_agent_pulse(
@@ -220,6 +284,67 @@ def handle_tool_call(name: str, args: dict) -> dict:
         timeout = args.get("timeout_sec", 60)
         res = run_distilled_tests(cmd, working_dir=cwd, timeout_sec=timeout)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
+
+    elif name == "generate_handoff":
+        import workflow_lock
+        import time
+        bp_dir = args.get("blueprint_dir")
+        if not bp_dir:
+            found = workflow_lock.find_latest_blueprint_dir(".")
+            bp_dir = found if found else "01_entrega"
+        epic_name = args.get("epic_name", "")
+        summary = args.get("summary", "")
+        files_touched = args.get("files_touched", [])
+        tests_passed = args.get("tests_passed", True)
+        remaining_risks = args.get("remaining_risks", [])
+        next_steps = args.get("next_steps", "")
+
+        path = workflow_lock.write_handoff_document(
+            blueprint_dir=bp_dir,
+            epic_name=epic_name,
+            summary=summary,
+            files_touched=files_touched,
+            tests_passed=tests_passed,
+            remaining_risks=remaining_risks,
+            next_steps=next_steps
+        )
+        handoff_meta = {
+            "blueprint_dir": os.path.basename(bp_dir),
+            "path": path,
+            "epic_name": epic_name,
+            "files_count": len(files_touched),
+            "tests_passed": tests_passed,
+            "created_at": time.strftime("%H:%M:%S")
+        }
+        db.set_last_handoff(handoff_meta)
+        result = {
+            "status": "HANDOFF_CREATED",
+            "handoff_file": path,
+            "files_documented": len(files_touched),
+            "tests_passed": tests_passed,
+            "chat_pointer": f"✅ **Épico Concluído: [{epic_name}]**\n- Fatias: 3/3 aprovadas pelo Harsh Critic\n- Handoff: [{path}]\n- Testes: {'PASSOU' if tests_passed else 'FALHOU'}\n- Dashboard: http://localhost:8765"
+        }
+        return {"content": [{"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=False)}]}
+
+    elif name == "read_last_handoff":
+        import workflow_lock
+        base_dir = args.get("base_dir", ".")
+        data = workflow_lock.read_latest_handoff(base_dir)
+        if not data:
+            return {"content": [{"type": "text", "text": json.dumps({"status": "NO_HANDOFF_FOUND"})}]}
+        return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}]}
+
+    elif name == "get_slice_spec":
+        slice_id = args.get("slice_id", "")
+        spec = db.get_slice_spec(slice_id)
+        if not spec:
+            return {"content": [{"type": "text", "text": json.dumps({"error": f"Fatia '{slice_id}' não encontrada no estado atual."})}]}
+        return {"content": [{"type": "text", "text": json.dumps(spec, indent=2, ensure_ascii=False)}]}
+
+    elif name == "check_human_gate":
+        gate_name = args.get("gate_name", "gate_ship_approved")
+        status = db.get_gate_status(gate_name)
+        return {"content": [{"type": "text", "text": json.dumps(status, indent=2, ensure_ascii=False)}]}
 
     else:
         return {"isError": True, "content": [{"type": "text", "text": f"Ferramenta desconhecida: {name}"}]}

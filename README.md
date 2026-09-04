@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # Agent Cockpit
 
@@ -50,7 +50,7 @@ AI Agent Fleet (3x3 pairs)         Agent Cockpit (local)
 
 | Tool | Description |
 | :--- | :--- |
-| `sync_blueprint` | Initialize flow nodes with the Master Blueprint and vertical slice acceptance criteria. |
+| `sync_blueprint` | Initialize flow nodes with the Master Blueprint and vertical slice acceptance criteria, generating `blueprint.lock.json`. |
 | `update_agent_pulse` | Update 3x3 pair telemetry and move a Kanban card in real time. |
 | `log_critique_verdict` | Record an approval or rejection in the Gauntlet Log. |
 | `fetch_user_steering` | Read queued human instructions from the dashboard chat. |
@@ -60,6 +60,10 @@ AI Agent Fleet (3x3 pairs)         Agent Cockpit (local)
 | `get_slice_failure_report` | Retrieve the distilled failure history for a specific vertical slice. |
 | `analyze_codebase_graph` | Scan the codebase with static AST analysis and return the full dependency graph. |
 | `query_symbol_impact` | Given a file or symbol, return every file that imports it (impact zone). |
+| `generate_handoff` | Generate a standardized `HANDOFF.md` in disk for seamless session continuity. |
+| `read_last_handoff` | Read the most recent `HANDOFF.md` to resume work in a new session with zero context drift. |
+| `get_slice_spec` | Retrieve only the isolated specification of a single vertical slice (saving 70-80% tokens). |
+| `check_human_gate` | Verify human authorization status for release/ship gates from the dashboard. |
 
 ### Zero-Token Codebase Map
 The **Code Graph** tab renders a force-directed interactive graph of your entire repository without calling any LLM. Uses regex-based AST parsing of C#, Python, JS, and TS files — runs in under 500ms on most projects.

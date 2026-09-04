@@ -39,6 +39,14 @@ const kpiCompletedSlices = document.getElementById('kpi-completed-slices');
 const kpiVerdictsCount = document.getElementById('kpi-verdicts-count');
 const gauntletFullList = document.getElementById('gauntlet-full-list');
 
+// Human Gate & Handoff
+const btnHumanGate = document.getElementById('btn-human-gate');
+const btnRefreshHandoff = document.getElementById('btn-refresh-handoff');
+const handoffDirDisplay = document.getElementById('handoff-dir-display');
+const handoffPathDisplay = document.getElementById('handoff-path-display');
+const handoffStatusBadge = document.getElementById('handoff-status-badge');
+const handoffRenderedContent = document.getElementById('handoff-rendered-content');
+
 // Canvas
 const graphCanvas = document.getElementById('graph-canvas');
 const canvasViewport = document.getElementById('canvas-viewport');
@@ -66,6 +74,8 @@ window.switchTab = function(viewId) {
 
   if (viewId === 'view-graph') {
     initOrRefreshGraph();
+  } else if (viewId === 'view-handoff') {
+    loadHandoff();
   }
 };
 
@@ -100,8 +110,9 @@ function initWebSocket() {
         renderAll();
       } else if (data.event === 'STEERING_RECEIVED' || data.event === 'ORCHESTRATOR_MESSAGE') {
         renderChatMessages();
-      } else if (data.event === 'PULSE_UPDATED' || data.event === 'VERDICT_LOGGED') {
+      } else if (data.event === 'PULSE_UPDATED' || data.event === 'VERDICT_LOGGED' || data.event === 'GATE_APPROVED' || data.event === 'HANDOFF_UPDATED') {
         renderAll();
+        loadHandoff();
       }
     } catch (e) {
       console.error('Erro processando mensagem WebSocket:', e);
@@ -151,6 +162,72 @@ function renderHeaderAndKPIs() {
   kpiFirstPass.textContent = `${firstPassRate}%`;
   kpiCompletedSlices.textContent = `${approved} / ${total}`;
   kpiVerdictsCount.textContent = `${logs.length}`;
+
+  // Human Gate Button
+  if (btnHumanGate) {
+    const isApproved = state.human_gates && state.human_gates.gate_ship_approved;
+    if (isApproved) {
+      btnHumanGate.className = 'action-btn gate-btn approved';
+      btnHumanGate.textContent = 'Gate: Aprovado';
+      btnHumanGate.title = `Release aprovado por ${state.human_gates.approved_by || 'usuário'}`;
+    } else {
+      btnHumanGate.className = 'action-btn gate-btn pending';
+      btnHumanGate.textContent = 'Gate: Pendente (Aprovar)';
+      btnHumanGate.title = 'Clique para aprovar e autorizar o release da entrega';
+    }
+  }
+}
+
+// HANDOFF LOADER
+async function loadHandoff() {
+  if (!handoffRenderedContent) return;
+  handoffRenderedContent.textContent = 'Carregando handoff em disco...';
+  try {
+    const res = await fetch('/api/handoff');
+    const data = await res.json();
+    if (data.status === 'NO_HANDOFF_FOUND') {
+      if (handoffDirDisplay) handoffDirDisplay.textContent = 'Nenhum detectado';
+      if (handoffPathDisplay) handoffPathDisplay.textContent = 'HANDOFF.md';
+      if (handoffStatusBadge) {
+        handoffStatusBadge.className = 'meta-value badge aguardando';
+        handoffStatusBadge.textContent = 'Aguardando';
+      }
+      handoffRenderedContent.innerHTML = `<p class="empty-state">${escapeHtml(data.content)}</p>`;
+      return;
+    }
+    if (handoffDirDisplay) handoffDirDisplay.textContent = data.blueprint_dir || 'blueprint';
+    if (handoffPathDisplay) handoffPathDisplay.textContent = data.handoff_path || 'HANDOFF.md';
+    const contentStr = data.content || '';
+    const isPassed = !contentStr.includes('Status Testes: FALHOU');
+    if (handoffStatusBadge) {
+      handoffStatusBadge.className = `meta-value badge ${isPassed ? 'passou' : 'falhou'}`;
+      handoffStatusBadge.textContent = isPassed ? 'PASSOU' : 'FALHOU';
+    }
+    handoffRenderedContent.textContent = contentStr;
+  } catch (e) {
+    handoffRenderedContent.textContent = `Erro ao ler handoff: ${e}`;
+  }
+}
+
+if (btnRefreshHandoff) {
+  btnRefreshHandoff.addEventListener('click', loadHandoff);
+}
+
+if (btnHumanGate) {
+  btnHumanGate.addEventListener('click', () => {
+    const isApproved = state.human_gates && state.human_gates.gate_ship_approved;
+    if (!isApproved) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ action: 'APPROVE_GATE', gate: 'gate_ship_approved' }));
+      } else {
+        fetch('/api/gates/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gate: 'gate_ship_approved', approved_by: 'user' })
+        }).then(r => r.json()).then(() => renderAll());
+      }
+    }
+  });
 }
 
 function renderNodes() {

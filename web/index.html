@@ -42,6 +42,10 @@
         <span class="tab-icon">📜</span>
         <span>Gauntlet Log</span>
       </button>
+      <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff">
+        <span class="tab-icon">📋</span>
+        <span>Handoff</span>
+      </button>
     </nav>
 
     <div class="topbar-actions">
@@ -49,6 +53,7 @@
         <span class="epic-tag">ÉPICO</span>
         <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
       </div>
+      <button class="action-btn gate-btn pending" id="btn-human-gate" title="Portão Humano Obrigatório do Release">Gate: Pendente</button>
       <button class="action-btn secondary" id="btn-test-cycle" title="Simular avanço de pulso da frota">Simular Pulso</button>
       <button class="action-btn danger" id="btn-reset" title="Restaurar estado padrão">Resetar</button>
     </div>
@@ -223,6 +228,40 @@
           </div>
           <div class="gauntlet-timeline-full" id="gauntlet-full-list">
             <!-- Gerado via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: HANDOFF & WORKLOG -->
+      <section class="tab-view" id="view-handoff">
+        <div class="handoff-view-container">
+          <div class="handoff-header">
+            <div class="handoff-header-info">
+              <h2>📋 Handoff da Sessão & Worklog</h2>
+              <span class="handoff-desc">Memória persistente em disco (Zero Token Context Drift) para retomada instantânea de sessões</span>
+            </div>
+            <div class="handoff-header-actions">
+              <button class="action-btn secondary" id="btn-refresh-handoff">Recarregar do Disco</button>
+            </div>
+          </div>
+          <div class="handoff-card">
+            <div class="handoff-meta-bar">
+              <div class="meta-item">
+                <span class="meta-label">Diretório:</span>
+                <span class="meta-value" id="handoff-dir-display">Nenhum detectado</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Arquivo:</span>
+                <span class="meta-value" id="handoff-path-display">HANDOFF.md</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Status Testes:</span>
+                <span class="meta-value badge" id="handoff-status-badge">Aguardando</span>
+              </div>
+            </div>
+            <div class="handoff-body" id="handoff-rendered-content">
+              <p class="empty-state">Nenhum documento <code>HANDOFF.md</code> registrado ainda nesta sessão.<br>Quando o Orquestrador finalizar a entrega chamando a tool MCP <code>generate_handoff</code>, o relatório completo aparecerá aqui automaticamente.</p>
+            </div>
           </div>
         </div>
       </section>

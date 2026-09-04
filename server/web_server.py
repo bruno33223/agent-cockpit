@@ -82,6 +82,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         db.add_user_steering(text.strip())
                 elif action == "RESET_STATE":
                     db.reset_state()
+                elif action == "APPROVE_GATE":
+                    gate = msg.get("gate", "gate_ship_approved")
+                    db.approve_gate(gate, "web_user")
                 elif action == "GET_STATE":
                     await websocket.send_text(json.dumps({
                         "event": "STATE_FULL",
@@ -123,6 +126,22 @@ def get_graph():
 @app.get("/api/metrics")
 def get_metrics():
     return db.get_metrics()
+
+class GateApprovalPayload(BaseModel):
+    gate: str = "gate_ship_approved"
+    approved_by: str = "user"
+
+@app.post("/api/gates/approve")
+def post_approve_gate(payload: GateApprovalPayload):
+    return db.approve_gate(payload.gate, payload.approved_by)
+
+@app.get("/api/handoff")
+def get_handoff():
+    import workflow_lock
+    data = workflow_lock.read_latest_handoff(".")
+    if not data:
+        return {"status": "NO_HANDOFF_FOUND", "content": "# Nenhum HANDOFF.md encontrado\nExecute a tool MCP `generate_handoff` na conclusão do Épico."}
+    return data
 
 # Monta arquivos estáticos do dashboard visual
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))

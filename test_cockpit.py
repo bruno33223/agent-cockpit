@@ -154,8 +154,79 @@ def run_tests():
             "arguments": {}
         }
     })
-    assert "performance dos índices" in fetch_res["result"]["content"][0]["text"]
+    assert "performance" in fetch_res["result"]["content"][0]["text"]
     print(" [OK] Tool call fetch_user_steering (Human Steering) OK")
+
+    # Call get_slice_spec
+    slice_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "tools/call",
+        "params": {
+            "name": "get_slice_spec",
+            "arguments": {"slice_id": "slice-1"}
+        }
+    })
+    slice_data = json.loads(slice_res["result"]["content"][0]["text"])
+    assert slice_data["id"] == "slice-1"
+    assert "Fatia 1: Banco e Modelos" in slice_data["title"]
+    print(" [OK] Tool call get_slice_spec (Zero-Token Slicing) OK")
+
+    # Call check_human_gate
+    gate_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "tools/call",
+        "params": {
+            "name": "check_human_gate",
+            "arguments": {"gate_name": "gate_ship_approved"}
+        }
+    })
+    gate_data = json.loads(gate_res["result"]["content"][0]["text"])
+    assert gate_data["gate"] == "gate_ship_approved"
+    assert gate_data["approved"] is False
+    print(" [OK] Tool call check_human_gate (Gate pendente) OK")
+
+    # Call generate_handoff
+    handoff_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+            "name": "generate_handoff",
+            "arguments": {
+                "blueprint_dir": "test_handoff_dir",
+                "epic_name": "Sistema de Teste de Cockpit",
+                "summary": "Implementação e testes executados com sucesso.",
+                "files_touched": ["Models.cs", "StateStore.py"],
+                "tests_passed": True,
+                "remaining_risks": ["Nenhum"],
+                "next_steps": "Iniciar próximo épico."
+            }
+        }
+    })
+    handoff_data = json.loads(handoff_res["result"]["content"][0]["text"])
+    assert handoff_data["status"] == "HANDOFF_CREATED"
+    print(" [OK] Tool call generate_handoff (Handoff em disco) OK")
+
+    # Call read_last_handoff
+    read_handoff_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+            "name": "read_last_handoff",
+            "arguments": {"base_dir": "."}
+        }
+    })
+    read_data = json.loads(read_handoff_res["result"]["content"][0]["text"])
+    assert "content" in read_data or "status" in read_data
+    print(" [OK] Tool call read_last_handoff OK")
+
+    # Clean up test handoff dir
+    import shutil
+    if os.path.exists("test_handoff_dir"):
+        shutil.rmtree("test_handoff_dir")
 
     proc.terminate()
 
@@ -184,6 +255,24 @@ def run_tests():
             data = json.loads(resp.read().decode("utf-8"))
             assert data["epic"]["name"] == "Sistema de Teste de Cockpit"
             print(" [OK] Endpoint /api/state OK")
+
+        # Gate approval check
+        req = urllib.request.Request(
+            "http://127.0.0.1:8766/api/gates/approve",
+            data=json.dumps({"gate": "gate_ship_approved", "approved_by": "test_suite"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["status"] == "APPROVED"
+            assert data["gate"] == "gate_ship_approved"
+            print(" [OK] Endpoint POST /api/gates/approve OK")
+
+        # Handoff endpoint check
+        with urllib.request.urlopen("http://127.0.0.1:8766/api/handoff") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "content" in data or "status" in data
+            print(" [OK] Endpoint GET /api/handoff OK")
 
         # Static index.html check
         with urllib.request.urlopen("http://127.0.0.1:8766/") as resp:

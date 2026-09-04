@@ -1145,3 +1145,126 @@ body {
 .timeline-verdict.aprovado { color: var(--green-bright); font-weight: 700; }
 .timeline-verdict.rejeitado { color: var(--red-bright); font-weight: 700; }
 .timeline-reason { font-size: 11px; color: var(--text-secondary); }
+
+/* HUMAN GATE BUTTON */
+.gate-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.gate-btn.pending {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid #f59e0b;
+  color: #fbbf24;
+  animation: gate-pulse 2s infinite;
+}
+
+.gate-btn.pending:hover {
+  background: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.gate-btn.approved {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid #10b981;
+  color: #34d399;
+}
+
+@keyframes gate-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* HANDOFF & WORKLOG VIEW */
+.handoff-view-container {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.handoff-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 14px;
+}
+
+.handoff-header-info h2 {
+  font-size: 18px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.handoff-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.handoff-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.handoff-meta-bar {
+  display: flex;
+  gap: 20px;
+  padding: 12px 18px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meta-label {
+  color: var(--text-muted);
+}
+
+.meta-value {
+  color: var(--cyan-bright);
+}
+
+.meta-value.badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+.meta-value.badge.passou { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.meta-value.badge.falhou { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.meta-value.badge.aguardando { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+
+.handoff-body {
+  padding: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-height: 65vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+}
+
+.handoff-body h1, .handoff-body h2, .handoff-body h3 {
+  color: var(--text-primary);
+  margin-top: 14px;
+  margin-bottom: 8px;
+}

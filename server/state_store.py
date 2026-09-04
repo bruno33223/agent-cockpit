@@ -87,7 +87,14 @@ def default_initial_state() -> Dict[str, Any]:
                 "consumed": True
             }
         ],
-        "gauntlet_log": []
+        "gauntlet_log": [],
+        "human_gates": {
+            "gate_plan_approved": True,
+            "gate_ship_approved": False,
+            "last_approved_at": None,
+            "approved_by": None
+        },
+        "last_handoff": None
     }
 
 class StateStore:
@@ -282,6 +289,59 @@ class StateStore:
                 "active_pairs_count": len([p for p in state.get("pairs_3x3", []) if p.get("builder_status") != "IDLE" or p.get("critic_status") != "IDLE"]),
                 "last_update": time.strftime("%H:%M:%S")
             }
+
+    def get_slice_spec(self, slice_id: str) -> Optional[Dict[str, Any]]:
+        with self.lock:
+            state = self.get_state()
+            for node in state.get("nodes", []):
+                if node.get("id") == slice_id or str(node.get("pair_id")) == str(slice_id):
+                    return {
+                        "id": node.get("id"),
+                        "title": node.get("title"),
+                        "acceptance_criteria": node.get("acceptance_criteria"),
+                        "spec_md": node.get("spec_md"),
+                        "kanban_status": node.get("kanban_status"),
+                        "attempt": node.get("attempt", 1),
+                        "max_attempts": node.get("max_attempts", 5)
+                    }
+        return None
+
+    def approve_gate(self, gate_name: str, approved_by: str = "user") -> Dict[str, Any]:
+        with self.lock:
+            state = self.get_state()
+            gates = state.setdefault("human_gates", {})
+            gates[gate_name] = True
+            gates["last_approved_at"] = time.strftime("%H:%M:%S")
+            gates["approved_by"] = approved_by
+            self._save_state(state)
+        self._notify("GATE_APPROVED", {"gate": gate_name, "approved_by": approved_by})
+        self._notify("STATE_FULL", state)
+        return {"status": "APPROVED", "gate": gate_name, "approved_by": approved_by}
+
+    def get_gate_status(self, gate_name: str) -> Dict[str, Any]:
+        with self.lock:
+            state = self.get_state()
+            gates = state.get("human_gates", {})
+            is_approved = gates.get(gate_name, False)
+            return {
+                "gate": gate_name,
+                "approved": bool(is_approved),
+                "last_approved_at": gates.get("last_approved_at"),
+                "approved_by": gates.get("approved_by")
+            }
+
+    def set_last_handoff(self, handoff_meta: Dict[str, Any]):
+        with self.lock:
+            state = self.get_state()
+            state["last_handoff"] = handoff_meta
+            self._save_state(state)
+        self._notify("HANDOFF_UPDATED", handoff_meta)
+        self._notify("STATE_FULL", state)
+
+    def get_last_handoff(self) -> Optional[Dict[str, Any]]:
+        with self.lock:
+            state = self.get_state()
+            return state.get("last_handoff")
 
     def reset_state(self) -> Dict[str, Any]:
         with self.lock:
