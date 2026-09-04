@@ -24,8 +24,8 @@ All structural codebase intelligence, graph mapping, and test distillation happe
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        AI FLEET & ORCHESTRATOR                         │
-│   Par 1: Infra & Contratos  │  Par 2: Domínio & Negócio  │ Par 3: UI   │
-│   (Executor + Revisor)      │  (Executor + Revisor)      │ (Exec+Rev)  │
+│   Pair 1: Infra & Contracts │ Pair 2: Domain & Logic │  Pair 3: UI     │
+│   (Executor + Reviewer)     │ (Executor + Reviewer)  │  (Exec+Review)  │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ stdio (JSON-RPC 2.0)
                                     ▼
@@ -54,194 +54,194 @@ All structural codebase intelligence, graph mapping, and test distillation happe
 
 ## 📸 Interface Showcase
 
-### 1. Visão Geral (Overview Dashboard & Live Steering)
+### 1. Overview Dashboard & Live Steering
 A central control room displaying real-time productivity KPIs, fleet execution states, active epic banners, and a bidirectional human-in-the-loop steering chat.
 
-![Visão Geral](docs/screenshots/screenshot_2.png)
+![Overview Dashboard](docs/screenshots/screenshot_2.png)
 
-- **KPI Grid**: Track tokens saved via AST indexing, first-pass review rate, vertical slices completed, and MCP/WebSocket heartbeat.
-- **Frota 3x3 (Ao Vivo)**: Real-time telemetry for all 3 executor/reviewer pairs (Infra, Domain, UI).
-- **Direcionamento (Steering)**: Chat directly with the AI orchestrator to inject human instructions or course corrections mid-flight without context loss.
+- **KPI Grid**: Track tokens saved via AST indexing, first-pass review approval rate, vertical slices completed, and MCP/WebSocket heartbeat.
+- **Fleet 3x3 (Live)**: Real-time telemetry for all 3 executor/reviewer pairs (Infra, Domain, UI).
+- **Steering Chat**: Chat directly with the AI orchestrator to inject human instructions or course corrections mid-flight without context loss.
 
 ---
 
-### 2. Fluxograma de Fatias Verticais (Flow & Kanban)
+### 2. Vertical Slices Flowchart (Flow & Kanban)
 Pipeline visualizer where vertical slices operate as autonomous micro-kanbans (`Backlog → Builder → Critic → Approved`) ending in a unified release integration gate.
 
-![Fluxo e Kanban](docs/screenshots/screenshot_3.png)
+![Flow & Kanban](docs/screenshots/screenshot_3.png)
 
-- **Micro-Kanban por Fatia**: Visual feedback as cards shift dynamically when agents commit code or submit PRs.
-- **Gate de Integração Final**: Automatic global cohesion verification and regression test validation before final release sign-off.
+- **Per-Slice Micro-Kanban**: Immediate visual feedback as cards shift dynamically when agents commit code or submit work for review.
+- **Final Integration Gate**: Automatic global cohesion verification and regression test validation before final release sign-off.
 
 ---
 
-### 3. Drawer de Inspeção de Fatias (Slice Detail & Acceptance Criteria)
+### 3. Slice Inspection Drawer (Slice Detail & Acceptance Criteria)
 Click any slice in the pipeline to open the lateral inspection drawer containing the full vertical specification, checklist, and audit history.
 
-![Drawer de Inspeção](docs/screenshots/screenshot_4.png)
+![Inspection Drawer](docs/screenshots/screenshot_4.png)
 
-- **Critérios de Aceite**: Markdown checklists extracted straight from the `MASTER_BLUEPRINT.md`.
+- **Acceptance Criteria**: Markdown checklists extracted directly from `MASTER_BLUEPRINT.md`.
 - **Master Blueprint Viewer**: Full slice context isolated from the rest of the project.
-- **Log do Gauntlet Integrado**: View historical passes, rejections, and test assertions for that specific slice.
+- **Integrated Gauntlet Log**: View historical passes, rejections, and test assertions specific to that slice.
 
 ---
 
-### 4. Grafo de Dependências AST & Constelação Obsidian (Code Graph)
+### 4. AST Dependency Graph & Obsidian Constellation (Code Graph)
 Interactive 2D constellation canvas powered by AST regex parsing. Zero tokens, zero external API calls.
 
 ![Code Graph](docs/screenshots/screenshot_1.png)
 
-- **Constelação Estelar**: Nodes sized proportionally to connectivity (degree) and color-coded by directory clusters (`Entities`, `Core`, `Systems`, `UI`, `Tests`, etc.).
-- **Filtros de Cluster**: Instant filtering buttons at the top to isolate subsystems with a single click.
-- **Navegação Inteligente**: Clique em um nó para focar e abrir o drawer; clique no fundo ou selecione um filtro para desfocar; clique duplo no nó para desselecionar.
-- **Editor de Notas Obsidian**: Drawer lateral que exibe os símbolos (classes, métodos, interfaces) e permite editar anotações Markdown persistidas diretamente no Vault.
+- **Constellation View**: Nodes sized proportionally to connectivity (degree) and color-coded by directory clusters (`Entities`, `Core`, `Systems`, `UI`, `Tests`, etc.).
+- **Cluster Filter Bar**: Instant filter pills at the top to isolate specific subsystems with a single click.
+- **Smart Navigation**: Click any node to focus and open its drawer; click the canvas background or a cluster filter to deselect; double-click a node to toggle focus off.
+- **Obsidian Note Editor**: Lateral drawer displaying symbols (classes, methods, interfaces) and allowing instant markdown note editing saved straight to the Obsidian Vault.
 
 ---
 
-### 5. Gauntlet Audit Log (Banca Revisora Adversária)
+### 5. Gauntlet Audit Log (Adversarial Review History)
 Immutable historical record of every adversarial review round between Builders and Harsh Critics.
 
 ![Gauntlet Log](docs/screenshots/screenshot_5.png)
 
-- **Auditoria Cega**: Critics evaluate implementations against acceptance criteria without knowing internal builder shortcuts.
-- **Registro Detalhado**: Captures passed unit tests, coverage requirements, and constructive feedback on failure loops.
+- **Blind Code Audit**: Critics evaluate implementations against acceptance criteria without knowing internal builder shortcuts.
+- **Detailed Audit Trail**: Captures passed unit tests, coverage requirements, and actionable feedback across failure loops.
 
 ---
 
-### 6. Handoff da Sessão & Worklog (Zero Token Context Drift)
-Persistent on-disk session memory located at `./cockpit-agent/blueprints/{epic}/HANDOFF.md` allowing instantaneous session resumption with zero token bloat.
+### 6. Session Handoff & Worklog (Zero-Token Context Drift)
+Persistent on-disk session memory located at `./cockpit-agent/blueprints/{epic}/HANDOFF.md` enabling instant session resumption with zero token drift.
 
-![Handoff](docs/screenshots/screenshot_6.png)
+![Session Handoff](docs/screenshots/screenshot_6.png)
 
-- **Resumo do Épico**: High-level overview of delivered capabilities.
-- **Arquivos Criados e Modificados**: Complete inventory of touched files and tests.
-- **Status dos Testes & Passos Futuros**: Ready-to-use briefing for the next developer or agent session.
+- **Epic Summary**: High-level overview of delivered capabilities.
+- **Touched Files Inventory**: Complete manifest of created and modified source files and tests.
+- **Test Status & Next Steps**: Ready-to-use briefing for the next developer or agent session.
 
 ---
 
-## 📂 Estrutura Padronizada `./cockpit-agent/`
+## 📂 Standardized `./cockpit-agent/` Directory Architecture
 
-Para manter o repositório principal limpo e garantir compatibilidade nativa com ferramentas como [Obsidian](https://obsidian.md), o Agent Cockpit padroniza todos os artefatos de governança em uma pasta raiz unificada:
+To keep your project's root clean and ensure native compatibility with tools like [Obsidian](https://obsidian.md), Agent Cockpit standardizes all governance artifacts inside a unified `./cockpit-agent/` directory:
 
 ```
-<raiz-do-seu-projeto>/
+<your-project-root>/
 └── cockpit-agent/
     ├── blueprints/
-    │   └── {NN_nome_do_epico}/
-    │       ├── MASTER_BLUEPRINT.md    # Especificação pragmática vertical
-    │       ├── blueprint.lock.json    # Contrato imutável de validação
-    │       └── HANDOFF.md             # Memória persistente e log de trabalho
+    │   └── {NN_epic_name}/
+    │       ├── MASTER_BLUEPRINT.md    # Pragmatic vertical specification
+    │       ├── blueprint.lock.json    # Immutable validation contract
+    │       └── HANDOFF.md             # Persistent memory & session worklog
     │
-    └── vault/                         # Obsidian Vault gerado via AST (Zero-Token)
+    └── vault/                         # Zero-token AST-generated Obsidian Vault
         ├── .obsidian/
-        │   └── app.json               # Configurações do Obsidian (Wikilinks ativos)
-        ├── INDEX.md                   # Índice mestre categorizado por clusters
-        └── {caminho_do_arquivo}.md    # Nota de cada arquivo de código com wikilinks
+        │   └── app.json               # Obsidian vault config (Wikilinks enabled)
+        ├── INDEX.md                   # Master index categorized by clusters
+        └── {file_path}.md             # Code note per file with bidirectional wikilinks
 ```
 
-### Notas do Obsidian com Preservação de Anotações
-Cada arquivo de código gera uma nota correspondente no Vault contendo:
+### Obsidian Notes with Custom Note Preservation
+Each code file generates a corresponding note in the Vault containing:
 - **YAML Frontmatter**: `type: code_node`, `cluster`, `file_path`, `degree`, `dependencies`, `symbols`.
-- **Wikilinks Bidirecionais**: Links como `[[Entities/Player.cs]]` navegáveis tanto pelo Cockpit quanto pelo Obsidian.
-- **Bloco Seguro de Anotações**:
+- **Bidirectional Wikilinks**: Links like `[[Entities/Player.cs]]` navigable both in Cockpit and Obsidian.
+- **Protected Notes Block**:
   ```markdown
   <!-- COCKPIT_NOTES_START -->
-  ### Anotações da Arquitetura
-  - O capacitor passivo foi adicionado aqui para carregar o primeiro tiro.
+  ### Architecture Notes
+  - Passive capacitor was added here to prime the devastating first shot.
   <!-- COCKPIT_NOTES_END -->
   ```
-  Quaisquer anotações manuais ou notas de agentes escritas dentro deste bloco são **estritamente preservadas** mesmo após sucessivas re-sincronizações do grafo AST!
+  Any manual developer annotations or agent notes written inside this block are **strictly preserved** across repeated AST graph synchronizations!
 
 ---
 
-## 🛠️ Ferramentas MCP (Protocolo JSON-RPC 2.0)
+## 🛠️ MCP Server Tools (JSON-RPC 2.0)
 
-O servidor MCP stdio expõe 14 ferramentas de alta precisão para o agente orquestrador:
+The stdio MCP server exposes 14 specialized tools for AI orchestrators:
 
-| Ferramenta | Descrição |
+| Tool | Description |
 | :--- | :--- |
-| `sync_blueprint` | Inicializa o épico e as fatias verticais, gerando o `blueprint.lock.json` em `./cockpit-agent/blueprints/`. |
-| `update_agent_pulse` | Envia telemetria em tempo real dos pares 3x3 e movimenta cards no Kanban visual. |
-| `log_critique_verdict` | Registra aprovações ou reprovações detalhadas no Gauntlet Audit Log. |
-| `fetch_user_steering` | Lê instruções e feedbacks humanos enviados pelo chat da interface web. |
-| `post_orchestrator_message` | Envia mensagens de progresso do orquestrador para o chat do Cockpit. |
-| `get_cockpit_state` | Retorna o snapshot JSON completo do estado de governança atual. |
-| `run_project_tests` | Executa a suíte de testes (`dotnet test`, `pytest`, `npm test`) e destila apenas falhas e stack traces (95% menos tokens). |
-| `get_slice_failure_report` | Obtém histórico destilado de falhas de uma fatia específica. |
-| `analyze_codebase_graph` | Executa varredura AST estática e retorna o grafo de dependências sem gastar tokens. |
-| `query_symbol_impact` | Retorna a zona de impacto (blast radius) de um símbolo ou arquivo modificado. |
-| `generate_handoff` | Escreve o `HANDOFF.md` padronizado em disco para encerramento ou continuidade de sessão. |
-| `read_last_handoff` | Lê o último handoff registrado para retomar o projeto com zero drift de contexto. |
-| `get_slice_spec` | Retorna apenas a especificação isolada de uma fatia vertical (economia de 80% de tokens para os subagentes). |
-| `check_human_gate` | Verifica se o operador humano aprovou o gate de liberação/integração no painel. |
+| `sync_blueprint` | Initializes the active epic and vertical slices, creating `blueprint.lock.json` in `./cockpit-agent/blueprints/`. |
+| `update_agent_pulse` | Sends real-time telemetry for 3x3 pairs and moves cards across the visual Kanban pipeline. |
+| `log_critique_verdict` | Records approvals or detailed rejections into the Gauntlet Audit Log. |
+| `fetch_user_steering` | Reads queued human instructions sent via the dashboard live chat. |
+| `post_orchestrator_message` | Sends orchestrator status updates and replies back to the dashboard chat. |
+| `get_cockpit_state` | Returns the full JSON snapshot of the current governance state. |
+| `run_project_tests` | Executes the project test suite (`dotnet test`, `pytest`, `npm test`) and distills only failing assertions and stack traces (~95% token reduction). |
+| `get_slice_failure_report` | Retrieves the distilled failure history for a specific vertical slice. |
+| `analyze_codebase_graph` | Performs a static AST scan and returns the dependency graph with zero token expenditure. |
+| `query_symbol_impact` | Computes the impact zone (blast radius) of any modified file or symbol. |
+| `generate_handoff` | Writes the standardized `HANDOFF.md` to disk for session wrap-up or continuation. |
+| `read_last_handoff` | Reads the most recent handoff to resume work in a new session with zero context drift. |
+| `get_slice_spec` | Returns only the isolated specification of a single vertical slice (saving 80% tokens for subagents). |
+| `check_human_gate` | Verifies whether the human operator has approved release or integration gates. |
 
 ---
 
-## 🌐 Endpoints da API REST & WebSockets
+## 🌐 REST API Endpoints & WebSockets
 
-O backend FastAPI opera na porta `8765` por padrão:
+The FastAPI backend runs on port `8765` by default:
 
-| Método | Endpoint | Parâmetros | Descrição |
+| Method | Endpoint | Parameters | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/state` | — | Snapshot completo do estado atual da máquina de estados. |
-| `GET` | `/api/metrics` | — | Métricas de produtividade (tokens economizados, aprovações, fatias). |
-| `GET` | `/api/graph` | `root` (opcional) | Grafo AST de dependências, clusters, graus e símbolos do projeto. |
-| `GET` | `/api/vault/note` | `file`, `root` | Retorna o conteúdo Markdown da nota associada a um arquivo no Vault. |
-| `POST` | `/api/vault/note` | JSON: `{file, content, root}` | Salva edições na nota Markdown preservando o bloco de anotações. |
-| `POST` | `/api/vault/sync` | JSON: `{root}` | Força a re-sincronização do Obsidian Vault a partir da árvore AST. |
-| `GET` | `/api/handoff` | `root` (opcional) | Carrega o arquivo `HANDOFF.md` mais recente persistido em disco. |
-| `POST` | `/api/project_root` | JSON: `{project_root}` | Atualiza o diretório raiz do projeto ativo em tempo de execução. |
-| `POST` | `/api/steering` | JSON: `{message}` | Enfileira um comando humano para consumo do orquestrador via MCP. |
-| `POST` | `/api/gates/approve` | JSON: `{gate_id}` | Aprova manualmente um gate de qualidade ou integração. |
-| `POST` | `/api/reset` | — | Reinicializa a máquina de estados para o estado inicial. |
-| `GET` | `/api/health` | — | Health check retornando `{"status": "healthy"}`. |
-| `WS` | `/ws` | — | Canal WebSocket bidirecional para atualizações reativas instantâneas. |
+| `GET` | `/api/state` | — | Full current state snapshot from the atomic store. |
+| `GET` | `/api/metrics` | — | Productivity KPIs (tokens saved, approval rate, slice progress). |
+| `GET` | `/api/graph` | `root` (optional) | Codebase dependency graph (nodes, edges, clusters, symbols). |
+| `GET` | `/api/vault/note` | `file`, `root` | Fetches the Markdown note content for a file in the Vault. |
+| `POST` | `/api/vault/note` | JSON: `{file, content, root}` | Saves updates to a Vault note while preserving user notes. |
+| `POST` | `/api/vault/sync` | JSON: `{root}` | Triggers a fresh Vault resynchronization from the AST graph. |
+| `GET` | `/api/handoff` | `root` (optional) | Reads the most recent `HANDOFF.md` from disk. |
+| `POST` | `/api/project_root` | JSON: `{project_root}` | Updates the active project root directory dynamically at runtime. |
+| `POST` | `/api/steering` | JSON: `{message}` | Queues a human steering instruction for the orchestrator. |
+| `POST` | `/api/gates/approve` | JSON: `{gate_id}` | Manually approves a quality or integration gate. |
+| `POST` | `/api/reset` | — | Resets the state machine back to initial idle status. |
+| `GET` | `/api/health` | — | Health check returning `{"status": "healthy"}`. |
+| `WS` | `/ws` | — | Bidirectional WebSocket feed delivering real-time state updates. |
 
 ---
 
-## 🚀 Instalação e Inicialização
+## 🚀 Installation & Quick Start
 
-### Pré-requisitos
-- **Python 3.9+** instalado ([python.org](https://python.org))
-- Cliente MCP compatível: **Google Antigravity** ou **Claude Desktop**
+### Prerequisites
+- **Python 3.9+** installed ([python.org](https://python.org))
+- A MCP-compatible AI client: **Google Antigravity** or **Claude Desktop**
 
-### 1. Instalação Automática (1-Clique)
+### 1. One-Click Installation
 
-**No Windows:**
+**On Windows:**
 ```cmd
 install.bat
 ```
 
-**No macOS / Linux:**
+**On macOS / Linux:**
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
-O instalador automático:
-1. Valida o ambiente Python e instala as dependências (`fastapi`, `uvicorn`, `websockets`, `pydantic`).
-2. Configura automaticamente o servidor MCP no seu cliente de IA preferido.
-3. Instala as skills empacotadas (`cockpit`, `spec-orchestrator`, `gauntlet-loop`).
+The automated installer will:
+1. Validate your Python environment and install dependencies (`fastapi`, `uvicorn`, `websockets`, `pydantic`).
+2. Auto-configure the MCP server in your AI client's configuration file.
+3. Install the bundled skills (`cockpit`, `spec-orchestrator`, `gauntlet-loop`).
 
-### 2. Inicializando o Cockpit
+### 2. Launching the Cockpit
 
-**No Windows:**
+**On Windows:**
 ```cmd
 start_cockpit.bat
 ```
 
-**Via Terminal (Qualquer Plataforma):**
+**Via Terminal (All Platforms):**
 ```bash
 python run_cockpit.py
 ```
 
-Acesse o painel no seu navegador: **`http://localhost:8765`**.
+Open your browser at: **`http://localhost:8765`**.
 
 ---
 
-## ⚙️ Configuração Manual do MCP
+## ⚙️ Manual MCP Configuration
 
-Se preferir configurar o MCP manualmente no arquivo de configuração do seu cliente (`~/.gemini/config/mcp_config.json` ou Claude Desktop `claude_desktop_config.json`):
+If you prefer to configure MCP manually in your client's config file (`~/.gemini/config/mcp_config.json` or Claude Desktop's `claude_desktop_config.json`):
 
 ```json
 {
@@ -249,7 +249,7 @@ Se preferir configurar o MCP manualmente no arquivo de configuração do seu cli
     "agent-cockpit": {
       "command": "python",
       "args": [
-        "C:/caminho/absoluto/para/agent-cockpit/server/mcp_server.py"
+        "C:/absolute/path/to/agent-cockpit/server/mcp_server.py"
       ]
     }
   }
@@ -258,35 +258,35 @@ Se preferir configurar o MCP manualmente no arquivo de configuração do seu cli
 
 ---
 
-## 💡 Como Usar com Seu Agente de IA
+## 💡 How to Use with Your AI Agent
 
-Com o Cockpit em execução, abra seu assistente de IA e execute:
+With the dashboard running, start a prompt in your AI assistant:
 
 ```text
-Ative a skill /cockpit e orquestre as fatias deste projeto usando /spec-orchestrator
+Activate the /cockpit skill and orchestrate this project using /spec-orchestrator
 ```
 
-O orquestrador executará o ciclo de voo completo:
-1. Escaneia o código via `analyze_codebase_graph` e gera a estrutura `./cockpit-agent/vault/`.
-2. Cria o `MASTER_BLUEPRINT.md` e registra no Cockpit via `sync_blueprint`.
-3. Despacha os 3 pares simultâneos da Frota 3x3, enviando telemetria em tempo real via `update_agent_pulse`.
-4. Executa os testes automatizados com `run_project_tests` e registra as rodadas adversárias via `log_critique_verdict`.
-5. Emite o `HANDOFF.md` final via `generate_handoff` para garantir retomada perfeita.
+The orchestrator will run the complete development flight cycle:
+1. Scans codebase AST via `analyze_codebase_graph` and creates `./cockpit-agent/vault/`.
+2. Generates `MASTER_BLUEPRINT.md` and syncs it with `sync_blueprint`.
+3. Dispatches the 3 concurrent pairs of the 3x3 Fleet, transmitting live telemetry via `update_agent_pulse`.
+4. Runs automated tests via `run_project_tests` and registers adversarial review rounds via `log_critique_verdict`.
+5. Emits the final `HANDOFF.md` via `generate_handoff` to guarantee flawless session resumption.
 
 ---
 
-## 🧪 Testes Automatizados
+## 🧪 Automated Testing
 
-Para rodar a suíte de testes de integração e validação do servidor:
+To run the automated integration test suite:
 
 ```bash
 python test_cockpit.py
 ```
 
-Valida o handshake JSON-RPC do MCP, atomicidade da máquina de estados, endpoints REST e canais WebSocket.
+Validates MCP JSON-RPC handshakes, state store atomicity, REST endpoints, and WebSocket channels.
 
 ---
 
-## 📄 Licença
+## 📄 License
 
-Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais detalhes.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
