@@ -119,6 +119,42 @@ Persistent on-disk session memory located at `./cockpit-agent/blueprints/{epic}/
 
 ---
 
+## 🏛️ Architectural Practices & Governance (KISS, Clean, SOLID)
+
+The orchestrator operates with a **Staff Software Engineer & Senior Architecture Advisor** mindset, enforcing **radical pragmatism**: mastering Clean Architecture, SOLID principles, and proven design patterns, but knowing precisely when to use them and—critically—when to avoid over-engineering in favor of simplicity (**KISS**) and continuous value delivery.
+
+### 1. KISS & Radical Pragmatism (No Over-Engineering)
+- **Anti-Overengineering Rule**: Never introduce speculative abstractions, factories-of-factories, or premature generalized frameworks for hypothetical future requirements.
+- **Direct & Legible Solutions**: Favor transparent, straightforward implementations over complex layers of indirection. Code must be immediately obvious and easily maintainable.
+- **Continuous Value Delivery**: Each iteration must deliver concrete, working features rather than sprawling architectural scaffolding.
+
+### 2. Clean Architecture & Domain Isolation
+- **Boundary Separation**: Decouples core business logic and domain entities from external frameworks, rendering engines, databases, and UI components.
+- **Dependency Rule**: Dependencies always point inward toward high-level domain policies, never outward toward volatile implementation details.
+- **Testability First**: Isolated domain structures ensure business rules are validated with fast, deterministic unit tests without spinning up heavy external dependencies.
+
+### 3. SOLID Principles in Practice
+- **Single Responsibility (SRP)**: Every class and subsystem has a single, well-defined reason to change. The 3x3 fleet divides vertical concerns cleanly (contracts, core domain, UI wiring).
+- **Open/Closed (OCP) & Extension Points**: Existing code is protected. New behaviors are plugged in via designated hooks, events, or modular extension points rather than mutating core established structures.
+- **Liskov Substitution (LSP)**: Polymorphic components and specialized implementations honor base contracts without surprise side-effects or broken invariants.
+- **Interface Segregation (ISP)**: Lean, purposeful interfaces tailored specifically to what client consumers actually require, preventing bloated fat contracts.
+- **Dependency Inversion (DIP)**: High-level systems interact through clear abstractions and contracts rather than depending directly on volatile low-level mechanics.
+
+### 4. Vertical Slice Architecture
+Instead of traditional, horizontal siloed layers (where database schemas, domain models, and UI screens are built weeks apart across disconnected branches), features are split into **self-contained vertical slices**:
+- **Slice 1 (Contracts & Infra)**: Data structures, interfaces, and core persistence schemas.
+- **Slice 2 (Domain & Business Logic)**: Rules, physics, state machines, and calculations.
+- **Slice 3 (UI, Integration & Polish)**: User interaction, audio/visual wiring, and integration.
+
+Each slice is an end-to-end, testable deliverable that adds verified functionality to the system.
+
+### 5. Pre-flight Collision Check & Declarative File Locks
+When multiple subagents operate concurrently in parallel:
+- **Exclusive File Ownership**: Each domain file or entity is strictly assigned to exactly one builder agent. Modifying files outside the agent's assigned lock is forbidden.
+- **Shared Append-Only Points**: Central integration hubs (e.g., `Game1.cs`, `CollisionSystem.cs`) are designated as *Shared Append-Only*. Agents only register/wire their subsystems in earmarked regions, preventing destructive merge conflicts and race conditions.
+
+---
+
 ## 📂 Standardized `./cockpit-agent/` Directory Architecture
 
 To keep your project's root clean and ensure native compatibility with tools like [Obsidian](https://obsidian.md), Agent Cockpit standardizes all governance artifacts inside a unified `./cockpit-agent/` directory:
