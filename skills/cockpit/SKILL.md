@@ -24,16 +24,27 @@ Quando o usuário disser:
 > **1. O ORQUESTRADOR NUNCA CODA DIRETAMENTE:**
 > O Orquestrador está **TERMINANTEMENTE PROIBIDO** de utilizar `write_to_file` ou `replace_file_content` para implementar a aplicação. Toda codificação deve ser feita pelos subagentes executores via `invoke_subagent`.
 > 
-> **2. PROTOCOLO DE COMUNICAÇÃO POR PONTEIROS (ZERO-FLUFF JSON):**
+> **2. PROIBIDA A EXPLORAÇÃO BRUTA DE ARQUIVOS (DIETA ZERO-TOKEN):**
+> É **TERMINANTEMENTE PROIBIDO** sair fazendo dezenas de `grep_search` e abrindo múltiplos arquivos de código com `view_file` para "entender a situação".
+> O fluxo OBRIGATÓRIO de entendimento é:
+> - Chamar `query_symbol_impact` e `analyze_codebase_graph` no MCP para obter o grafo de dependências com custo zero de tokens.
+> - Consultar `./cockpit-agent/vault/INDEX.md` ou as notas específicas `./cockpit-agent/vault/{arquivo}.md` (que já trazem classes, métodos e dependências resumidas).
+> 
+> **3. PROIBIDO EXECUTAR BUILDS OU TESTES NO TERMINAL RAW:**
+> É **PROIBIDO** executar `dotnet run`, `dotnet test`, `pytest` ou `npm test` diretamente via `run_command`. Isso cospe centenas de linhas de lixo e polui a janela de contexto.
+> - O Orquestrador NUNCA roda testes antes de planejar e despachar.
+> - Quando necessário, os testes DEVEM ser executados exclusivamente pela tool MCP `run_project_tests`, que roda em segundo plano e retorna apenas as falhas em JSON enxuto.
+> 
+> **4. PROTOCOLO DE COMUNICAÇÃO POR PONTEIROS (ZERO-FLUFF JSON):**
 > Subagentes executores e revisores são **ESTRITAMENTE PROIBIDOS de retornar resumos em prosa, ensaios literários ou listas longas de arquivos no chat final**.
 > - O relatório técnico rico DEVE ser gravado no disco (`GAUNTLET_LOG.md`) e no MCP (`update_agent_pulse` / `log_critique_verdict`).
 > - A resposta textual do subagente para o Orquestrador DEVE ser **exclusivamente um micro-JSON de 1 linha** (`{"status": "DELIVERED", ...}` ou `{"status": "VERDICT", ...}`).
 > - Isso economiza 98% dos tokens da janela de contexto.
 >
-> **3. NENHUMA FATIA É APROVADA SEM SUBAGENTE VALIDADOR:**
+> **5. NENHUMA FATIA É APROVADA SEM SUBAGENTE VALIDADOR:**
 > O Orquestrador não pode autoaprovar tarefas. Um Subagente Validador (Harsh Critic) em contexto limpo DEVE ser despachado via `invoke_subagent` para testar e validar cada fatia.
 >
-> **4. GATE DE VALIDAÇÃO FINAL DO ORQUESTRADOR:**
+> **6. GATE DE VALIDAÇÃO FINAL DO ORQUESTRADOR:**
 > Ao término das 3 fatias, o Orquestrador audita a coesão global e integra os módulos ponta a ponta.
 
 ---

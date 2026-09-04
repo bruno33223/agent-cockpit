@@ -81,13 +81,14 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 ## 🧪 REGRA DE OURO 4: PROIBIDO TESTES E BUILDS NO TERMINAL RAW (ZERO TERMINAL NOISE)
 
 > [!CRITICAL]
-> **NUNCA EXECUTE `run_command("dotnet test")`, `run_command("pytest")` OU `npm test` DIRETAMENTE!**
-> Rodar comandos de teste no terminal cospe centenas de linhas de lixo (restore de pacotes, avisos de compilação, banners), estourando a janela de contexto.
->
-> **Toda verificação de testes DEVE ser delegada ao servidor Python via tool MCP `run_project_tests`:**
-> 1. O servidor Python executa a suíte silenciosamente em segundo plano.
-> 2. O log bruto completo de 500+ linhas é salvo em disco em `01_[nome]/TEST_RAW.log` (custo zero de tokens).
-> 3. Apenas as falhas reais (arquivo, linha exata, valor esperado vs recebido) são destiladas e devolvidas em um JSON compacto de 5 a 10 linhas.
+> **NUNCA EXECUTE `run_command` COM `dotnet test`, `dotnet run`, `pytest` OU `npm test` DIRETAMENTE!**
+> Rodar comandos de teste ou build no terminal cospe centenas de linhas de lixo (restore de pacotes, avisos de compilação, banners), estourando a janela de contexto.
+> 
+> 1. **O Orquestrador NUNCA roda testes antes de planejar e despachar:** Não tente "investigar testes" rodando comandos no terminal antes de ter a Blueprint e despachar os Builders.
+> 2. **Toda verificação de testes DEVE ser delegada à tool MCP `run_project_tests`:**
+>    - O servidor executa a suíte silenciosamente em segundo plano.
+>    - O log bruto completo de 500+ linhas é salvo em disco em `01_[nome]/TEST_RAW.log` (custo zero de tokens).
+>    - Apenas as falhas reais (arquivo, linha exata, valor esperado vs recebido) são destiladas e devolvidas em um JSON compacto de 5 a 10 linhas.
 ---
 
 ## 🏛️ REGRA DE OURO 5: DEFINIÇÃO ARQUITETURAL EXPLÍCITA NA BLUEPRINT (KISS, CLEAN, SOLID)
