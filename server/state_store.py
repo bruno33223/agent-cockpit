@@ -94,7 +94,8 @@ def default_initial_state() -> Dict[str, Any]:
             "last_approved_at": None,
             "approved_by": None
         },
-        "last_handoff": None
+        "last_handoff": None,
+        "project_root": None
     }
 
 class StateStore:
@@ -135,9 +136,11 @@ class StateStore:
         with open(self.file_path, 'w', encoding='utf-8') as f:
             json.dump(state, f, indent=2, ensure_ascii=False)
 
-    def sync_epic(self, epic_name: str, goal: str, vertical_slices: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def sync_epic(self, epic_name: str, goal: str, vertical_slices: List[Dict[str, Any]], project_root: Optional[str] = None) -> Dict[str, Any]:
         with self.lock:
             state = self.get_state()
+            if project_root:
+                state["project_root"] = os.path.abspath(project_root)
             state["epic"] = {
                 "name": epic_name,
                 "goal": goal,
@@ -342,6 +345,21 @@ class StateStore:
         with self.lock:
             state = self.get_state()
             return state.get("last_handoff")
+
+    def set_project_root(self, root_path: str) -> str:
+        with self.lock:
+            state = self.get_state()
+            abs_p = os.path.abspath(root_path)
+            state["project_root"] = abs_p
+            self._save_state(state)
+        self._notify("PROJECT_ROOT_UPDATED", {"project_root": abs_p})
+        self._notify("STATE_FULL", state)
+        return abs_p
+
+    def get_project_root(self) -> Optional[str]:
+        with self.lock:
+            state = self.get_state()
+            return state.get("project_root")
 
     def reset_state(self) -> Dict[str, Any]:
         with self.lock:

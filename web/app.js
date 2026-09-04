@@ -421,15 +421,60 @@ chatForm.addEventListener('submit', (e) => {
   chatInput.value = '';
 });
 
+// Fallback Polling a cada 2s (garante atualização automática sem F5 mesmo se o WebSocket falhar)
+setInterval(async () => {
+  try {
+    const res = await fetch('/api/state');
+    if (res.ok) {
+      const remoteState = await res.json();
+      if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
+        state = remoteState;
+        renderAll();
+      }
+    }
+  } catch (e) {
+    // Silencioso
+  }
+}, 2000);
+
 // 5. INTERACTIVE CODE GRAPH (CANVAS 2D)
-function initOrRefreshGraph() {
-  fetch('/api/graph')
+const projectPathInput = document.getElementById('project-path-input');
+const btnScanProject = document.getElementById('btn-scan-project');
+
+function initOrRefreshGraph(customRoot = null) {
+  const targetRoot = customRoot || (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+  if (projectPathInput && targetRoot && !projectPathInput.value) {
+    projectPathInput.value = targetRoot;
+  }
+  const url = targetRoot ? `/api/graph?root=${encodeURIComponent(targetRoot)}` : '/api/graph';
+  fetch(url)
     .then(r => r.json())
     .then(data => {
       graphData = data;
       setupCanvasGraph();
     })
     .catch(err => console.error('Erro carregando /api/graph:', err));
+}
+
+if (btnScanProject) {
+  btnScanProject.addEventListener('click', () => {
+    const path = projectPathInput.value.trim();
+    if (!path) return;
+    localStorage.setItem('cockpit_target_project', path);
+    fetch('/api/project_root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === 'ok') {
+        initOrRefreshGraph(path);
+      } else {
+        alert(res.message || 'Erro ao definir pasta.');
+      }
+    });
+  });
 }
 
 let graphNodes = [];

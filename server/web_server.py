@@ -63,9 +63,30 @@ manager = ConnectionManager()
 # Registra o broadcast no StateStore para eventos automáticos
 db.register_listener(manager.broadcast_sync)
 
+async def file_watch_loop():
+    """Monitora modificações em workflow_state.json em tempo real.
+    Garante que atualizações feitas pelo mcp_server (outro processo) sejam propagadas via WebSocket sem F5.
+    """
+    last_mtime = 0
+    state_file = db.file_path
+    while True:
+        try:
+            if os.path.exists(state_file):
+                current_mtime = os.path.getmtime(state_file)
+                if last_mtime == 0:
+                    last_mtime = current_mtime
+                elif current_mtime > last_mtime:
+                    last_mtime = current_mtime
+                    state = db.get_state()
+                    await manager._broadcast("STATE_FULL", state)
+        except Exception:
+            pass
+        await asyncio.sleep(0.3)
+
 @app.on_event("startup")
 async def startup_event():
     manager.loop = asyncio.get_running_loop()
+    asyncio.create_task(file_watch_loop())
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -119,9 +140,30 @@ def get_health():
     return {"status": "healthy", "service": "agent-cockpit"}
 
 @app.get("/api/graph")
-def get_graph():
+def get_graph(root: str = None):
     from code_graph import get_graph_elements_for_ui
-    return get_graph_elements_for_ui(".")
+    target_root = root
+    if not target_root:
+        state = db.get_state()
+        target_root = state.get("project_root")
+    if not target_root or not os.path.exists(target_root):
+        parent = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        if os.path.basename(os.path.abspath(".")).lower() == "agent-cockpit" and os.path.exists(parent):
+            target_root = parent
+        else:
+            target_root = "."
+    return get_graph_elements_for_ui(target_root)
+
+class ProjectRootPayload(BaseModel):
+    path: str
+
+@app.post("/api/project_root")
+def post_project_root(payload: ProjectRootPayload):
+    p = payload.path.strip()
+    if not os.path.exists(p):
+        return {"status": "error", "message": f"Caminho não encontrado: {p}"}
+    saved_p = db.set_project_root(p)
+    return {"status": "ok", "project_root": saved_p}
 
 @app.get("/api/metrics")
 def get_metrics():

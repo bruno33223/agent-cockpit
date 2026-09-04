@@ -1,6 +1,10 @@
 import sys
 import json
 import os
+import warnings
+
+# Suprime warnings para proteger o pipe stdio JSON-RPC 2.0
+warnings.filterwarnings("ignore")
 
 # Garante path relativo para importar state_store
 sys.path.insert(0, os.path.dirname(__file__))
@@ -15,6 +19,7 @@ TOOLS_DEFINITIONS = [
             "properties": {
                 "epic_name": {"type": "string", "description": "Nome do Épico ou objetivo macro."},
                 "goal": {"type": "string", "description": "Resumo em uma linha do objetivo global."},
+                "project_root": {"type": "string", "description": "Caminho absoluto ou relativo da raiz do projeto alvo do usuário."},
                 "vertical_slices": {
                     "type": "array",
                     "description": "Lista das fatias verticais (até 3 simultâneas) para os nós do fluxograma.",
@@ -190,10 +195,14 @@ TOOLS_DEFINITIONS = [
 
 def handle_tool_call(name: str, args: dict) -> dict:
     if name == "sync_blueprint":
+        proj_root = args.get("project_root")
+        if not proj_root:
+            proj_root = os.path.abspath(".")
         res = db.sync_epic(
             epic_name=args.get("epic_name", ""),
             goal=args.get("goal", ""),
-            vertical_slices=args.get("vertical_slices", [])
+            vertical_slices=args.get("vertical_slices", []),
+            project_root=proj_root
         )
         try:
             import workflow_lock
