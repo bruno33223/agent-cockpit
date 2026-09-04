@@ -463,8 +463,8 @@ const projectPathInput = document.getElementById('project-path-input');
 const btnScanProject = document.getElementById('btn-scan-project');
 
 function initOrRefreshGraph(customRoot = null) {
-  const targetRoot = customRoot || (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
-  if (projectPathInput && targetRoot && !projectPathInput.value) {
+  const targetRoot = (typeof customRoot === 'string' && customRoot.trim()) ? customRoot.trim() : (projectPathInput ? projectPathInput.value.trim() : '') || localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+  if (projectPathInput && targetRoot) {
     projectPathInput.value = targetRoot;
   }
   const url = targetRoot ? `/api/graph?root=${encodeURIComponent(targetRoot)}` : '/api/graph';
@@ -472,6 +472,12 @@ function initOrRefreshGraph(customRoot = null) {
     .then(r => r.json())
     .then(data => {
       graphData = data;
+      // Reseta zoom e pan para centralizar a visão do grafo
+      graphZoom = 1;
+      graphPanX = 0;
+      graphPanY = 0;
+      selectedGraphNode = null;
+      hoveredGraphNode = null;
       setupCanvasGraph();
     })
     .catch(err => console.error('Erro carregando /api/graph:', err));
@@ -571,12 +577,14 @@ function setupCanvasGraph() {
     target: graphNodes.find(n => n.id === e.target)
   })).filter(l => l.source && l.target);
 
-  // 3. Relaxamento de Força Estilo Obsidian (Force-Directed Layout)
+  // 3. Relaxamento de Força Estilo Obsidian (Fruchterman-Reingold com Annealing e Velocity Clamping)
   const nodeCount = graphNodes.length;
-  const iterations = Math.min(70, Math.max(30, Math.floor(12000 / (nodeCount || 1))));
+  const iterations = 50;
   
   for (let iter = 0; iter < iterations; iter++) {
-    // Repulsão (Coulomb)
+    const temp = 1.0 - (iter / iterations) * 0.8; // Temperatura de resfriamento (Annealing)
+
+    // A. Repulsão entre nós (Coulomb com clamp)
     for (let i = 0; i < nodeCount; i++) {
       const n1 = graphNodes[i];
       for (let j = i + 1; j < nodeCount; j++) {
@@ -584,9 +592,9 @@ function setupCanvasGraph() {
         const dx = n2.x - n1.x;
         const dy = n2.y - n1.y;
         const distSq = dx * dx + dy * dy || 1;
-        if (distSq < 22500) {
+        if (distSq < 16000) {
           const dist = Math.sqrt(distSq);
-          const force = 1400 / (distSq + 80);
+          const force = Math.min(12.0, 400.0 / (distSq + 100));
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
           n1.vx -= fx;
@@ -597,13 +605,13 @@ function setupCanvasGraph() {
       }
     }
 
-    // Atração de arestas (Hooke Springs)
+    // B. Atração de arestas (Hooke Springs com clamp)
     for (let i = 0; i < graphLinks.length; i++) {
       const l = graphLinks[i];
       const dx = l.target.x - l.source.x;
       const dy = l.target.y - l.source.y;
       const dist = Math.hypot(dx, dy) || 1;
-      const force = (dist - 45) * 0.035;
+      const force = Math.max(-10.0, Math.min(10.0, (dist - 40) * 0.015));
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
       l.source.vx += fx;
@@ -612,15 +620,21 @@ function setupCanvasGraph() {
       l.target.vy -= fy;
     }
 
-    // Gravidade central + amortecimento
+    // C. Gravidade central + limite de velocidade terminal + amortecimento
+    const maxV = 8.0;
     for (let i = 0; i < nodeCount; i++) {
       const n = graphNodes[i];
-      n.vx += (centerX - n.x) * 0.002;
-      n.vy += (centerY - n.y) * 0.002;
-      n.x += n.vx * 0.45;
-      n.y += n.vy * 0.45;
-      n.vx *= 0.68;
-      n.vy *= 0.68;
+      n.vx += (centerX - n.x) * 0.005;
+      n.vy += (centerY - n.y) * 0.005;
+
+      // Clampa velocidade para evitar que nós explodam para o infinito
+      n.vx = Math.max(-maxV, Math.min(maxV, n.vx));
+      n.vy = Math.max(-maxV, Math.min(maxV, n.vy));
+
+      n.x += n.vx * temp;
+      n.y += n.vy * temp;
+      n.vx *= 0.5;
+      n.vy *= 0.5;
     }
   }
 
@@ -818,7 +832,7 @@ function selectGraphNode(node) {
 }
 
 if (btnRefreshGraph) {
-  btnRefreshGraph.addEventListener('click', initOrRefreshGraph);
+  btnRefreshGraph.addEventListener('click', () => initOrRefreshGraph());
 }
 
 if (graphSearchInput) {
