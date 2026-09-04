@@ -127,15 +127,15 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "run_project_tests",
-        "description": "Executa a suíte de testes de forma determinística no sistema e destila o resultado, eliminando 95% do lixo de terminal e retornando apenas as falhas reais em JSON compacto.",
+        "description": "Executa a suíte de testes de forma determinística no servidor Python e destila o resultado, eliminando 95% do lixo de terminal, salvando o log bruto em disco e retornando apenas as falhas reais em JSON compacto. Se test_command for omitido, auto-detecta dotnet test, pytest ou npm test.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "test_command": {"type": "string", "description": "Comando de teste (ex: 'dotnet test', 'pytest', 'npm test')."},
+                "test_command": {"type": "string", "description": "Comando de teste opcional (ex: 'dotnet test', 'pytest', 'npm test'). Se omitido, auto-detecta."},
                 "working_dir": {"type": "string", "description": "Diretório de execução (padrão: .)."},
-                "timeout_sec": {"type": "integer", "description": "Timeout em segundos (padrão: 60)."}
-            },
-            "required": ["test_command"]
+                "timeout_sec": {"type": "integer", "description": "Timeout em segundos (padrão: 60)."},
+                "log_output_dir": {"type": "string", "description": "Pasta para salvar TEST_RAW.log (padrão: pasta da blueprint mais recente)."}
+            }
         }
     },
     {
@@ -279,10 +279,15 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
     elif name == "run_project_tests":
         from test_runner import run_distilled_tests
-        cmd = args.get("test_command", "")
+        cmd = args.get("test_command")
         cwd = args.get("working_dir", ".")
         timeout = args.get("timeout_sec", 60)
-        res = run_distilled_tests(cmd, working_dir=cwd, timeout_sec=timeout)
+        log_dir = args.get("log_output_dir")
+        if not log_dir:
+            import workflow_lock
+            found = workflow_lock.find_latest_blueprint_dir(".")
+            log_dir = found if found else cwd
+        res = run_distilled_tests(cmd, working_dir=cwd, timeout_sec=timeout, log_output_dir=log_dir)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
     elif name == "generate_handoff":

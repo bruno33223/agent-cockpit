@@ -1,16 +1,54 @@
-import os
+﻿import os
 import re
 import sys
 import time
 import subprocess
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
-def run_distilled_tests(test_command: str, working_dir: str = ".", timeout_sec: int = 60) -> Dict[str, Any]:
+def auto_detect_test_command(working_dir: str = ".") -> str:
+    """Detecta automaticamente o comando de teste apropriado para a codebase."""
+    working_dir = os.path.abspath(working_dir)
+
+    # 1. C# / .NET (.sln ou .csproj)
+    for root, _, files in os.walk(working_dir):
+        if any(f.endswith(".sln") or f.endswith(".csproj") for f in files):
+            return "dotnet test"
+        # Limita busca a 2 níveis de profundidade
+        if os.path.relpath(root, working_dir).count(os.sep) >= 2:
+            break
+
+    # 2. Python (pytest, unittest)
+    if os.path.exists(os.path.join(working_dir, "pytest.ini")) or \
+       os.path.exists(os.path.join(working_dir, "conftest.py")) or \
+       os.path.exists(os.path.join(working_dir, "tests")):
+        return "pytest"
+
+    # 3. Node.js / JavaScript / TypeScript
+    if os.path.exists(os.path.join(working_dir, "package.json")):
+        return "npm test"
+
+    # 4. Rust
+    if os.path.exists(os.path.join(working_dir, "Cargo.toml")):
+        return "cargo test"
+
+    return "pytest"
+
+def run_distilled_tests(
+    test_command: Optional[str] = None,
+    working_dir: str = ".",
+    timeout_sec: int = 60,
+    save_raw_log: bool = True,
+    log_output_dir: Optional[str] = None
+) -> Dict[str, Any]:
     """Executa a suíte de testes de forma determinística e destila o resultado,
 
-    removendo 95% do lixo de terminal e retornando apenas as falhas reais.
+    removendo 95% do lixo de terminal e retornando apenas as falhas reais em JSON compacto.
     """
     working_dir = os.path.abspath(working_dir)
+
+    if not test_command or not test_command.strip():
+        test_command = auto_detect_test_command(working_dir)
+
     start_time = time.time()
 
     try:
@@ -30,28 +68,40 @@ def run_distilled_tests(test_command: str, working_dir: str = ".", timeout_sec: 
         proc.kill()
         return {
             "status": "TIMEOUT",
+            "command": test_command,
             "duration_seconds": timeout_sec,
             "error": f"Execução de testes expirou após {timeout_sec}s."
         }
     except Exception as e:
         return {
             "status": "ERROR",
+            "command": test_command,
             "duration_seconds": round(time.time() - start_time, 2),
             "error": f"Falha ao iniciar comando de teste: {str(e)}"
         }
 
     duration = round(time.time() - start_time, 2)
     full_output = f"{stdout}\n{stderr}".strip()
-
-    # Identifica padrão de runner
     is_pass = exit_code == 0
     failures: List[Dict[str, Any]] = []
 
     if not is_pass:
         failures = parse_failures(full_output)
 
-    # Contagem resumida
     summary = extract_summary(full_output, is_pass)
+
+    # Salva o log bruto completo em disco para auditoria humana sem gastar tokens
+    raw_log_path = None
+    if save_raw_log:
+        try:
+            target_dir = log_output_dir if log_output_dir and os.path.exists(log_output_dir) else working_dir
+            raw_log_path = os.path.join(target_dir, "TEST_RAW.log")
+            with open(raw_log_path, "w", encoding="utf-8") as f:
+                f.write(f"=== TEST RUN: {test_command} ===\n")
+                f.write(f"Data: {time.strftime('%Y-%m-%d %H:%M:%S')} | Exit Code: {exit_code}\n\n")
+                f.write(full_output)
+        except Exception as e:
+            raw_log_path = f"Aviso salvando log: {e}"
 
     return {
         "status": "PASS" if is_pass else "FAIL",
@@ -60,19 +110,20 @@ def run_distilled_tests(test_command: str, working_dir: str = ".", timeout_sec: 
         "exit_code": exit_code,
         "summary": summary,
         "failures_count": len(failures),
-        "failures": failures[:10]  # Limita às 10 primeiras falhas mais críticas
+        "failures": failures[:10],  # Apenas as falhas essenciais
+        "raw_log_file": raw_log_path
     }
 
 def parse_failures(output: str) -> List[Dict[str, Any]]:
-    """Extrai cirurgicamente falhas de C# (dotnet test/MSTest/NUnit/xUnit), Python (pytest) ou JS (Jest/Vitest)."""
+    """Extrai cirurgicamente falhas de C# (dotnet test/xUnit/NUnit), Python (pytest) ou JS (Jest/Vitest)."""
     failures: List[Dict[str, Any]] = []
     lines = output.splitlines()
 
-    # 1. dotnet test / C# (Failed ... [ErrorMessage] ... at ...)
+    # 1. dotnet test / C#
     csharp_failed_re = re.compile(r'^\s*Failed\s+([A-Za-z0-9_\.]+)', re.IGNORECASE)
     csharp_stack_re = re.compile(r'^\s*at\s+.*?\s+in\s+(.*?):line\s+(\d+)', re.IGNORECASE)
 
-    # 2. pytest (FAILED tests/test_x.py::test_func - AssertionError: ...)
+    # 2. pytest
     pytest_re = re.compile(r'FAILED\s+([^\s:]+)::([^\s\-]+)\s+-\s+(.*)')
 
     current_test = None
@@ -81,7 +132,6 @@ def parse_failures(output: str) -> List[Dict[str, Any]]:
     current_msg = []
 
     for idx, line in enumerate(lines):
-        # Checa pytest
         py_m = pytest_re.search(line)
         if py_m:
             failures.append({
@@ -92,7 +142,6 @@ def parse_failures(output: str) -> List[Dict[str, Any]]:
             })
             continue
 
-        # Checa dotnet / C#
         cs_m = csharp_failed_re.search(line)
         if cs_m:
             if current_test:
@@ -126,12 +175,12 @@ def parse_failures(output: str) -> List[Dict[str, Any]]:
             "message": " ".join(current_msg).strip()[:300]
         })
 
-    # Se não capturou pelos regexes estruturados, captura as últimas linhas de erro
+    # Fallback caso não pegue pelo formato estruturado
     if not failures:
         error_lines = [l.strip() for l in lines if any(k in l.lower() for k in ['fail', 'error', 'assert', 'exception']) and len(l.strip()) > 5]
         if error_lines:
             failures.append({
-                "test_name": "GenericFailure",
+                "test_name": "ExecutionFailure",
                 "file": None,
                 "line": None,
                 "message": " | ".join(error_lines[:4])[:350]
@@ -143,18 +192,13 @@ def extract_summary(output: str, is_pass: bool) -> str:
     """Extrai a linha de resumo do teste."""
     for line in reversed(output.splitlines()):
         line_clean = line.strip()
-        # pytest: === 5 passed, 1 failed in 0.12s ===
         if re.search(r'\d+\s+(?:passed|failed)', line_clean, re.IGNORECASE):
             return line_clean
-        # dotnet: Total tests: 12. Passed: 10. Failed: 2.
         if "Total tests:" in line_clean or "Passed:" in line_clean:
             return line_clean
 
-    return "Todos os testes passaram." if is_pass else "Testes falharam com erros."
+    return "Todos os testes passaram com sucesso." if is_pass else "Testes falharam com erros."
 
 if __name__ == "__main__":
-    # Teste local
     res = run_distilled_tests("python -c \"import sys; sys.exit(0)\"")
     print("PASS TEST:", res["status"])
-    res_fail = run_distilled_tests("python -c \"raise AssertionError('Esperado 200, recebido 500')\"")
-    print("FAIL TEST:", res_fail["status"], res_fail["failures"])
