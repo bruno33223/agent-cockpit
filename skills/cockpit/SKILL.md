@@ -34,7 +34,7 @@ Quando o usuário disser:
 > **3. PROIBIDO EXECUTAR BUILDS OU TESTES NO TERMINAL RAW:**
 > É **PROIBIDO** executar `dotnet run`, `dotnet test`, `pytest` ou `npm test` diretamente via `run_command`. Isso cospe centenas de linhas de lixo e polui a janela de contexto.
 > - O Orquestrador NUNCA roda testes antes de planejar e despachar.
-> - Quando necessário, os testes DEVEM ser executados exclusivamente pela tool MCP `run_project_tests`, que roda em segundo plano e retorna apenas as falhas em JSON enxuto.
+>   - Quando necessário, os testes DEVEM ser executados exclusivamente pela tool MCP `run_project_tests(test_command='...', working_dir='...')`, passando explicitamente o comando desejado (ex: `'dotnet build'` ou comando específico da suíte de testes), que roda em segundo plano e retorna apenas as falhas em JSON enxuto. NUNCA omita o `test_command`.
 > 
 > **4. PROTOCOLO DE COMUNICAÇÃO POR PONTEIROS (ZERO-FLUFF JSON):**
 > Subagentes executores e revisores são **ESTRITAMENTE PROIBIDOS de retornar resumos em prosa, ensaios literários ou listas longas de arquivos no chat final**.

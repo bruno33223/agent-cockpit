@@ -63,10 +63,10 @@ Para cada **Entregável $k$**:
    - **Execução:** O Orquestrador despacha os Builders necessários para implementar a fatia vertical completa. Os Builders atualizam a telemetria via MCP `update_agent_pulse(WORKING)` e documentam as decisões tomadas em `cockpit-agent/vault/`.
    - **Auditoria Cega via MCP:** O Orquestrador despacha os Harsh Critics necessários com contexto limpo.
      - **PROIBIDO TERMINAL RAW:** O Crítico NUNCA executa comandos de teste no terminal (`dotnet build`, `dotnet test`, `npm test` via `run_command`).
-     - **USO OBRIGATÓRIO DO MCP:** O Crítico chama exclusivamente a ferramenta MCP `run_project_tests(test_command='...')`, que roda em segundo plano e retorna apenas falhas resumidas.
+     - **USO OBRIGATÓRIO DO MCP COM COMANDO EXPLÍCITO:** O Crítico chama exclusivamente a ferramenta MCP `run_project_tests(test_command='...', working_dir='...')`, passando obrigatoriamente o comando de verificação adequado (ex: `'dotnet build'` para auditar ausência de erros de compilação, ou o comando específico de testes do projeto como `'dotnet run --no-build -- --test-...'`). NUNCA omita o `test_command`.
    - **Veredito:**
      - Se **APROVADO** por todos os críticos: registre o veredito no Cockpit chamando a tool MCP `log_critique_verdict(APROVADO)` e no histórico `GAUNTLET_LOG.md`. Passe para o próximo Entregável.
-     - Se **REJEITADO**: registre o veredito chamando a tool MCP `log_critique_verdict(REJEITADO, reason_md=...)`, incremente a Tentativa ($i+1$) e despache o Builder instruindo-o a consultar a falha via `get_slice_failure_report`.
+     - Se **REJEITADO**: registre o veredito chamando a tool MCP `log_critique_verdict(REJEITADO, reason_md=...)`, incremente a Tentativa ($i+1$) e despache o Builder instruindo-o a consultar a falha via `get_slice_failure_report(slice_id="...")`. **O Orquestrador está TERMINANTEMENTE PROIBIDO de chamar `get_slice_failure_report` no chat principal**; essa leitura é restrita ao contexto isolado do Builder.
 2. **Controle de Limites (Safety & Credit Bounds):**
    - Se atingir o limite estipulado (padrão: 3 a 5 tentativas) sem aprovação do Critic, **pause imediatamente**, apresente o relatório ao usuário no chat e peça autorização antes de gastar novos ciclos.
 
