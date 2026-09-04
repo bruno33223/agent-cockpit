@@ -151,7 +151,7 @@ Each slice is an end-to-end, testable deliverable that adds verified functionali
 ### 5. Pre-flight Collision Check & Declarative File Locks
 When multiple subagents operate concurrently in parallel:
 - **Exclusive File Ownership**: Each domain file or entity is strictly assigned to exactly one builder agent. Modifying files outside the agent's assigned lock is forbidden.
-- **Shared Append-Only Points**: Central integration hubs (e.g., `Game1.cs`, `CollisionSystem.cs`) are designated as *Shared Append-Only*. Agents only register/wire their subsystems in earmarked regions, preventing destructive merge conflicts and race conditions.
+- **Shared Append-Only Points**: Central aggregation hubs (e.g., `app.ts`, `container.py`, `Program.cs`) are designated as *Shared Append-Only*. Agents only register or wire their subsystems in earmarked sections, preventing destructive merge conflicts and race conditions.
 
 ---
 

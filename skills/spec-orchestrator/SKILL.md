@@ -90,7 +90,32 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 > 3. Apenas as falhas reais (arquivo, linha exata, valor esperado vs recebido) são destiladas e devolvidas em um JSON compacto de 5 a 10 linhas.
 ---
 
-## 🔒 REGRA DE OURO 5: PRE-FLIGHT COLLISION CHECK & FILE LOCKS DECLARATIVOS
+## 🏛️ REGRA DE OURO 5: DEFINIÇÃO ARQUITETURAL EXPLÍCITA NA BLUEPRINT (KISS, CLEAN, SOLID)
+
+> [!CRITICAL]
+> **PROIBIDO DEIXAR DIRETRIZES ARQUITETURAIS IMPLÍCITAS**
+> O Orquestrador atua como o Staff Engineer / Arquiteto do sistema. É sua responsabilidade indelegável estabelecer a arquitetura antes que qualquer código seja escrito. Se a arquitetura ficar implícita ou for deixada à imaginação dos subagentes, o Builder produzirá código desordenado ou com over-engineering, e o Harsh Critic do Gauntlet não terá parâmetros objetivos para auditar.
+>
+> **O `MASTER_BLUEPRINT.md` DEVE OBRIGATORIAMENTE CONTER A SEÇÃO: `### Diretrizes Arquiteturais & Padrões (KISS, Clean Architecture, SOLID)`:**
+> 1. **KISS & Pragmatismo Radical (Anti-Overengineering):**
+>    - Proibido criar abstrações para requisitos hipotéticos futuros, fábricas desnecessárias ou indireção sem valor imediato.
+>    - A implementação deve ser direta, legível e econômica.
+> 2. **Clean Architecture & Isolamento de Domínio:**
+>    - Modelos e regras de negócio essenciais (Domain) devem ser puros e isolados de frameworks, bancos de dados, I/O e interfaces de usuário.
+>    - As dependências apontam exclusivamente para dentro (Dependency Rule).
+> 3. **SOLID Aplicado:**
+>    - *SRP (Single Responsibility):* Cada módulo ou classe deve ter uma única razão clara para ser modificada.
+>    - *OCP (Open/Closed):* Código estável existente não é refatorado destrutivamente; novas capacidades são adicionadas por extensão e hooks.
+>    - *LSP (Liskov Substitution):* Implementações cumprem rigorosamente contratos de base sem quebrar invariantes.
+>    - *ISP (Interface Segregation):* Interfaces enxutas e focadas estritamente nas necessidades do consumidor.
+>    - *DIP (Dependency Inversion):* Acoplamento em fronteiras através de contratos e abstrações, nunca em classes concretas de baixo nível.
+> 4. **Por que essa definição pertence ao Orquestrador?**
+>    - O **`spec-orchestrator`** é quem desenha a solução e estabelece o contrato.
+>    - O **`gauntlet-loop`** atua como a banca de auditoria: o Harsh Critic avalia o código construído contra exatamente essas diretrizes formalizadas no blueprint, eliminando qualquer subjetividade.
+
+---
+
+## 🔒 REGRA DE OURO 6: PRE-FLIGHT COLLISION CHECK & FILE LOCKS DECLARATIVOS
 
 > [!CRITICAL]
 > **PROIBIÇÃO DE CONFLITO CONCORRENTE EM ARQUIVOS DE CÓDIGO**
@@ -98,24 +123,24 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 >
 > **O Orquestrador é OBRIGADO a realizar o Pre-flight Collision Check e declarar a Matriz de Locks no `MASTER_BLUEPRINT.md`:**
 > 1. **Exclusive File Ownership (Locks Estritos):** Cada arquivo de domínio, entidade ou sistema DEVE pertencer a exatamente UMA fatia vertical. Nenhum outro agente pode alterá-lo.
-> 2. **Shared Append-Only Points (Pontos de Extensão Compartilhados):** Arquivos que agregam subsistemas (ex: `Game1.cs`, `CollisionSystem.cs`, `Program.cs`) devem ser identificados como *Shared Append-Only*. Os agentes são instruídos a apenas adicionar linhas em suas seções demarcadas, sendo proibidos de refatorar código compartilhado existente.
+> 2. **Shared Append-Only Points (Pontos de Extensão Compartilhados):** Arquivos que agregam subsistemas (ex: `src/app.ts`, `src/container.py`, `src/Program.cs`) devem ser identificados como *Shared Append-Only*. Os agentes são instruídos a apenas adicionar linhas em suas seções demarcadas, sendo proibidos de refatorar código compartilhado existente.
 > 3. **Contrato de Locks no Briefing:** O prompt de cada Builder DEVE listar expressamente os arquivos sob seu LOCK exclusivo. O Builder é instruído a NUNCA editar arquivos fora da sua lista de permissão.
 >
-> **Exemplo obrigatório no MASTER_BLUEPRINT.md:**
+> **Exemplo genérico obrigatório no MASTER_BLUEPRINT.md:**
 > ```markdown
 > ### Matriz de Locks & Ownership de Arquivos
 > | Fatia | Builder | Arquivos sob Lock Exclusivo |
 > | :--- | :--- | :--- |
-> | Fatia 1 | Builder 1 | `Entities/Asteroid3D.cs`, `Systems/Collision/ShipCollisionHandler.cs`, `Tests/Asteroid*.cs` |
-> | Fatia 2 | Builder 2 | `Entities/Player.cs`, `Systems/Environment/SectorHazardSystem.cs`, `Tests/Passive*.cs` |
-> | Fatia 3 | Builder 3 | `Entities/Enemies/Modular/*.cs`, `Entities/Enemies/WorldBreakerBoss.cs`, `Tests/Modular*.cs` |
+> | Fatia 1 | Builder 1 | `src/Contracts/*.ts`, `src/Infrastructure/*.ts`, `tests/unit/contracts/*.test.ts` |
+> | Fatia 2 | Builder 2 | `src/Domain/Entities/*.ts`, `src/Domain/Services/*.ts`, `tests/unit/domain/*.test.ts` |
+> | Fatia 3 | Builder 3 | `src/Controllers/*.ts`, `src/UI/Components/*.tsx`, `tests/e2e/*.test.ts` |
 > 
-> *Arquivos Compartilhados (Append-Only):* `Game1.cs`, `Systems/CollisionSystem.cs`
+> *Arquivos Compartilhados (Append-Only):* `src/app.ts`, `src/container.ts` (ou `main.py`, `Program.cs`)
 > ```
 
 ---
 
-## 🪐 REGRA DE OURO 6: DIRETÓRIO PADRONIZADO `./cockpit-agent` & OBSIDIAN VAULT
+## 🪐 REGRA DE OURO 7: DIRETÓRIO PADRONIZADO `./cockpit-agent` & OBSIDIAN VAULT
 
 > [!CRITICAL]
 > **PROIBIDO ESPALHAR BLUEPRINTS E NOTAS NA RAIZ DO REPOSITÓRIO ALVO**
