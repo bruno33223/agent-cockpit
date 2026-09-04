@@ -565,6 +565,22 @@ body {
   border-color: var(--cyan-bright);
   background-color: var(--cyan-dim);
 }
+.kanban-task-card.waiting {
+  border-color: var(--amber-bright);
+  background-color: var(--amber-dim);
+}
+.kanban-task-card.reviewing {
+  border-color: var(--purple-bright);
+  background-color: var(--purple-dim);
+}
+.kanban-task-card.approved {
+  border-color: var(--green-bright);
+  background-color: var(--green-dim);
+}
+.kanban-task-card.rejected {
+  border-color: var(--red-bright);
+  background-color: var(--red-dim);
+}
 
 .task-desc {
   font-size: 10px;
@@ -954,7 +970,8 @@ body {
 }
 .state-idle { color: var(--text-muted); }
 .state-working { color: var(--cyan-bright); }
-.state-reviewing { color: var(--amber-bright); }
+.state-waiting { color: var(--amber-bright); }
+.state-reviewing { color: var(--purple-bright); }
 .state-approved { color: var(--green-bright); }
 .state-rejected { color: var(--red-bright); }
 

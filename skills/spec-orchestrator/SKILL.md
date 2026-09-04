@@ -88,7 +88,30 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 > 1. O servidor Python executa a suíte silenciosamente em segundo plano.
 > 2. O log bruto completo de 500+ linhas é salvo em disco em `01_[nome]/TEST_RAW.log` (custo zero de tokens).
 > 3. Apenas as falhas reais (arquivo, linha exata, valor esperado vs recebido) são destiladas e devolvidas em um JSON compacto de 5 a 10 linhas.
-> 4. O comando é opcional: o servidor auto-detecta C# (`dotnet test`), Python (`pytest`) ou Node (`npm test`).
+---
+
+## 🔒 REGRA DE OURO 5: PRE-FLIGHT COLLISION CHECK & FILE LOCKS DECLARATIVOS
+
+> [!CRITICAL]
+> **PROIBIÇÃO DE CONFLITO CONCORRENTE EM ARQUIVOS DE CÓDIGO**
+> Quando 3 subagentes operam em paralelo, modificar o mesmo arquivo simultaneamente causa race conditions, sobrescrita acidental de código e quebras de compilação.
+>
+> **O Orquestrador é OBRIGADO a realizar o Pre-flight Collision Check e declarar a Matriz de Locks no `MASTER_BLUEPRINT.md`:**
+> 1. **Exclusive File Ownership (Locks Estritos):** Cada arquivo de domínio, entidade ou sistema DEVE pertencer a exatamente UMA fatia vertical. Nenhum outro agente pode alterá-lo.
+> 2. **Shared Append-Only Points (Pontos de Extensão Compartilhados):** Arquivos que agregam subsistemas (ex: `Game1.cs`, `CollisionSystem.cs`, `Program.cs`) devem ser identificados como *Shared Append-Only*. Os agentes são instruídos a apenas adicionar linhas em suas seções demarcadas, sendo proibidos de refatorar código compartilhado existente.
+> 3. **Contrato de Locks no Briefing:** O prompt de cada Builder DEVE listar expressamente os arquivos sob seu LOCK exclusivo. O Builder é instruído a NUNCA editar arquivos fora da sua lista de permissão.
+>
+> **Exemplo obrigatório no MASTER_BLUEPRINT.md:**
+> ```markdown
+> ### Matriz de Locks & Ownership de Arquivos
+> | Fatia | Builder | Arquivos sob Lock Exclusivo |
+> | :--- | :--- | :--- |
+> | Fatia 1 | Builder 1 | `Entities/Asteroid3D.cs`, `Systems/Collision/ShipCollisionHandler.cs`, `Tests/Asteroid*.cs` |
+> | Fatia 2 | Builder 2 | `Entities/Player.cs`, `Systems/Environment/SectorHazardSystem.cs`, `Tests/Passive*.cs` |
+> | Fatia 3 | Builder 3 | `Entities/Enemies/Modular/*.cs`, `Entities/Enemies/WorldBreakerBoss.cs`, `Tests/Modular*.cs` |
+> 
+> *Arquivos Compartilhados (Append-Only):* `Game1.cs`, `Systems/CollisionSystem.cs`
+> ```
 
 ---
 

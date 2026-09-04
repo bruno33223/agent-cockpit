@@ -239,7 +239,7 @@ function renderNodes() {
     card.className = `flow-node-card ${statusClass}`;
 
     const colBacklog = node.kanban_status === 'BACKLOG' ? renderTaskCard(node) : '';
-    const colExecuting = node.kanban_status === 'EXECUTING' || node.kanban_status === 'REJECTED' ? renderTaskCard(node) : '';
+    const colExecuting = (node.kanban_status === 'EXECUTING' || node.kanban_status === 'WAITING_REVIEW' || node.kanban_status === 'REJECTED') ? renderTaskCard(node) : '';
     const colReviewing = node.kanban_status === 'CRITIQUING' ? renderTaskCard(node) : '';
     const colApproved = node.kanban_status === 'APPROVED' ? renderTaskCard(node) : '';
 
@@ -269,6 +269,7 @@ function renderNodes() {
 function getNodeStatusClass(status) {
   switch (status) {
     case 'EXECUTING': return 'active-working';
+    case 'WAITING_REVIEW': return 'active-waiting';
     case 'CRITIQUING': return 'active-reviewing';
     case 'APPROVED': return 'active-approved';
     case 'REJECTED': return 'active-rejected';
@@ -277,12 +278,31 @@ function getNodeStatusClass(status) {
 }
 
 function renderTaskCard(node) {
-  const isRejected = node.kanban_status === 'REJECTED';
-  const tagColor = isRejected ? 'var(--red-bright)' : 'var(--cyan-bright)';
-  const tagText = isRejected ? 'Rejeitado (Corrigindo)' : (node.kanban_status === 'APPROVED' ? 'Aprovado' : 'Em Andamento');
+  const status = node.kanban_status;
+  let tagColor = 'var(--cyan-bright)';
+  let tagText = 'Em Construção';
+  let cardClass = 'active';
+
+  if (status === 'WAITING_REVIEW') {
+    tagColor = 'var(--amber-bright)';
+    tagText = 'Entregue (Aguardando Revisor)';
+    cardClass = 'waiting';
+  } else if (status === 'CRITIQUING') {
+    tagColor = 'var(--purple-bright)';
+    tagText = 'Harsh Critic em Auditoria';
+    cardClass = 'reviewing';
+  } else if (status === 'REJECTED') {
+    tagColor = 'var(--red-bright)';
+    tagText = 'Rejeitado (Corrigindo)';
+    cardClass = 'rejected';
+  } else if (status === 'APPROVED') {
+    tagColor = 'var(--green-bright)';
+    tagText = 'Aprovado';
+    cardClass = 'approved';
+  }
 
   return `
-    <div class="kanban-task-card active">
+    <div class="kanban-task-card ${cardClass}">
       <div style="font-weight: 600; font-size: 10px; color: ${tagColor}">${tagText}</div>
       <div class="task-desc">${escapeHtml(node.latest_feedback || 'Em processamento')}</div>
       <div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; font-family: var(--font-mono)">${node.updated_at || ''}</div>
@@ -332,6 +352,7 @@ function createPairCard(pair) {
 function getAgentStatusClass(status) {
   switch (status) {
     case 'WORKING': return 'state-working';
+    case 'WAITING': return 'state-waiting';
     case 'REVIEWING': return 'state-reviewing';
     case 'APPROVED': return 'state-approved';
     case 'REJECTED': return 'state-rejected';
@@ -479,6 +500,26 @@ if (btnScanProject) {
 
 let graphNodes = [];
 let graphLinks = [];
+let graphZoom = 1;
+let graphPanX = 0;
+let graphPanY = 0;
+let isGraphPanning = false;
+let startPanX = 0;
+let startPanY = 0;
+let draggedGraphNode = null;
+
+const CLUSTER_PALETTE = {
+  'Entities': '#10b981',   // Emerald
+  'Systems': '#0ea5e9',    // Sky blue
+  'Core': '#f59e0b',       // Amber
+  'Tests': '#a855f7',      // Purple
+  'UI': '#ec4899',         // Pink
+  'Graphics': '#6366f1',   // Indigo
+  'Audio': '#06b6d4',      // Cyan
+  'Navigation': '#14b8a6', // Teal
+  'Common': '#84cc16',     // Lime
+  'Raiz': '#38bdf8'        // Light cyan
+};
 
 function setupCanvasGraph() {
   if (!graphCanvas || !canvasViewport) return;
@@ -487,23 +528,41 @@ function setupCanvasGraph() {
   graphCanvas.width = rect.width;
   graphCanvas.height = rect.height;
 
-  const ctx = graphCanvas.getContext('2d');
   const nodes = graphData.nodes || [];
   const edges = graphData.edges || [];
 
-  // Layout circular/orgânico
   const centerX = rect.width / 2;
   const centerY = rect.height / 2;
-  const radius = Math.min(centerX, centerY) * 0.75;
 
+  // 1. Identifica clusters e posiciona centros em anel
+  const clusters = [...new Set(nodes.map(n => n.cluster || 'Raiz'))];
+  const clusterCenters = {};
+  const ringRadius = Math.min(centerX, centerY) * 0.6;
+  clusters.forEach((c, idx) => {
+    const angle = (idx / (clusters.length || 1)) * 2 * Math.PI;
+    clusterCenters[c] = {
+      x: centerX + ringRadius * Math.cos(angle),
+      y: centerY + ringRadius * Math.sin(angle)
+    };
+  });
+
+  // 2. Cria nós com posições iniciais próximas aos clusters
   graphNodes = nodes.map((n, idx) => {
-    const angle = (idx / (nodes.length || 1)) * 2 * Math.PI;
-    const r = radius * (0.6 + 0.4 * Math.sin(idx * 2));
+    const center = clusterCenters[n.cluster || 'Raiz'] || { x: centerX, y: centerY };
+    const jitter = 30 + (idx % 15) * 12;
+    const jAngle = (idx * 1.37) * 2 * Math.PI;
+    const deg = n.degree || 0;
+    const r = Math.max(5, Math.min(5 + Math.sqrt(deg) * 2.5, 24));
+    const col = CLUSTER_PALETTE[n.cluster] || '#38bdf8';
+
     return {
       ...n,
-      x: centerX + r * Math.cos(angle),
-      y: centerY + r * Math.sin(angle),
-      radius: 12 + Math.min(n.lines / 30, 16)
+      x: center.x + jitter * Math.cos(jAngle),
+      y: center.y + jitter * Math.sin(jAngle),
+      vx: 0,
+      vy: 0,
+      radius: r,
+      clusterColor: col
     };
   });
 
@@ -512,76 +571,199 @@ function setupCanvasGraph() {
     target: graphNodes.find(n => n.id === e.target)
   })).filter(l => l.source && l.target);
 
+  // 3. Relaxamento de Força Estilo Obsidian (Force-Directed Layout)
+  const nodeCount = graphNodes.length;
+  const iterations = Math.min(70, Math.max(30, Math.floor(12000 / (nodeCount || 1))));
+  
+  for (let iter = 0; iter < iterations; iter++) {
+    // Repulsão (Coulomb)
+    for (let i = 0; i < nodeCount; i++) {
+      const n1 = graphNodes[i];
+      for (let j = i + 1; j < nodeCount; j++) {
+        const n2 = graphNodes[j];
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+        const distSq = dx * dx + dy * dy || 1;
+        if (distSq < 22500) {
+          const dist = Math.sqrt(distSq);
+          const force = 1400 / (distSq + 80);
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          n1.vx -= fx;
+          n1.vy -= fy;
+          n2.vx += fx;
+          n2.vy += fy;
+        }
+      }
+    }
+
+    // Atração de arestas (Hooke Springs)
+    for (let i = 0; i < graphLinks.length; i++) {
+      const l = graphLinks[i];
+      const dx = l.target.x - l.source.x;
+      const dy = l.target.y - l.source.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const force = (dist - 45) * 0.035;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      l.source.vx += fx;
+      l.source.vy += fy;
+      l.target.vx -= fx;
+      l.target.vy -= fy;
+    }
+
+    // Gravidade central + amortecimento
+    for (let i = 0; i < nodeCount; i++) {
+      const n = graphNodes[i];
+      n.vx += (centerX - n.x) * 0.002;
+      n.vy += (centerY - n.y) * 0.002;
+      n.x += n.vx * 0.45;
+      n.y += n.vy * 0.45;
+      n.vx *= 0.68;
+      n.vy *= 0.68;
+    }
+  }
+
   drawGraph();
 }
 
 function drawGraph() {
   if (!graphCanvas) return;
   const ctx = graphCanvas.getContext('2d');
+  ctx.save();
   ctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+
+  // Aplica Pan & Zoom
+  ctx.translate(graphPanX, graphPanY);
+  ctx.scale(graphZoom, graphZoom);
 
   // Desenha Arestas
   graphLinks.forEach(link => {
     const isConnected = selectedGraphNode && (link.source.id === selectedGraphNode.id || link.target.id === selectedGraphNode.id);
+    const isHoverConnected = hoveredGraphNode && (link.source.id === hoveredGraphNode.id || link.target.id === hoveredGraphNode.id);
+    const isHigh = isConnected || isHoverConnected;
+
     ctx.beginPath();
     ctx.moveTo(link.source.x, link.source.y);
     ctx.lineTo(link.target.x, link.target.y);
-    ctx.strokeStyle = isConnected ? '#f59e0b' : (selectedGraphNode ? 'rgba(30, 41, 59, 0.3)' : 'rgba(56, 189, 248, 0.2)');
-    ctx.lineWidth = isConnected ? 2.5 : 1;
+
+    if (isHigh) {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2.2 / graphZoom;
+    } else if (selectedGraphNode || hoveredGraphNode) {
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.12)';
+      ctx.lineWidth = 0.5 / graphZoom;
+    } else {
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
+      ctx.lineWidth = 0.8 / graphZoom;
+    }
     ctx.stroke();
   });
 
   // Desenha Nós
   graphNodes.forEach(node => {
     const isSelected = selectedGraphNode && selectedGraphNode.id === node.id;
-    const isNeighbor = selectedGraphNode && graphLinks.some(l => (l.source.id === selectedGraphNode.id && l.target.id === node.id) || (l.target.id === selectedGraphNode.id && l.source.id === node.id));
     const isHovered = hoveredGraphNode && hoveredGraphNode.id === node.id;
+    const isNeighbor = (selectedGraphNode && graphLinks.some(l => (l.source.id === selectedGraphNode.id && l.target.id === node.id) || (l.target.id === selectedGraphNode.id && l.source.id === node.id))) ||
+                       (hoveredGraphNode && graphLinks.some(l => (l.source.id === hoveredGraphNode.id && l.target.id === node.id) || (l.target.id === hoveredGraphNode.id && l.source.id === node.id)));
 
     ctx.beginPath();
     ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
 
-    // Cor por tipo
-    let fillColor = '#38bdf8';
-    if (node.type === 'cs') fillColor = '#3b82f6';
-    else if (node.type === 'py') fillColor = '#eab308';
-    else if (node.type === 'ts' || node.type === 'js') fillColor = '#06b6d4';
+    let fillColor = node.clusterColor || '#38bdf8';
+    if (selectedGraphNode || hoveredGraphNode) {
+      if (isSelected) fillColor = '#22c55e';
+      else if (isHovered || isNeighbor) fillColor = '#f59e0b';
+      else fillColor = 'rgba(30, 41, 59, 0.35)';
+    }
 
-    ctx.fillStyle = isSelected ? '#22c55e' : (isNeighbor ? '#f59e0b' : fillColor);
+    ctx.fillStyle = fillColor;
     ctx.fill();
 
-    ctx.strokeStyle = isSelected || isHovered ? '#ffffff' : 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = isSelected ? 3 : 1.5;
+    ctx.strokeStyle = (isSelected || isHovered) ? '#ffffff' : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = (isSelected || isHovered) ? 2.5 / graphZoom : 1 / graphZoom;
     ctx.stroke();
 
-    // Rótulo
-    ctx.fillStyle = isSelected || isNeighbor ? '#ffffff' : '#8da0b8';
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(node.label, node.x, node.y + node.radius + 12);
+    // Rótulo dinâmico baseado em zoom ou relevância
+    const showLabel = isSelected || isHovered || isNeighbor || (node.degree >= 35) || (graphZoom > 1.25);
+    if (showLabel) {
+      ctx.fillStyle = isSelected || isNeighbor ? '#ffffff' : '#94a3b8';
+      ctx.font = `${Math.max(9, Math.round(11 / graphZoom))}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(node.label, node.x, node.y + node.radius + (12 / graphZoom));
+    }
   });
+
+  ctx.restore();
 }
 
-// Mouse events on canvas
+// Mouse interaction (Pan, Zoom, Drag & Click)
 if (graphCanvas) {
-  graphCanvas.addEventListener('mousemove', (e) => {
+  graphCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
     const rect = graphCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    hoveredGraphNode = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius);
-    graphCanvas.style.cursor = hoveredGraphNode ? 'pointer' : 'default';
+    graphPanX = mouseX - (mouseX - graphPanX) * zoomFactor;
+    graphPanY = mouseY - (mouseY - graphPanY) * zoomFactor;
+    graphZoom = Math.max(0.15, Math.min(graphZoom * zoomFactor, 6.0));
     drawGraph();
+  }, { passive: false });
+
+  graphCanvas.addEventListener('mousedown', (e) => {
+    const rect = graphCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left - graphPanX) / graphZoom;
+    const y = (e.clientY - rect.top - graphPanY) / graphZoom;
+
+    const clicked = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 3);
+    if (clicked) {
+      draggedGraphNode = clicked;
+      selectGraphNode(clicked);
+    } else {
+      isGraphPanning = true;
+      startPanX = e.clientX - graphPanX;
+      startPanY = e.clientY - graphPanY;
+    }
   });
 
-  graphCanvas.addEventListener('click', (e) => {
-    const rect = graphCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const clicked = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius);
-    if (clicked) {
-      selectGraphNode(clicked);
+  window.addEventListener('mousemove', (e) => {
+    if (isGraphPanning) {
+      graphPanX = e.clientX - startPanX;
+      graphPanY = e.clientY - startPanY;
+      drawGraph();
+      return;
     }
+    if (draggedGraphNode && graphCanvas) {
+      const rect = graphCanvas.getBoundingClientRect();
+      draggedGraphNode.x = (e.clientX - rect.left - graphPanX) / graphZoom;
+      draggedGraphNode.y = (e.clientY - rect.top - graphPanY) / graphZoom;
+      drawGraph();
+      return;
+    }
+    if (graphCanvas && graphCanvas.offsetParent !== null) {
+      const rect = graphCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left - graphPanX) / graphZoom;
+      const y = (e.clientY - rect.top - graphPanY) / graphZoom;
+      hoveredGraphNode = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 3);
+      graphCanvas.style.cursor = hoveredGraphNode ? 'pointer' : (isGraphPanning ? 'grabbing' : 'grab');
+      drawGraph();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isGraphPanning = false;
+    draggedGraphNode = null;
+    if (graphCanvas) graphCanvas.style.cursor = 'grab';
+  });
+
+  graphCanvas.addEventListener('dblclick', () => {
+    graphZoom = 1;
+    graphPanX = 0;
+    graphPanY = 0;
+    selectedGraphNode = null;
+    drawGraph();
   });
 }
 

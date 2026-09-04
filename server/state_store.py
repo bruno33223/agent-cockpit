@@ -192,6 +192,8 @@ class StateStore:
                         node["kanban_status"] = "REJECTED"
                     elif critic_status == "REVIEWING":
                         node["kanban_status"] = "CRITIQUING"
+                    elif builder_status == "WAITING":
+                        node["kanban_status"] = "WAITING_REVIEW"
                     elif builder_status == "WORKING":
                         node["kanban_status"] = "EXECUTING"
                     node["updated_at"] = time.strftime("%H:%M:%S")
