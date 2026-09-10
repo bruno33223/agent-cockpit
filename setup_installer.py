@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import json
 import shutil
@@ -120,14 +120,16 @@ def copy_skills(base_dir):
     dest_skills = Path.home() / ".gemini" / "config" / "skills"
     try:
         dest_skills.mkdir(parents=True, exist_ok=True)
-        for skill_name in ["cockpit", "spec-orchestrator", "gauntlet-loop"]:
-            src = os.path.join(skills_src, skill_name)
-            dst = dest_skills / skill_name
-            if os.path.exists(src):
+        installed_skills = []
+        for item in os.listdir(skills_src):
+            src = os.path.join(skills_src, item)
+            if os.path.isdir(src):
+                dst = dest_skills / item
                 if dst.exists():
                     shutil.rmtree(dst)
                 shutil.copytree(src, dst)
-                print(f"      [OK] Skill '{skill_name}' instalada com sucesso!")
+                installed_skills.append(item)
+        print(f"      [OK] Total de {len(installed_skills)} skills instaladas com sucesso (Cockpit + Superpowers)!")
     except Exception as e:
         print(f"      [AVISO] Nao foi possivel copiar skills automaticamente: {e}")
 

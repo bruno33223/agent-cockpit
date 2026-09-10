@@ -60,18 +60,18 @@ Quando acionado, você atua **estritamente como o Agente Orquestrador**. Você n
 ### Passo 3: Execução do Gauntlet por Fatia Vertical (Inner Loop)
 Para cada **Entregável $k$**:
 1. **Tentativa $i$ (iniciando em 1 até o limite de 3 a 5):**
-   - **Execução:** O Orquestrador despacha os Builders necessários para implementar a fatia vertical completa. Os Builders atualizam a telemetria via MCP `update_agent_pulse(WORKING)` e documentam as decisões tomadas em `cockpit-agent/vault/`.
-   - **Auditoria Cega via MCP:** O Orquestrador despacha os Harsh Critics necessários com contexto limpo.
+   - **Execução:** O Orquestrador despacha os Builders necessários para implementar a fatia vertical completa aplicando a skill `test-driven-development`. Os Builders atualizam a telemetria via MCP `update_agent_pulse(WORKING)` e documentam as decisões tomadas em `cockpit-agent/vault/`.
+   - **Auditoria Cega via MCP & Skills de Review:** O Orquestrador despacha os Harsh Critics necessários com contexto limpo, instruídos pelas skills `requesting-code-review` e `receiving-code-review`.
      - **PROIBIDO TERMINAL RAW:** O Crítico NUNCA executa comandos de teste no terminal (`dotnet build`, `dotnet test`, `npm test` via `run_command`).
      - **USO OBRIGATÓRIO DO MCP COM COMANDO EXPLÍCITO:** O Crítico chama exclusivamente a ferramenta MCP `run_project_tests(test_command='...', working_dir='...')`, passando obrigatoriamente o comando de verificação adequado (ex: `'dotnet build'` para auditar ausência de erros de compilação, ou o comando específico de testes do projeto como `'dotnet run --no-build -- --test-...'`). NUNCA omita o `test_command`.
    - **Veredito:**
-     - Se **APROVADO** por todos os críticos: registre o veredito no Cockpit chamando a tool MCP `log_critique_verdict(APROVADO)` e no histórico `GAUNTLET_LOG.md`. Passe para o próximo Entregável.
-     - Se **REJEITADO**: registre o veredito chamando a tool MCP `log_critique_verdict(REJEITADO, reason_md=...)`, incremente a Tentativa ($i+1$) e despache o Builder instruindo-o a consultar a falha via `get_slice_failure_report(slice_id="...")`. **O Orquestrador está TERMINANTEMENTE PROIBIDO de chamar `get_slice_failure_report` no chat principal**; essa leitura é restrita ao contexto isolado do Builder.
+     - Se **APROVADO** por todos os críticos: registre o veredito no Cockpit chamando a tool MCP `log_critique_verdict(APROVADO)` com as métricas de severidade e no histórico `GAUNTLET_LOG.md`. Passe para o próximo Entregável.
+     - Se **REJEITADO**: registre o veredito chamando a tool MCP `log_critique_verdict(REJEITADO, reason_md=..., review_metrics=...)`, incremente a Tentativa ($i+1$) e despache o Builder aplicando obrigatoriamente a skill `systematic-debugging` para diagnosticar a causa-raiz antes de qualquer correção, instruindo-o a consultar a falha via `get_slice_failure_report(slice_id="...")`. **O Orquestrador está TERMINANTEMENTE PROIBIDO de chamar `get_slice_failure_report` no chat principal**; essa leitura é restrita ao contexto isolado do Builder.
 2. **Controle de Limites (Safety & Credit Bounds):**
    - Se atingir o limite estipulado (padrão: 3 a 5 tentativas) sem aprovação do Critic, **pause imediatamente**, apresente o relatório ao usuário no chat e peça autorização antes de gastar novos ciclos.
 
-### Passo 4: Auditoria de Integração Final
-- Quando todas as fatias verticais estiverem marcadas como `CONCLUÍDO`, o Orquestrador roda a suíte global de regressão via `run_project_tests`, gera o `HANDOFF.md` via MCP `generate_handoff` e emite estritamente o micro-ponteiro de conclusão no chat (sem textão de resumo).
+### Passo 4: Auditoria de Integração Final & Verification Gate
+- Quando todas as fatias verticais estiverem marcadas como `CONCLUÍDO`, o Orquestrador executa a skill `verification-before-completion` via MCP `verify_completion_evidence`, roda a suíte global de regressão via `run_project_tests`, gera o `HANDOFF.md` via MCP `generate_handoff`, limpa branches com `finishing-a-development-branch` e emite estritamente o micro-ponteiro de conclusão no chat (sem textão de resumo).
 
 ---
 

@@ -194,45 +194,47 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 
 ---
 
-## 2. Workflow Integrado: Padrão Maestro no Cockpit
+## 2. Workflow Integrado: Orquestração Cockpit + 14 Skills Especializadas
 
 ```
 [Início de Sessão / Épico]
          │
          ▼
-[Fase 0: Retomada Instantânea (Handoff)]
-   - Chame read_last_handoff no MCP para ler o estado da sessão anterior sem ler repositório
+[Fase 0: Retomada Instantânea & Preparação]
+   - Chame read_last_handoff no MCP para ler o estado sem ler arquivos
+   - Ative a skill `brainstorming` se os requisitos iniciais estiverem abertos
          │
          ▼
-[Fase 1: Spec-Driven Architecture (/boost)]
-   - Mapeamento de impacto via query_symbol_impact (zero tokens)
-   - Geração da pasta versionada: 01_[nome]/MASTER_BLUEPRINT.md
-   - Decomposição em exatamente 3 Fatias Verticais
+[Fase 1: Spec-Driven Architecture & Planejamento]
+   - Ative a skill `writing-plans` e mapeie impacto via query_symbol_impact (zero tokens)
+   - Geração da pasta versionada: cockpit-agent/blueprints/01_[nome]/MASTER_BLUEPRINT.md
+   - Decomposição estrita em Fatias Verticais
          │
          ▼
-[Fase 2: Sincronização MCP & Lock Declarativo]
-   - Chamada da tool: sync_blueprint
-   - Geração automática de 01_[nome]/blueprint.lock.json (critérios imutáveis)
-   - Renderização instantânea do fluxograma com micro-kanbans
+[Fase 2: Sincronização MCP & Isolamento Git Worktrees]
+   - Chamada da tool: sync_blueprint (gera blueprint.lock.json)
+   - Ative a skill `using-git-worktrees` via MCP create_slice_worktree para isolamento físico por fatia
          │
          ▼
-[Fase 3: Despacho Concorrente dos 3 Builders (Briefing Fatiado)]
-   - UMA ÚNICA chamada de invoke_subagent contendo [Builder 1, Builder 2, Builder 3]
-   - Cada builder instruído a buscar sua spec via get_slice_spec(slice_id="...")
+[Fase 3: Despacho Concorrente dos Builders (Padrão SDD + TDD Iron Law)]
+   - Governe pelo protocolo `subagent-driven-development` em lote único via invoke_subagent
+   - Cada Builder executa `prepare_task_context` para carregar contexto cirúrgico
+   - Cada Builder aplica rigorosamente a skill `test-driven-development` (Fase RED antes de Fase GREEN)
    - Atualização de pulso: update_agent_pulse(WORKING)
          │
          ▼
-[Fase 4: Auditoria Concorrente dos 3 Critics & Test Distiller]
+[Fase 4: Auditoria Concorrente dos Critics & Systematic Debugging]
    - UMA ÚNICA chamada de invoke_subagent contendo [Critic 1, Critic 2, Critic 3]
-   - Critics executam run_project_tests (logs filtrados cirurgicamente)
-   - Registro de veredito: log_critique_verdict(APROVADO / REJEITADO)
-   - Log histórico em: 01_[nome]/GAUNTLET_LOG.md
+   - Critics aplicam os checklists das skills `requesting-code-review` e `receiving-code-review`
+   - Em caso de rejeição, o Builder seguinte aciona obrigatoriamente a skill `systematic-debugging`
+   - Registro de veredito formal via log_critique_verdict (com severidades)
          │
          ▼
-[Fase 5: Human Gate, Handoff em Disco & Ponteiro Compacto]
-   - Verificação opcional do gate: check_human_gate("gate_ship_approved")
-   - Geração de 01_[nome]/HANDOFF.md via MCP generate_handoff
-   - Emissão de ponteiro cirúrgico no chat (máx 5 linhas)
+[Fase 5: Verification Gate, Handoff & Finalização de Branch]
+   - Ative a skill `verification-before-completion` via tool MCP verify_completion_evidence (<180s, Exit Code 0)
+   - Chame cleanup_slice_worktree seguindo a skill `finishing-a-development-branch`
+   - Geração do HANDOFF.md via generate_handoff
+   - Emissão de micro-ponteiro cirúrgico no chat (máx 5 linhas)
 ```
 
 ---

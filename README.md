@@ -328,6 +328,8 @@ Validates MCP JSON-RPC handshakes, state store atomicity, REST endpoints, and We
 
 ---
 
-## 📄 License
+## 📄 License & Third-Party Credits
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+
+This project integrates and adapts the engineering skills and guidelines from **Superpowers** (`obra/superpowers`) by Jesse Vincent, distributed under the MIT License. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full licensing details.

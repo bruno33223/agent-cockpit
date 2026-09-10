@@ -1,6 +1,20 @@
+# Third-Party Software & Licenses
+
+This project incorporates and adapts code, skills, and prompts from third-party open-source projects under permissive licenses.
+
+---
+
+## Superpowers
+
+- **Project:** Superpowers (`obra/superpowers`)
+- **Author:** Jesse Vincent and contributors
+- **Repository:** https://github.com/obra/superpowers
+- **License:** MIT License
+
+```
 MIT License
 
-Copyright (c) 2026 lekdohacking contributors
+Copyright (c) 2025 Jesse Vincent
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,7 +33,21 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
 
----
-
-For third-party components, skills, and prompts included in this distribution (including Jesse Vincent's Superpowers), see THIRD_PARTY_LICENSES.md.
+### Integrated Components & Skills
+The following skills and guidelines from Superpowers are bundled and integrated into Agent Cockpit:
+1. `brainstorming`
+2. `dispatching-parallel-agents`
+3. `executing-plans`
+4. `finishing-a-development-branch`
+5. `receiving-code-review`
+6. `requesting-code-review`
+7. `subagent-driven-development`
+8. `systematic-debugging`
+9. `test-driven-development`
+10. `using-git-worktrees`
+11. `using-superpowers`
+12. `verification-before-completion`
+13. `writing-plans`
+14. `writing-skills`
