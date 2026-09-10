@@ -547,7 +547,7 @@ def handle_tool_call(name: str, args: dict) -> dict:
             exit_code = int(exit_m.group(1)) if exit_m else (0 if "Exit Code: 0" in content else 1)
             evidence["exit_code"] = exit_code
             
-            if age <= max_age and is_zero_exit:
+            if age <= max_age and exit_code == 0:
                 evidence["compliant"] = True
                 evidence["reason"] = f"Evidência fresca confirmada ({age}s atrás, Exit Code 0, 0 falhas)."
             elif age > max_age:
