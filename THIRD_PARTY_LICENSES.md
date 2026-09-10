@@ -36,18 +36,19 @@ SOFTWARE.
 ```
 
 ### Integrated Components & Skills
-The following skills and guidelines from Superpowers are bundled and integrated into Agent Cockpit:
+The following 13 skills and guidelines from Superpowers are bundled and integrated into Agent Cockpit:
 1. `brainstorming`
 2. `dispatching-parallel-agents`
-3. `executing-plans`
-4. `finishing-a-development-branch`
-5. `receiving-code-review`
-6. `requesting-code-review`
-7. `subagent-driven-development`
-8. `systematic-debugging`
-9. `test-driven-development`
-10. `using-git-worktrees`
-11. `using-superpowers`
-12. `verification-before-completion`
-13. `writing-plans`
-14. `writing-skills`
+3. `finishing-a-development-branch`
+4. `receiving-code-review`
+5. `requesting-code-review`
+6. `subagent-driven-development`
+7. `systematic-debugging`
+8. `test-driven-development`
+9. `using-git-worktrees`
+10. `using-superpowers`
+11. `verification-before-completion`
+12. `writing-plans`
+13. `writing-skills`
+
+*(Nota: A skill `executing-plans` e os scripts bash legados de SDD foram podados por redundância operacional, sendo nativamente substituídos pelo orquestrador multiagente 3x3 e pelas ferramentas MCP Python `prepare_task_context` e `get_slice_spec`).*

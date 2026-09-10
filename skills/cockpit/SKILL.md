@@ -68,10 +68,10 @@ Quando o usuário disser:
 
 ## ⚠️ Diagnóstico de Redundâncias (O que NÃO Usar)
 
-1. **`executing-plans` (REDUNDANTE / PRETERIDO):**
-   - Esta skill do Superpowers é um fallback para terminais mono-agente sem capacidade de invocar subagentes. Como o Cockpit opera nativamente com a frota 3x3 (`invoke_subagent`), **`executing-plans` NUNCA deve ser acionada**; use sempre `spec-orchestrator` + `subagent-driven-development`.
-2. **Scripts Bash em `skills/subagent-driven-development/scripts/` (REDUNDANTE):**
-   - Scripts como `review-package`, `task-brief` e `sdd-workspace` foram feitos para ambientes Unix/Bash. O Cockpit substituiu essa necessidade pelas tools MCP nativas em Python `prepare_task_context` e `get_slice_spec`, que rodam 100% no Windows sem dependência de terminal.
+1. **`executing-plans` (REMOVIDO / REDUNDANTE):**
+   - Removido fisicamente do pacote. Esta skill do Superpowers era apenas um fallback para terminais mono-agente sem capacidade de invocar subagentes. O Cockpit opera nativamente com a frota 3x3 (`invoke_subagent`), usando exclusivamente `spec-orchestrator` + `subagent-driven-development`.
+2. **Scripts Bash em `skills/subagent-driven-development/scripts/` (REMOVIDOS / REDUNDANTES):**
+   - Removidos fisicamente. Os scripts bash legados para Unix/Mac foram totalmente substituídos pelas tools MCP nativas em Python `prepare_task_context` e `get_slice_spec`, que rodam 100% no Windows sem dependência de terminal.
 3. **Comandos de Shell de Worktree manuais (REDUNDANTE):**
    - Não execute comandos manuais como `git worktree add` via `run_command`. Use sempre a tool MCP `create_slice_worktree`, que trata normalização de diretórios e bloqueios de arquivos no Windows automaticamente.
 4. **Execução de Testes no Terminal Raw (PROIBIDO):**

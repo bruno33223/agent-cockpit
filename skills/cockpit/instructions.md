@@ -74,8 +74,8 @@ Sempre que o usuário solicitar uma tarefa, modificação ou épico referenciand
 
 ---
 
-## 🚫 Alertas de Redundância (O que NÃO Usar)
+## 🚫 Redundâncias Removidas & O que NÃO Usar
 
-- **`executing-plans`:** Redundante e preterida em relação ao SDD + `spec-orchestrator`.
-- **Scripts Bash em `skills/subagent-driven-development/scripts/`:** Redundantes; substituídos pelas ferramentas nativas em Python `prepare_task_context` e `get_slice_spec`.
+- **`executing-plans` (REMOVIDO):** Fisicamente excluído do pacote; o Cockpit utiliza exclusivamente a frota 3x3 com `spec-orchestrator` e `subagent-driven-development`.
+- **Scripts Bash em `skills/subagent-driven-development/scripts/` (REMOVIDOS):** Fisicamente excluídos; substituídos pelas ferramentas nativas em Python `prepare_task_context` e `get_slice_spec`.
 - **Comandos manuais de terminal (`run_command`) para testes e worktrees:** Proibidos; substituídos por `run_project_tests` e `create_slice_worktree`.
