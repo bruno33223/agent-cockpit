@@ -57,14 +57,23 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "log_critique_verdict",
-        "description": "Registra o veredito formal da banca revisora (Harsh Critic) no GAUNTLET_LOG e atualiza o nó no dashboard.",
+        "description": "Registra o veredito formal da banca revisora (Harsh Critic) no GAUNTLET_LOG e atualiza o nó no dashboard com métricas de severidade do Superpowers (Critical, Important, Minor).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "slice_id": {"type": "string", "description": "ID da fatia vertical (ex: slice-1)."},
                 "attempt": {"type": "integer", "description": "Número da tentativa avaliada."},
                 "verdict": {"type": "string", "description": "Veredito da revisão: APROVADO ou REJEITADO.", "enum": ["APROVADO", "REJEITADO"]},
-                "reason_md": {"type": "string", "description": "Justificativa técnica rigorosa dos defeitos ou validação."}
+                "reason_md": {"type": "string", "description": "Justificativa técnica rigorosa dos defeitos ou validação."},
+                "review_metrics": {
+                    "type": "object",
+                    "description": "Métricas estruturadas de severidade (inspirado no Superpowers code review).",
+                    "properties": {
+                        "critical": {"type": "integer", "description": "Contagem de achados críticos/bloqueantes.", "default": 0},
+                        "important": {"type": "integer", "description": "Contagem de problemas importantes antes de merge.", "default": 0},
+                        "minor": {"type": "integer", "description": "Contagem de melhorias menores/estilísticas.", "default": 0}
+                    }
+                }
             },
             "required": ["slice_id", "attempt", "verdict", "reason_md"]
         }
@@ -132,14 +141,16 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "run_project_tests",
-        "description": "Executa a suíte de testes de forma determinística no servidor Python e destila o resultado, eliminando 95% do lixo de terminal, salvando o log bruto em disco e retornando apenas as falhas reais em JSON compacto. Se test_command for omitido, auto-detecta dotnet test, pytest ou npm test.",
+        "description": "Executa a suíte de testes de forma determinística no servidor Python e destila o resultado, eliminando 95% do lixo de terminal, salvando o log bruto em disco e retornando apenas as falhas reais em JSON compacto. Suporta verificação TDD Iron Law (verify_red, verify_green). Se test_command for omitido, auto-detecta.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "test_command": {"type": "string", "description": "Comando de teste opcional (ex: 'dotnet test', 'pytest', 'npm test'). Se omitido, auto-detecta."},
                 "working_dir": {"type": "string", "description": "Diretório de execução (padrão: .)."},
                 "timeout_sec": {"type": "integer", "description": "Timeout em segundos (padrão: 60)."},
-                "log_output_dir": {"type": "string", "description": "Pasta para salvar TEST_RAW.log (padrão: pasta da blueprint mais recente)."}
+                "log_output_dir": {"type": "string", "description": "Pasta para salvar TEST_RAW.log (padrão: pasta da blueprint mais recente)."},
+                "tdd_mode": {"type": "string", "description": "Modo TDD: 'standard', 'verify_red' (deve falhar), 'verify_green' (deve passar 100%).", "enum": ["standard", "verify_red", "verify_green"], "default": "standard"},
+                "slice_id": {"type": "string", "description": "ID da fatia vertical associada ao teste (ex: 'slice-1')."}
             }
         }
     },
@@ -201,6 +212,55 @@ TOOLS_DEFINITIONS = [
                 "retain_last_verdicts": {"type": "integer", "description": "Quantidade de vereditos recentes do Gauntlet a reter (padrão: 6).", "default": 6}
             }
         }
+    },
+    {
+        "name": "create_slice_worktree",
+        "description": "Cria um workspace Git Worktree isolado em .worktrees/{slice_id} com branch dedicada cockpit/{slice_id}, garantindo isolamento total de execução sem colisão entre subagentes (Superpowers pattern).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {"type": "string", "description": "Identificador da fatia (ex: 'slice-1')."},
+                "repo_root": {"type": "string", "description": "Diretório raiz do repositório (padrão: .).", "default": "."},
+                "base_branch": {"type": "string", "description": "Branch base de origem opcional."}
+            },
+            "required": ["slice_id"]
+        }
+    },
+    {
+        "name": "cleanup_slice_worktree",
+        "description": "Remove o workspace Git Worktree e limpa os diretórios e referências de branch temporárias criadas durante a execução da fatia.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {"type": "string", "description": "Identificador da fatia a limpar."},
+                "repo_root": {"type": "string", "description": "Diretório raiz do repositório.", "default": "."},
+                "delete_branch": {"type": "boolean", "description": "Se deve deletar a branch cockpit/{slice_id} associada.", "default": True}
+            },
+            "required": ["slice_id"]
+        }
+    },
+    {
+        "name": "prepare_task_context",
+        "description": "Prepara um briefing cirúrgico e isolado de uma fatia vertical para o implementador/revisor SDD, integrando spec_md, impacto de símbolos AST e regras de isolamento.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {"type": "string", "description": "ID da fatia (ex: 'slice-1')."},
+                "role_type": {"type": "string", "description": "Papel do agente: 'implementer' ou 'task_reviewer'.", "enum": ["implementer", "task_reviewer"], "default": "implementer"}
+            },
+            "required": ["slice_id"]
+        }
+    },
+    {
+        "name": "verify_completion_evidence",
+        "description": "Anti-Slop Completion Gate (Superpowers): Valida se existe evidência fresca (<180s) e impecável de testes (0 falhas) antes de permitir a conclusão de uma fatia ou liberação do gate de entrega.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {"type": "string", "description": "ID da fatia opcional."},
+                "max_age_seconds": {"type": "integer", "description": "Idade máxima permitida para o teste mais recente em segundos.", "default": 180}
+            }
+        }
     }
 ]
 
@@ -255,7 +315,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
             slice_id=args.get("slice_id", "slice-1"),
             attempt=args.get("attempt", 1),
             verdict=args.get("verdict", "REJEITADO"),
-            reason_md=args.get("reason_md", "")
+            reason_md=args.get("reason_md", ""),
+            review_metrics=args.get("review_metrics")
         )
         return {"content": [{"type": "text", "text": f"Veredito [{res.get('verdict')}] registrado no Gauntlet Log para {args.get('slice_id')} (Tentativa {args.get('attempt')})."}]}
 
@@ -309,11 +370,20 @@ def handle_tool_call(name: str, args: dict) -> dict:
         cwd = args.get("working_dir", ".")
         timeout = args.get("timeout_sec", 60)
         log_dir = args.get("log_output_dir")
+        tdd_mode = args.get("tdd_mode", "standard")
+        slice_id = args.get("slice_id")
         if not log_dir:
             import workflow_lock
             found = workflow_lock.find_latest_blueprint_dir(".")
             log_dir = found if found else cwd
-        res = run_distilled_tests(cmd, working_dir=cwd, timeout_sec=timeout, log_output_dir=log_dir)
+        res = run_distilled_tests(
+            cmd,
+            working_dir=cwd,
+            timeout_sec=timeout,
+            log_output_dir=log_dir,
+            tdd_mode=tdd_mode,
+            slice_id=slice_id
+        )
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
     elif name == "generate_handoff":
@@ -382,6 +452,97 @@ def handle_tool_call(name: str, args: dict) -> dict:
         retain_verdicts = args.get("retain_last_verdicts", 6)
         res = db.prune_session_context(retain_last_messages=retain_msgs, retain_last_verdicts=retain_verdicts)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
+
+    elif name == "create_slice_worktree":
+        import git_worktrees
+        slice_id = args.get("slice_id", "slice-1")
+        repo_root = args.get("repo_root", ".")
+        base_branch = args.get("base_branch")
+        res = git_worktrees.create_slice_worktree(slice_id, repo_root=repo_root, base_branch=base_branch)
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
+
+    elif name == "cleanup_slice_worktree":
+        import git_worktrees
+        slice_id = args.get("slice_id", "slice-1")
+        repo_root = args.get("repo_root", ".")
+        del_br = args.get("delete_branch", True)
+        res = git_worktrees.cleanup_slice_worktree(slice_id, repo_root=repo_root, delete_branch=del_br)
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
+
+    elif name == "prepare_task_context":
+        slice_id = args.get("slice_id", "")
+        role_type = args.get("role_type", "implementer")
+        spec = db.get_slice_spec(slice_id)
+        if not spec:
+            return {"content": [{"type": "text", "text": json.dumps({"error": f"Fatia '{slice_id}' não encontrada."})}]}
+        
+        # Recupera símbolos do grafo de código se disponível
+        from code_graph import query_impact
+        target_symbols = []
+        for line in spec.get("acceptance_criteria", "").splitlines():
+            for word in line.replace("`", " ").split():
+                if len(word) > 3 and word[0].isupper():
+                    target_symbols.append(word.strip("(),.:;"))
+        
+        impacts = {}
+        for sym in list(set(target_symbols))[:5]:
+            try:
+                imp = query_impact(".", sym)
+                if imp.get("found"):
+                    impacts[sym] = imp
+            except Exception:
+                pass
+
+        brief = {
+            "slice_id": slice_id,
+            "title": spec.get("title"),
+            "role_type": role_type,
+            "tdd_stage": spec.get("tdd_stage", "PENDING"),
+            "acceptance_criteria": spec.get("acceptance_criteria"),
+            "spec_md": spec.get("spec_md"),
+            "symbol_impacts": impacts,
+            "guardrails": [
+                "NUNCA despache outros subagentes ou revisores secundários.",
+                "Se houver dúvidas sobre os requisitos, pare e questione imediatamente.",
+                "Siga a Iron Law do TDD: comprove teste falhando (RED) antes do código de produção.",
+                "Realize auto-revisão lendo seu próprio git diff antes de submeter a entrega."
+            ]
+        }
+        return {"content": [{"type": "text", "text": json.dumps(brief, indent=2, ensure_ascii=False)}]}
+
+    elif name == "verify_completion_evidence":
+        import time
+        max_age = args.get("max_age_seconds", 180)
+        slice_id = args.get("slice_id")
+        raw_log = os.path.join(".", "TEST_RAW.log")
+        
+        evidence = {
+            "compliant": False,
+            "reason": "Nenhuma evidência de teste recente encontrada.",
+            "test_log_age_seconds": None,
+            "exit_code": None
+        }
+        
+        if os.path.exists(raw_log):
+            mtime = os.path.getmtime(raw_log)
+            age = int(time.time() - mtime)
+            evidence["test_log_age_seconds"] = age
+            
+            with open(raw_log, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            
+            is_zero_exit = "Exit Code: 0" in content
+            evidence["exit_code"] = 0 if is_zero_exit else 1
+            
+            if age <= max_age and is_zero_exit:
+                evidence["compliant"] = True
+                evidence["reason"] = f"Evidência fresca confirmada ({age}s atrás, Exit Code 0, 0 falhas)."
+            elif age > max_age:
+                evidence["reason"] = f"Evidência desatualizada ({age}s atrás > limite de {max_age}s). Execute os testes novamente."
+            else:
+                evidence["reason"] = "Os testes mais recentes falharam (Exit Code != 0). O portão de entrega permanece bloqueado."
+        
+        return {"content": [{"type": "text", "text": json.dumps(evidence, indent=2, ensure_ascii=False)}]}
 
     else:
         return {"isError": True, "content": [{"type": "text", "text": f"Ferramenta desconhecida: {name}"}]}

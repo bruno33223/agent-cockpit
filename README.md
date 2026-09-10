@@ -192,17 +192,17 @@ Each code file generates a corresponding note in the Vault containing:
 
 ## 🛠️ MCP Server Tools (JSON-RPC 2.0)
 
-The stdio MCP server exposes 14 specialized tools for AI orchestrators:
+The stdio MCP server exposes 19 specialized tools for AI orchestrators (including Superpowers engineering patterns):
 
 | Tool | Description |
 | :--- | :--- |
 | `sync_blueprint` | Initializes the active epic and vertical slices, creating `blueprint.lock.json` in `./cockpit-agent/blueprints/`. |
 | `update_agent_pulse` | Sends real-time telemetry for 3x3 pairs and moves cards across the visual Kanban pipeline. |
-| `log_critique_verdict` | Records approvals or detailed rejections into the Gauntlet Audit Log. |
+| `log_critique_verdict` | Records approvals or detailed rejections into the Gauntlet Audit Log with structured severity metrics (`critical`, `important`, `minor`). |
 | `fetch_user_steering` | Reads queued human instructions sent via the dashboard live chat. |
 | `post_orchestrator_message` | Sends orchestrator status updates and replies back to the dashboard chat. |
 | `get_cockpit_state` | Returns the full JSON snapshot of the current governance state. |
-| `run_project_tests` | Executes the project test suite (`dotnet test`, `pytest`, `npm test`) and distills only failing assertions and stack traces (~95% token reduction). |
+| `run_project_tests` | Executes the project test suite (`dotnet test`, `pytest`, `npm test`), distills only failing assertions, and supports **TDD Iron Law** verification (`verify_red` and `verify_green`). |
 | `get_slice_failure_report` | Retrieves the distilled failure history for a specific vertical slice. |
 | `analyze_codebase_graph` | Performs a static AST scan and returns the dependency graph with zero token expenditure. |
 | `query_symbol_impact` | Computes the impact zone (blast radius) of any modified file or symbol. |
@@ -210,6 +210,11 @@ The stdio MCP server exposes 14 specialized tools for AI orchestrators:
 | `read_last_handoff` | Reads the most recent handoff to resume work in a new session with zero context drift. |
 | `get_slice_spec` | Returns only the isolated specification of a single vertical slice (saving 80% tokens for subagents). |
 | `check_human_gate` | Verifies whether the human operator has approved release or integration gates. |
+| `context_pruner` | Prunes and condenses past chat history and gauntlet logs to keep context strictly minimal. |
+| `create_slice_worktree` | **[Superpowers]** Creates an isolated Git Worktree in `.worktrees/{slice_id}` with dedicated branch `cockpit/{slice_id}` for zero-collision agent work. |
+| `cleanup_slice_worktree` | **[Superpowers]** Safely removes the Git Worktree and cleans up temporary branches and folders. |
+| `prepare_task_context` | **[Superpowers SDD]** Assembles surgical task context, AST symbol impacts, and strict isolation guardrails for implementers/reviewers. |
+| `verify_completion_evidence` | **[Superpowers Anti-Slop]** Enforces fresh test execution evidence (<180s, 0 failures) before allowing slice or epic completion. |
 
 ---
 

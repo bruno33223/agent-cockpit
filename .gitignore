@@ -49,3 +49,9 @@ uvicorn*.log
 03_*/
 cockpit-agent/
 
+# References & Isolated Worktrees
+_references/
+.worktrees/
+worktrees/
+
+

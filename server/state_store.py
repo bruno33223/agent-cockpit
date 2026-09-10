@@ -25,6 +25,8 @@ def default_initial_state() -> Dict[str, Any]:
                 "acceptance_criteria": "- Contratos de interface validados\n- Zero acoplamento destrutivo\n- Testes de ponta a ponta",
                 "spec_md": "### Fatia Vertical 1\nAguardando envio do Master Blueprint pelo Orquestrador.",
                 "latest_feedback": "Nenhuma revisão executada ainda.",
+                "tdd_stage": "PENDING",
+                "review_metrics": {"critical": 0, "important": 0, "minor": 0},
                 "updated_at": time.strftime("%H:%M:%S")
             },
             {
@@ -37,6 +39,8 @@ def default_initial_state() -> Dict[str, Any]:
                 "acceptance_criteria": "- Lógica de negócio coesa\n- Sem regressões funcionais",
                 "spec_md": "### Fatia Vertical 2\nAguardando envio do Master Blueprint pelo Orquestrador.",
                 "latest_feedback": "Nenhuma revisão executada ainda.",
+                "tdd_stage": "PENDING",
+                "review_metrics": {"critical": 0, "important": 0, "minor": 0},
                 "updated_at": time.strftime("%H:%M:%S")
             },
             {
@@ -49,6 +53,8 @@ def default_initial_state() -> Dict[str, Any]:
                 "acceptance_criteria": "- Renderização e usabilidade validadas\n- Auditoria de integração final aprovada",
                 "spec_md": "### Fatia Vertical 3\nAguardando envio do Master Blueprint pelo Orquestrador.",
                 "latest_feedback": "Nenhuma revisão executada ainda.",
+                "tdd_stage": "PENDING",
+                "review_metrics": {"critical": 0, "important": 0, "minor": 0},
                 "updated_at": time.strftime("%H:%M:%S")
             }
         ],
@@ -159,6 +165,8 @@ class StateStore:
                     "acceptance_criteria": s.get("acceptance_criteria", "Critérios definidos no blueprint."),
                     "spec_md": s.get("spec_md", "Especificação técnica."),
                     "latest_feedback": "Aguardando início da execução.",
+                    "tdd_stage": "PENDING",
+                    "review_metrics": {"critical": 0, "important": 0, "minor": 0},
                     "updated_at": time.strftime("%H:%M:%S")
                 })
             state["nodes"] = nodes
@@ -202,16 +210,32 @@ class StateStore:
         self._notify("STATE_FULL", state)
         return state
 
+    def set_slice_tdd_stage(self, slice_id: str, stage: str) -> Dict[str, Any]:
+        """Atualiza o estágio do ciclo TDD da fatia (PENDING, RED_CONFIRMED, GREEN_CONFIRMED)."""
+        with self.lock:
+            state = self.get_state()
+            for node in state.get("nodes", []):
+                if node["id"] == slice_id:
+                    node["tdd_stage"] = stage
+                    node["updated_at"] = time.strftime("%H:%M:%S")
+            self._save_state(state)
+        self._notify("TDD_STAGE_UPDATED", {"slice_id": slice_id, "stage": stage})
+        self._notify("STATE_FULL", state)
+        return {"slice_id": slice_id, "tdd_stage": stage}
+
     def log_critique_verdict(self, slice_id: str, attempt: int, verdict: str,
-                             reason_md: str) -> Dict[str, Any]:
+                             reason_md: str,
+                             review_metrics: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
         with self.lock:
             state = self.get_state()
             verdict_norm = "APROVADO" if "APROV" in verdict.upper() else "REJEITADO"
+            metrics = review_metrics or {"critical": 0, "important": 0, "minor": 0}
             entry = {
                 "slice_id": slice_id,
                 "attempt": attempt,
                 "verdict": verdict_norm,
                 "reason": reason_md,
+                "review_metrics": metrics,
                 "timestamp": time.strftime("%H:%M:%S")
             }
             state.setdefault("gauntlet_log", []).append(entry)
@@ -220,6 +244,7 @@ class StateStore:
                     node["attempt"] = attempt
                     node["latest_feedback"] = f"[{verdict_norm}] {reason_md}"
                     node["kanban_status"] = "APPROVED" if verdict_norm == "APROVADO" else "REJEITADO"
+                    node["review_metrics"] = metrics
                     node["updated_at"] = time.strftime("%H:%M:%S")
             self._save_state(state)
         self._notify("VERDICT_LOGGED", entry)

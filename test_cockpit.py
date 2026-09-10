@@ -223,6 +223,91 @@ def run_tests():
     assert "content" in read_data or "status" in read_data
     print(" [OK] Tool call read_last_handoff OK")
 
+    # Call prepare_task_context (Superpowers SDD)
+    prep_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+            "name": "prepare_task_context",
+            "arguments": {
+                "slice_id": "slice-1",
+                "role_type": "implementer"
+            }
+        }
+    })
+    prep_data = json.loads(prep_res["result"]["content"][0]["text"])
+    assert prep_data["slice_id"] == "slice-1"
+    assert "guardrails" in prep_data
+    print(" [OK] Tool call prepare_task_context (Superpowers SDD) OK")
+
+    # Call run_project_tests com modo TDD (Iron Law)
+    tdd_red_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 14,
+        "method": "tools/call",
+        "params": {
+            "name": "run_project_tests",
+            "arguments": {
+                "test_command": "python -c \"import sys; sys.exit(1)\"",
+                "tdd_mode": "verify_red",
+                "slice_id": "slice-1"
+            }
+        }
+    })
+    tdd_red_data = json.loads(tdd_red_res["result"]["content"][0]["text"])
+    assert tdd_red_data["tdd_validation"]["compliant"] == True
+    assert "Fase RED confirmada" in tdd_red_data["tdd_validation"]["message"]
+    print(" [OK] Tool call run_project_tests (TDD Iron Law - verify_red) OK")
+
+    # Call create_slice_worktree (Superpowers Git Isolation)
+    wt_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 15,
+        "method": "tools/call",
+        "params": {
+            "name": "create_slice_worktree",
+            "arguments": {
+                "slice_id": "slice-test-99"
+            }
+        }
+    })
+    wt_data = json.loads(wt_res["result"]["content"][0]["text"])
+    assert wt_data["status"] in ["CREATED", "EXISTS", "ALREADY_ISOLATED", "FALLBACK_LOCAL"]
+    print(f" [OK] Tool call create_slice_worktree (Status: {wt_data['status']}) OK")
+
+    # Call cleanup_slice_worktree
+    clean_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 16,
+        "method": "tools/call",
+        "params": {
+            "name": "cleanup_slice_worktree",
+            "arguments": {
+                "slice_id": "slice-test-99"
+            }
+        }
+    })
+    clean_data = json.loads(clean_res["result"]["content"][0]["text"])
+    assert clean_data["status"] == "CLEANED"
+    print(" [OK] Tool call cleanup_slice_worktree OK")
+
+    # Call verify_completion_evidence (Superpowers Anti-Slop Gate)
+    evid_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 17,
+        "method": "tools/call",
+        "params": {
+            "name": "verify_completion_evidence",
+            "arguments": {
+                "max_age_seconds": 300
+            }
+        }
+    })
+    evid_data = json.loads(evid_res["result"]["content"][0]["text"])
+    assert "compliant" in evid_data
+    print(f" [OK] Tool call verify_completion_evidence (Anti-Slop Gate) OK")
+
     # Clean up test handoff dir
     import shutil
     if os.path.exists("test_handoff_dir"):

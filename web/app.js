@@ -301,10 +301,30 @@ function renderTaskCard(node) {
     cardClass = 'approved';
   }
 
+  const tddBadge = node.tdd_stage === 'GREEN_CONFIRMED' 
+    ? '<span style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); margin-left: 6px;">TDD: GREEN</span>'
+    : (node.tdd_stage === 'RED_CONFIRMED'
+      ? '<span style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); margin-left: 6px;">TDD: RED</span>'
+      : '');
+
+  const metrics = node.review_metrics || { critical: 0, important: 0, minor: 0 };
+  const hasFindings = (metrics.critical || 0) + (metrics.important || 0) + (metrics.minor || 0) > 0;
+  const metricsBadges = hasFindings ? `
+    <div style="display: flex; gap: 4px; margin-top: 4px;">
+      ${metrics.critical > 0 ? `<span style="font-size: 8px; padding: 1px 3px; border-radius: 2px; background: #dc2626; color: #fff;">CRIT: ${metrics.critical}</span>` : ''}
+      ${metrics.important > 0 ? `<span style="font-size: 8px; padding: 1px 3px; border-radius: 2px; background: #ea580c; color: #fff;">IMP: ${metrics.important}</span>` : ''}
+      ${metrics.minor > 0 ? `<span style="font-size: 8px; padding: 1px 3px; border-radius: 2px; background: #0284c7; color: #fff;">MIN: ${metrics.minor}</span>` : ''}
+    </div>
+  ` : '';
+
   return `
     <div class="kanban-task-card ${cardClass}">
-      <div style="font-weight: 600; font-size: 10px; color: ${tagColor}">${tagText}</div>
+      <div style="font-weight: 600; font-size: 10px; color: ${tagColor}; display: flex; align-items: center; justify-content: space-between;">
+        <span>${tagText}</span>
+        ${tddBadge}
+      </div>
       <div class="task-desc">${escapeHtml(node.latest_feedback || 'Em processamento')}</div>
+      ${metricsBadges}
       <div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; font-family: var(--font-mono)">${node.updated_at || ''}</div>
     </div>
   `;
@@ -413,11 +433,22 @@ function renderGauntletFull() {
     const isApproved = log.verdict === 'APROVADO';
     const item = document.createElement('div');
     item.className = `timeline-item ${isApproved ? 'aprovado' : 'rejeitado'}`;
+    const m = log.review_metrics || { critical: 0, important: 0, minor: 0 };
+    const hasFindings = (m.critical || 0) + (m.important || 0) + (m.minor || 0) > 0;
+    const badges = hasFindings ? `
+      <div style="display: flex; gap: 6px; margin: 4px 0;">
+        ${m.critical > 0 ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #dc2626; color: #fff; font-weight: 600;">CRITICAL: ${m.critical}</span>` : ''}
+        ${m.important > 0 ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #ea580c; color: #fff; font-weight: 600;">IMPORTANT: ${m.important}</span>` : ''}
+        ${m.minor > 0 ? `<span style="font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #0284c7; color: #fff; font-weight: 600;">MINOR: ${m.minor}</span>` : ''}
+      </div>
+    ` : '';
+
     item.innerHTML = `
       <div class="timeline-header">
         <span class="timeline-verdict ${isApproved ? 'aprovado' : 'rejeitado'}">${log.verdict} — ${escapeHtml(log.slice_id || '')} (Tentativa ${log.attempt})</span>
         <span style="color: var(--text-muted)">${log.timestamp || ''}</span>
       </div>
+      ${badges}
       <div class="timeline-reason">${escapeHtml(log.reason || '')}</div>
     `;
     gauntletFullList.appendChild(item);

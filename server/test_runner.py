@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import sys
 import time
@@ -38,11 +38,13 @@ def run_distilled_tests(
     working_dir: str = ".",
     timeout_sec: int = 60,
     save_raw_log: bool = True,
-    log_output_dir: Optional[str] = None
+    log_output_dir: Optional[str] = None,
+    tdd_mode: str = "standard",  # "standard", "verify_red", "verify_green"
+    slice_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Executa a suíte de testes de forma determinística e destila o resultado,
-
     removendo 95% do lixo de terminal e retornando apenas as falhas reais em JSON compacto.
+    Suporta modos de validação TDD rigorosos do Superpowers (Iron Law TDD).
     """
     working_dir = os.path.abspath(working_dir)
 
@@ -103,6 +105,46 @@ def run_distilled_tests(
         except Exception as e:
             raw_log_path = f"Aviso salvando log: {e}"
 
+    tdd_result = {"mode": tdd_mode, "compliant": True, "message": "Execução padrão."}
+    if tdd_mode == "verify_red":
+        if not is_pass and len(failures) > 0:
+            tdd_result = {
+                "mode": "verify_red",
+                "compliant": True,
+                "message": "Fase RED confirmada: O teste falhou conforme esperado antes da implementação."
+            }
+            if slice_id:
+                try:
+                    from state_store import db
+                    db.set_slice_tdd_stage(slice_id, "RED_CONFIRMED")
+                except Exception:
+                    pass
+        else:
+            tdd_result = {
+                "mode": "verify_red",
+                "compliant": False,
+                "message": "Violação da Iron Law do TDD: O teste deveria FALHAR na fase RED, mas passou ou não gerou falhas."
+            }
+    elif tdd_mode == "verify_green":
+        if is_pass and len(failures) == 0:
+            tdd_result = {
+                "mode": "verify_green",
+                "compliant": True,
+                "message": "Fase GREEN confirmada: Todos os testes passaram limpos após a implementação."
+            }
+            if slice_id:
+                try:
+                    from state_store import db
+                    db.set_slice_tdd_stage(slice_id, "GREEN_CONFIRMED")
+                except Exception:
+                    pass
+        else:
+            tdd_result = {
+                "mode": "verify_green",
+                "compliant": False,
+                "message": f"Fase GREEN falhou: Existem {len(failures)} testes falhando. Requer depuração sistemática."
+            }
+
     return {
         "status": "PASS" if is_pass else "FAIL",
         "command": test_command,
@@ -111,6 +153,7 @@ def run_distilled_tests(
         "summary": summary,
         "failures_count": len(failures),
         "failures": failures[:10],  # Apenas as falhas essenciais
+        "tdd_validation": tdd_result,
         "raw_log_file": raw_log_path
     }
 
@@ -184,6 +227,13 @@ def parse_failures(output: str) -> List[Dict[str, Any]]:
                 "file": None,
                 "line": None,
                 "message": " | ".join(error_lines[:4])[:350]
+            })
+        else:
+            failures.append({
+                "test_name": "ExitCodeFailure",
+                "file": None,
+                "line": None,
+                "message": "Comando de teste finalizou com código de saída diferente de zero."
             })
 
     return failures
