@@ -34,6 +34,15 @@ def is_inside_worktree(repo_root: str = ".") -> bool:
     except Exception:
         return False
 
+def _rmtree_onerror(func, path, _):
+    """Trata arquivos protegidos ou Read-Only no Windows durante a remoção de worktrees."""
+    import stat
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
 def create_slice_worktree(
     slice_id: str,
     repo_root: str = ".",
@@ -76,7 +85,9 @@ def create_slice_worktree(
             capture_output=True,
             text=True
         )
-        if worktree_dir in res.stdout:
+        norm_stdout = res.stdout.replace('\\', '/').lower()
+        norm_target = worktree_dir.replace('\\', '/').lower()
+        if norm_target in norm_stdout:
             return {
                 "status": "EXISTS",
                 "worktree_path": worktree_dir,
@@ -85,7 +96,7 @@ def create_slice_worktree(
             }
         else:
             try:
-                shutil.rmtree(worktree_dir)
+                shutil.rmtree(worktree_dir, onerror=_rmtree_onerror)
             except Exception:
                 pass
 
@@ -155,7 +166,7 @@ def cleanup_slice_worktree(
     # 2. Garante exclusão da pasta se sobrou algo
     if os.path.exists(worktree_dir):
         try:
-            shutil.rmtree(worktree_dir)
+            shutil.rmtree(worktree_dir, onerror=_rmtree_onerror)
             res_log.append("Diretório físico removido.")
         except Exception as e:
             res_log.append(f"Aviso ao deletar diretório: {str(e)}")

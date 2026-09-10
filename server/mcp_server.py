@@ -514,13 +514,24 @@ def handle_tool_call(name: str, args: dict) -> dict:
         import time
         max_age = args.get("max_age_seconds", 180)
         slice_id = args.get("slice_id")
-        raw_log = os.path.join(".", "TEST_RAW.log")
+        
+        possible_paths = [os.path.join(".", "TEST_RAW.log")]
+        try:
+            import workflow_lock
+            latest_bp = workflow_lock.find_latest_blueprint_dir(".")
+            if latest_bp:
+                possible_paths.insert(0, os.path.join(latest_bp, "TEST_RAW.log"))
+        except Exception:
+            pass
+
+        raw_log = next((p for p in possible_paths if os.path.exists(p)), possible_paths[0])
         
         evidence = {
             "compliant": False,
             "reason": "Nenhuma evidência de teste recente encontrada.",
             "test_log_age_seconds": None,
-            "exit_code": None
+            "exit_code": None,
+            "log_path": raw_log if os.path.exists(raw_log) else None
         }
         
         if os.path.exists(raw_log):
@@ -531,8 +542,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
             with open(raw_log, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
             
-            is_zero_exit = "Exit Code: 0" in content
-            evidence["exit_code"] = 0 if is_zero_exit else 1
+            import re
+            exit_m = re.search(r"Exit Code:\s*(\d+)", content)
+            exit_code = int(exit_m.group(1)) if exit_m else (0 if "Exit Code: 0" in content else 1)
+            evidence["exit_code"] = exit_code
             
             if age <= max_age and is_zero_exit:
                 evidence["compliant"] = True

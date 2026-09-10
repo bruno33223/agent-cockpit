@@ -332,7 +332,9 @@ class StateStore:
                         "spec_md": node.get("spec_md"),
                         "kanban_status": node.get("kanban_status"),
                         "attempt": node.get("attempt", 1),
-                        "max_attempts": node.get("max_attempts", 5)
+                        "max_attempts": node.get("max_attempts", 5),
+                        "tdd_stage": node.get("tdd_stage", "PENDING"),
+                        "review_metrics": node.get("review_metrics", {"critical": 0, "important": 0, "minor": 0})
                     }
         return None
 

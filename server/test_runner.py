@@ -67,7 +67,13 @@ def run_distilled_tests(
         stdout, stderr = proc.communicate(timeout=timeout_sec)
         exit_code = proc.returncode
     except subprocess.TimeoutExpired:
-        proc.kill()
+        if sys.platform == "win32":
+            try:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+            except Exception:
+                proc.kill()
+        else:
+            proc.kill()
         return {
             "status": "TIMEOUT",
             "command": test_command,
