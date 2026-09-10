@@ -209,6 +209,25 @@ def post_vault_sync(payload: Optional[ProjectRootPayload] = None):
     target_root = (payload and payload.path) or db.get_project_root() or "."
     return get_graph_elements_for_ui(target_root)
 
+class AutostartPayload(BaseModel):
+    enabled: bool
+
+@app.get("/api/autostart")
+def get_autostart_status():
+    from autostart import get_autostart_info
+    return get_autostart_info()
+
+@app.post("/api/autostart")
+def post_autostart_toggle(payload: AutostartPayload):
+    from autostart import enable_autostart, disable_autostart, get_autostart_info
+    if payload.enabled:
+        success = enable_autostart()
+    else:
+        success = disable_autostart()
+    info = get_autostart_info()
+    info["success"] = success
+    return info
+
 # Monta arquivos estáticos do dashboard visual
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 if os.path.exists(WEB_DIR):

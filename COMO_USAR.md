@@ -27,12 +27,29 @@ Bem-vindo ao **Agent Cockpit**! Este pacote transforma a forma como a IA desenvo
 
 Sempre que for programar com a IA e quiser acompanhar tudo na tela:
 
-1. Dê **dois cliques** em:
-   👉 **`start_cockpit.bat`**
-2. O dashboard abrirá automaticamente no seu navegador em:
+1. **No Linux:**
+   - O Agent Cockpit pode iniciar automaticamente ao ligar o computador (habilitado via instalador ou botão **Autostart** no topo da tela).
+   - Ou inicie manualmente pelo terminal:
+     ```bash
+     ./start_cockpit.sh
+     # ou
+     python3 run_cockpit.py
+     ```
+   - Ou clique no ícone **Agent Cockpit** no menu de aplicativos do seu sistema operacional.
+2. **No Windows:**
+   - Dê **dois cliques** em 👉 **`start_cockpit.bat`**
+3. O dashboard abrirá automaticamente no seu navegador em:
    🌐 **http://localhost:8765**
 
 ---
+
+### ⚙️ Inicialização com o Sistema Operacional (Linux)
+Você pode ativar ou desativar o autostart a qualquer momento:
+- **Pela Interface Web:** Clique no botão `Autostart` no topo da barra de ações.
+- **Pelo Terminal:**
+  - Status: `python3 run_cockpit.py --autostart-status`
+  - Habilitar: `python3 run_cockpit.py --autostart-enable`
+  - Desabilitar: `python3 run_cockpit.py --autostart-disable`
 
 ## 🤖 Como Usar no Chat da IA (Antigravity ou Claude)
 

@@ -363,7 +363,40 @@ def run_tests():
         with urllib.request.urlopen("http://127.0.0.1:8766/") as resp:
             html = resp.read().decode("utf-8")
             assert "AGENT COCKPIT" in html, "HTML não servido corretamente"
-            print(" [OK] Static Web Dashboard (index.html) OK")
+            assert "btn-autostart" in html, "Botão btn-autostart ausente no HTML"
+            print(" [OK] Static Web Dashboard (index.html com btn-autostart) OK")
+
+        # Autostart API endpoint check
+        import autostart
+        with urllib.request.urlopen("http://127.0.0.1:8766/api/autostart") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "enabled" in data
+            assert data["supported"] is True
+            print(" [OK] Endpoint GET /api/autostart OK")
+
+        # Autostart Toggle ON
+        req_enable = urllib.request.Request(
+            "http://127.0.0.1:8766/api/autostart",
+            data=json.dumps({"enabled": True}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req_enable) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["enabled"] is True
+            assert autostart.is_autostart_enabled() is True
+            print(" [OK] Endpoint POST /api/autostart (enable) OK")
+
+        # Autostart Toggle OFF
+        req_disable = urllib.request.Request(
+            "http://127.0.0.1:8766/api/autostart",
+            data=json.dumps({"enabled": False}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req_disable) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["enabled"] is False
+            assert autostart.is_autostart_enabled() is False
+            print(" [OK] Endpoint POST /api/autostart (disable) OK")
 
     finally:
         server.should_exit = True

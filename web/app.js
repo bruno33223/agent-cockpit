@@ -1305,5 +1305,62 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+// AUTOSTART LOGIC
+const btnAutostart = document.getElementById('btn-autostart');
+let autostartEnabled = false;
+
+async function checkAutostartStatus() {
+  if (!btnAutostart) return;
+  try {
+    const res = await fetch('/api/autostart');
+    if (res.ok) {
+      const data = await res.json();
+      updateAutostartUI(data.enabled);
+    }
+  } catch (err) {
+    console.warn('[Autostart] Falha ao checar status:', err);
+  }
+}
+
+function updateAutostartUI(enabled) {
+  autostartEnabled = !!enabled;
+  if (!btnAutostart) return;
+  btnAutostart.classList.remove('loading');
+  const label = btnAutostart.querySelector('.autostart-text');
+  if (autostartEnabled) {
+    btnAutostart.className = 'action-btn autostart-btn enabled';
+    if (label) label.textContent = 'Autostart: Ativo';
+    btnAutostart.title = 'Agent Cockpit inicia automaticamente com o sistema operacional. Clique para desativar.';
+  } else {
+    btnAutostart.className = 'action-btn autostart-btn disabled';
+    if (label) label.textContent = 'Autostart: Desligado';
+    btnAutostart.title = 'Inicialização com o sistema está desativada. Clique para ativar.';
+  }
+}
+
+if (btnAutostart) {
+  btnAutostart.addEventListener('click', async () => {
+    btnAutostart.classList.add('loading');
+    const newState = !autostartEnabled;
+    try {
+      const res = await fetch('/api/autostart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newState })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        updateAutostartUI(data.enabled);
+      } else {
+        updateAutostartUI(autostartEnabled);
+      }
+    } catch (err) {
+      console.error('[Autostart] Erro ao alternar autostart:', err);
+      updateAutostartUI(autostartEnabled);
+    }
+  });
+}
+
 // Inicializa
 initWebSocket();
+checkAutostartStatus();

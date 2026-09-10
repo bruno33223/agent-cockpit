@@ -18,7 +18,7 @@ def print_banner():
     print("=" * 65)
 
 def check_python():
-    print("\n[1/4] Verificando versao do Python...")
+    print("\n[1/5] Verificando versao do Python...")
     v = sys.version_info
     print(f"      Python detectado: {v.major}.{v.minor}.{v.micro} ({sys.executable})")
     if v.major < 3 or (v.major == 3 and v.minor < 8):
@@ -27,11 +27,14 @@ def check_python():
     print("      [OK] Versao do Python compativel.")
 
 def install_dependencies(base_dir):
-    print("\n[2/4] Instalando dependencias (FastAPI, Uvicorn, WebSockets, Pydantic)...")
+    print("\n[2/5] Instalando dependencias (FastAPI, Uvicorn, WebSockets, Pydantic)...")
     req_file = os.path.join(base_dir, "requirements.txt")
     if os.path.exists(req_file):
         cmd = [sys.executable, "-m", "pip", "install", "-r", req_file]
         res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0 and ("externally-managed-environment" in (res.stdout + res.stderr)):
+            cmd_fallback = [sys.executable, "-m", "pip", "install", "--user", "--break-system-packages", "-r", req_file]
+            res = subprocess.run(cmd_fallback, capture_output=True, text=True)
         if res.returncode == 0:
             print("      [OK] Todas as dependencias foram instaladas com sucesso!")
         else:
@@ -41,7 +44,7 @@ def install_dependencies(base_dir):
         print("      [PULADO] requirements.txt nao encontrado.")
 
 def configure_mcp(base_dir):
-    print("\n[3/4] Registrando Servidor MCP nas configuracoes da IA...")
+    print("\n[3/5] Registrando Servidor MCP nas configuracoes da IA...")
     mcp_server_script = os.path.abspath(os.path.join(base_dir, "server", "mcp_server.py"))
     python_exec = sys.executable.replace("\\", "/")
     server_path = mcp_server_script.replace("\\", "/")
@@ -110,8 +113,37 @@ def configure_mcp(base_dir):
         }
         print(json.dumps(manual, indent=2))
 
+def configure_autostart(base_dir, enable=None):
+    print("\n[5/5] Configurando inicializacao automatica com o sistema operacional...")
+    sys.path.insert(0, os.path.join(base_dir, "server"))
+    try:
+        import autostart
+        if enable is None:
+            # Se não especificado e estiver em terminal interativo, pergunta ao usuário.
+            # Caso contrário, habilita por padrão se for Linux.
+            if sys.stdin.isatty():
+                try:
+                    resp = input("      Deseja iniciar o Agent Cockpit automaticamente ao ligar o computador? (S/n): ").strip().lower()
+                    enable = resp != "n"
+                except Exception:
+                    enable = True
+            else:
+                enable = True
+
+        if enable:
+            if autostart.enable_autostart():
+                print(f"      [OK] Inicializacao automatica configurada com sucesso!")
+                print(f"      Arquivo registrado: {autostart.AUTOSTART_FILE}")
+            else:
+                print("      [AVISO] Nao foi possivel configurar o autostart.")
+        else:
+            autostart.disable_autostart()
+            print("      [INFO] Inicializacao automatica desativada conforme solicitado.")
+    except Exception as e:
+        print(f"      [AVISO] Erro ao configurar autostart: {e}")
+
 def copy_skills(base_dir):
-    print("\n[4/4] Instalando Skills do Cockpit e Spec-Orchestrator...")
+    print("\n[4/5] Instalando Skills do Cockpit e Superpowers...")
     skills_src = os.path.join(base_dir, "skills")
     if not os.path.exists(skills_src):
         print("      [PULADO] Pasta skills/ nao encontrada no pacote.")
@@ -134,22 +166,33 @@ def copy_skills(base_dir):
         print(f"      [AVISO] Nao foi possivel copiar skills automaticamente: {e}")
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Instalador do Agent Cockpit")
+    parser.add_argument("--autostart", dest="autostart", action="store_true", default=None, help="Ativar inicializacao automatica com o sistema")
+    parser.add_argument("--no-autostart", dest="autostart", action="store_false", help="Nao ativar inicializacao automatica com o sistema")
+    args, _ = parser.parse_known_args()
+
     base_dir = os.path.abspath(os.path.dirname(__file__))
     print_banner()
     check_python()
     install_dependencies(base_dir)
     configure_mcp(base_dir)
     copy_skills(base_dir)
+    configure_autostart(base_dir, enable=args.autostart)
 
     print("\n" + "=" * 65)
     print("       >>> INSTALACAO CONCLUIDA COM SUCESSO! <<<")
     print("=" * 65)
     print("\nComo usar:")
     print("  1. Inicie o Dashboard:")
+    print("     - No Terminal / Linux: python3 run_cockpit.py")
+    print("     - Ou utilize o icone gerado no menu de aplicativos do Linux")
     print("     - No Windows: De 2 cliques em 'start_cockpit.bat'")
-    print("     - No Terminal: python run_cockpit.py")
     print("  2. Acesse no Navegador: http://localhost:8765")
-    print("  3. No chat da IA (Antigravity ou Claude):")
+    print("  3. Inicializacao com o Sistema:")
+    print("     - Status: python3 run_cockpit.py --autostart-status")
+    print("     - Alternar: via painel Web (http://localhost:8765) ou CLI")
+    print("  4. No chat da IA (Antigravity ou Claude):")
     print('     \"Ative a skill /cockpit e execute meu projeto com /spec-orchestrator\"')
     print("\n" + "=" * 65)
 

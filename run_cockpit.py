@@ -1,7 +1,5 @@
 import os
 import sys
-import uvicorn
-
 import argparse
 import socket
 import subprocess
@@ -120,7 +118,30 @@ def main():
     parser.add_argument("--port", type=int, default=8765, help="Porta do servidor Web (padrão: 8765)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host de binding (padrão: 127.0.0.1)")
     parser.add_argument("--force", action="store_true", help="Forçar encerramento de qualquer processo na porta")
+    parser.add_argument("--autostart-enable", action="store_true", help="Configura o Agent Cockpit para iniciar com o sistema operacional")
+    parser.add_argument("--autostart-disable", action="store_true", help="Desativa a inicialização do Agent Cockpit com o sistema operacional")
+    parser.add_argument("--autostart-status", action="store_true", help="Verifica se o Agent Cockpit está configurado para iniciar com o sistema")
     args = parser.parse_args()
+
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "server"))
+    if args.autostart_enable or args.autostart_disable or args.autostart_status:
+        import autostart
+        if args.autostart_enable:
+            if autostart.enable_autostart():
+                print(f"[OK] Agent Cockpit configurado para iniciar com o sistema operacional ({autostart.AUTOSTART_FILE})")
+            else:
+                print("[ERRO] Falha ao configurar autostart.", file=sys.stderr)
+                sys.exit(1)
+        elif args.autostart_disable:
+            if autostart.disable_autostart():
+                print("[OK] Inicialização automática com o sistema desativada com sucesso.")
+            else:
+                print("[ERRO] Falha ao desativar autostart.", file=sys.stderr)
+                sys.exit(1)
+        elif args.autostart_status:
+            status = "HABILITADO" if autostart.is_autostart_enabled() else "DESABILITADO"
+            print(f"Agent Cockpit Autostart: {status} ({autostart.AUTOSTART_FILE})")
+        sys.exit(0)
 
     port = args.port
     host = args.host
@@ -149,6 +170,12 @@ def main():
 ''')
     print("=" * 68)
     print("Iniciando servidor local do Cockpit... Pressione Ctrl+C para encerrar.\n")
+
+    try:
+        import uvicorn
+    except ImportError:
+        print("[ERRO] Uvicorn não está instalado. Execute primeiro: pip install -r requirements.txt", file=sys.stderr)
+        sys.exit(1)
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "server"))
     uvicorn.run("web_server:app", host=host, port=port, log_level="info")

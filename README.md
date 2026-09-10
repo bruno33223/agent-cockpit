@@ -262,7 +262,8 @@ chmod +x install.sh
 The automated installer will:
 1. Validate your Python environment and install dependencies (`fastapi`, `uvicorn`, `websockets`, `pydantic`).
 2. Auto-configure the MCP server in your AI client's configuration file.
-3. Install the bundled skills (`cockpit`, `spec-orchestrator`, `gauntlet-loop`).
+3. Install all bundled skills (Cockpit, Spec-Orchestrator, Gauntlet-Loop, and 14 Superpowers skills).
+4. Configure automatic system startup on Linux (FreeDesktop XDG Autostart standard).
 
 ### 2. Launching the Cockpit
 
@@ -277,6 +278,18 @@ python run_cockpit.py
 ```
 
 Open your browser at: **`http://localhost:8765`**.
+
+### 3. System Autostart (Linux)
+
+Agent Cockpit can start automatically on system boot / user login:
+- **Web UI**: Toggle the `Autostart` button directly in the top header.
+- **CLI Commands**:
+  ```bash
+  python run_cockpit.py --autostart-status
+  python run_cockpit.py --autostart-enable
+  python run_cockpit.py --autostart-disable
+  ```
+- Uses standard XDG FreeDesktop autostart (`~/.config/autostart/agent-cockpit.desktop`) and adds a desktop menu entry (`~/.local/share/applications/agent-cockpit.desktop`).
 
 ---
 
