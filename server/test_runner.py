@@ -40,7 +40,8 @@ def run_distilled_tests(
     save_raw_log: bool = True,
     log_output_dir: Optional[str] = None,
     tdd_mode: str = "standard",  # "standard", "verify_red", "verify_green"
-    slice_id: Optional[str] = None
+    slice_id: Optional[str] = None,
+    project_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Executa a suíte de testes de forma determinística e destila o resultado,
     removendo 95% do lixo de terminal e retornando apenas as falhas reais em JSON compacto.
@@ -122,7 +123,7 @@ def run_distilled_tests(
             if slice_id:
                 try:
                     from state_store import db
-                    db.set_slice_tdd_stage(slice_id, "RED_CONFIRMED")
+                    db.set_slice_tdd_stage(slice_id, "RED_CONFIRMED", project_id=project_id)
                 except Exception:
                     pass
         else:
@@ -141,7 +142,7 @@ def run_distilled_tests(
             if slice_id:
                 try:
                     from state_store import db
-                    db.set_slice_tdd_stage(slice_id, "GREEN_CONFIRMED")
+                    db.set_slice_tdd_stage(slice_id, "GREEN_CONFIRMED", project_id=project_id)
                 except Exception:
                     pass
         else:

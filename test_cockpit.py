@@ -308,6 +308,62 @@ def run_tests():
     assert "compliant" in evid_data
     print(f" [OK] Tool call verify_completion_evidence (Anti-Slop Gate) OK")
 
+    # Call list_cockpit_projects (Multi-Workspace)
+    list_p_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 18,
+        "method": "tools/call",
+        "params": {
+            "name": "list_cockpit_projects",
+            "arguments": {}
+        }
+    })
+    list_p_data = json.loads(list_p_res["result"]["content"][0]["text"])
+    assert isinstance(list_p_data, list), "list_cockpit_projects deve retornar lista"
+    print(f" [OK] Tool call list_cockpit_projects ({len(list_p_data)} projetos listados) OK")
+
+    # Call sync_blueprint para Projeto Alfa e Beta (Concorrência isolada)
+    send_rpc({
+        "jsonrpc": "2.0",
+        "id": 19,
+        "method": "tools/call",
+        "params": {
+            "name": "sync_blueprint",
+            "arguments": {
+                "project_root": "/tmp/test_project_alfa",
+                "epic_name": "Projeto Alfa - API Financeira",
+                "goal": "Processamento de pagamentos",
+                "vertical_slices": [{"id": "slice-1", "title": "Fatia Alfa", "acceptance_criteria": "OK"}]
+            }
+        }
+    })
+    send_rpc({
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "tools/call",
+        "params": {
+            "name": "sync_blueprint",
+            "arguments": {
+                "project_root": "/tmp/test_project_beta",
+                "epic_name": "Projeto Beta - App Mobile",
+                "goal": "Interface do usuário",
+                "vertical_slices": [{"id": "slice-1", "title": "Fatia Beta", "acceptance_criteria": "OK"}]
+            }
+        }
+    })
+
+    # Valida isolamento entre Alfa e Beta
+    from state_store import db
+    alfa_id = db.resolve_project_id(project_root="/tmp/test_project_alfa")
+    beta_id = db.resolve_project_id(project_root="/tmp/test_project_beta")
+    state_alfa = db.get_state(alfa_id)
+    state_beta = db.get_state(beta_id)
+    assert state_alfa["epic"]["name"] == "Projeto Alfa - API Financeira"
+    assert state_beta["epic"]["name"] == "Projeto Beta - App Mobile"
+    assert state_alfa["nodes"][0]["title"] == "Fatia Alfa"
+    assert state_beta["nodes"][0]["title"] == "Fatia Beta"
+    print(" [OK] Multi-Workspace Concurrency Isolation (Alfa vs Beta) OK")
+
     # Clean up test handoff dir
     import shutil
     if os.path.exists("test_handoff_dir"):
@@ -359,12 +415,36 @@ def run_tests():
             assert "content" in data or "status" in data
             print(" [OK] Endpoint GET /api/handoff OK")
 
+        # Multi-Workspace API check
+        with urllib.request.urlopen("http://127.0.0.1:8766/api/projects") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert "projects" in data
+            assert any(p["id"] == alfa_id for p in data["projects"])
+            assert any(p["id"] == beta_id for p in data["projects"])
+            print(f" [OK] Endpoint GET /api/projects ({len(data['projects'])} projetos listados) OK")
+
+        with urllib.request.urlopen(f"http://127.0.0.1:8766/api/state?project_id={alfa_id}") as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["epic"]["name"] == "Projeto Alfa - API Financeira"
+            print(" [OK] Endpoint GET /api/state?project_id=... OK")
+
+        req_switch = urllib.request.Request(
+            "http://127.0.0.1:8766/api/projects/switch",
+            data=json.dumps({"project_id": beta_id}).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req_switch) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assert data["current_project_id"] == beta_id
+            print(" [OK] Endpoint POST /api/projects/switch OK")
+
         # Static index.html check
         with urllib.request.urlopen("http://127.0.0.1:8766/") as resp:
             html = resp.read().decode("utf-8")
             assert "AGENT COCKPIT" in html, "HTML não servido corretamente"
             assert "btn-autostart" in html, "Botão btn-autostart ausente no HTML"
-            print(" [OK] Static Web Dashboard (index.html com btn-autostart) OK")
+            assert "project-select" in html, "Seletor project-select ausente no HTML"
+            print(" [OK] Static Web Dashboard (index.html com project-select e btn-autostart) OK")
 
         # Autostart API endpoint check
         import autostart

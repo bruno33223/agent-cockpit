@@ -261,11 +261,53 @@ TOOLS_DEFINITIONS = [
                 "max_age_seconds": {"type": "integer", "description": "Idade máxima permitida para o teste mais recente em segundos.", "default": 180}
             }
         }
+    },
+    {
+        "name": "list_cockpit_projects",
+        "description": "Lista todos os workspaces/projetos registrados no Agent Cockpit com status de seus épicos e caminhos.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
+    {
+        "name": "switch_cockpit_project",
+        "description": "Alterna o projeto ativo padrão no Agent Cockpit.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_id_or_path": {"type": "string", "description": "ID do projeto ou caminho absoluto da pasta do projeto."}
+            },
+            "required": ["project_id_or_path"]
+        }
     }
 ]
 
+def resolve_context_project(args: dict) -> str:
+    """Resolve o project_id da chamada MCP a partir de project_id explícito, project_root ou diretório atual."""
+    explicit_id = args.get("project_id")
+    if explicit_id:
+        return db.resolve_project_id(project_id=explicit_id)
+    root = args.get("project_root") or args.get("root_path") or args.get("working_dir") or args.get("repo_root") or args.get("base_dir")
+    if root:
+        return db.resolve_project_id(project_root=root)
+    return db.resolve_project_id(project_root=os.getcwd())
+
 def handle_tool_call(name: str, args: dict) -> dict:
-    if name == "sync_blueprint":
+    target_pid = resolve_context_project(args)
+
+    if name == "list_cockpit_projects":
+        projects = db.list_projects()
+        return {"content": [{"type": "text", "text": json.dumps(projects, indent=2, ensure_ascii=False)}]}
+
+    elif name == "switch_cockpit_project":
+        req = args.get("project_id_or_path", "")
+        pid = db.resolve_project_id(project_id=req if not os.path.exists(req) else None,
+                                    project_root=req if os.path.exists(req) else None)
+        active_id = db.switch_current_project(pid)
+        return {"content": [{"type": "text", "text": f"Projeto ativo alternado para: '{active_id}'."}]}
+
+    elif name == "sync_blueprint":
         proj_root = args.get("project_root")
         if not proj_root:
             proj_root = os.path.abspath(".")
@@ -273,7 +315,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
             epic_name=args.get("epic_name", ""),
             goal=args.get("goal", ""),
             vertical_slices=args.get("vertical_slices", []),
-            project_root=proj_root
+            project_root=proj_root,
+            project_id=target_pid
         )
         try:
             import workflow_lock
@@ -297,7 +340,7 @@ def handle_tool_call(name: str, args: dict) -> dict:
         except Exception as e:
             lock_msg = f" | Aviso lock: {e}"
 
-        return {"content": [{"type": "text", "text": f"Épico '{args.get('epic_name')}' sincronizado no dashboard ({len(res.get('nodes', []))} nós atualizados){lock_msg}."}]}
+        return {"content": [{"type": "text", "text": f"Épico '{args.get('epic_name')}' sincronizado no dashboard (workspace: '{target_pid}', {len(res.get('nodes', []))} nós atualizados){lock_msg}."}]}
 
     elif name == "update_agent_pulse":
         db.update_agent_pulse(
@@ -306,9 +349,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
             critic_status=args.get("critic_status", "IDLE"),
             slice_id=args.get("slice_id"),
             attempt=args.get("attempt"),
-            details_md=args.get("details_md")
+            details_md=args.get("details_md"),
+            project_id=target_pid
         )
-        return {"content": [{"type": "text", "text": f"Pulso do Par {args.get('pair_id')} atualizado com sucesso no Cockpit."}]}
+        return {"content": [{"type": "text", "text": f"Pulso do Par {args.get('pair_id')} atualizado com sucesso no Cockpit (workspace: '{target_pid}')."}]}
 
     elif name == "log_critique_verdict":
         res = db.log_critique_verdict(
@@ -316,23 +360,24 @@ def handle_tool_call(name: str, args: dict) -> dict:
             attempt=args.get("attempt", 1),
             verdict=args.get("verdict", "REJEITADO"),
             reason_md=args.get("reason_md", ""),
-            review_metrics=args.get("review_metrics")
+            review_metrics=args.get("review_metrics"),
+            project_id=target_pid
         )
-        return {"content": [{"type": "text", "text": f"Veredito [{res.get('verdict')}] registrado no Gauntlet Log para {args.get('slice_id')} (Tentativa {args.get('attempt')})."}]}
+        return {"content": [{"type": "text", "text": f"Veredito [{res.get('verdict')}] registrado no Gauntlet Log para {args.get('slice_id')} (Tentativa {args.get('attempt')}, workspace: '{target_pid}')."}]}
 
     elif name == "fetch_user_steering":
-        messages = db.fetch_unconsumed_steering()
+        messages = db.fetch_unconsumed_steering(project_id=target_pid)
         if not messages:
             return {"content": [{"type": "text", "text": "Nenhum novo direcionamento ou mensagem do usuário no momento."}]}
         formatted = "\n".join([f"[{m['timestamp']}] Usuário: {m['text']}" for m in messages])
-        return {"content": [{"type": "text", "text": f"Mensagens recebidas do usuário:\n{formatted}"}]}
+        return {"content": [{"type": "text", "text": f"Mensagens recebidas do usuário ({target_pid}):\n{formatted}"}]}
 
     elif name == "post_orchestrator_message":
-        db.post_orchestrator_message(args.get("message", ""))
-        return {"content": [{"type": "text", "text": "Mensagem postada no chat do Cockpit com sucesso."}]}
+        db.post_orchestrator_message(args.get("message", ""), project_id=target_pid)
+        return {"content": [{"type": "text", "text": f"Mensagem postada no chat do Cockpit ({target_pid}) com sucesso."}]}
 
     elif name == "get_cockpit_state":
-        state = db.get_state()
+        state = db.get_state(project_id=target_pid)
         return {"content": [{"type": "text", "text": json.dumps(state, indent=2, ensure_ascii=False)}]}
 
     elif name == "analyze_codebase_graph":
@@ -357,7 +402,7 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
     elif name == "get_slice_failure_report":
         slice_id = args.get("slice_id", "")
-        state = db.get_state()
+        state = db.get_state(project_id=target_pid)
         logs = [l for l in state.get("gauntlet_log", []) if l.get("slice_id") == slice_id and l.get("verdict") == "REJEITADO"]
         latest = logs[-1] if logs else None
         if not latest:
@@ -382,7 +427,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
             timeout_sec=timeout,
             log_output_dir=log_dir,
             tdd_mode=tdd_mode,
-            slice_id=slice_id
+            slice_id=slice_id,
+            project_id=target_pid
         )
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
@@ -417,7 +463,7 @@ def handle_tool_call(name: str, args: dict) -> dict:
             "tests_passed": tests_passed,
             "created_at": time.strftime("%H:%M:%S")
         }
-        db.set_last_handoff(handoff_meta)
+        db.set_last_handoff(handoff_meta, project_id=target_pid)
         result = {
             "status": "HANDOFF_CREATED",
             "handoff_file": path,
@@ -437,20 +483,20 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
     elif name == "get_slice_spec":
         slice_id = args.get("slice_id", "")
-        spec = db.get_slice_spec(slice_id)
+        spec = db.get_slice_spec(slice_id, project_id=target_pid)
         if not spec:
             return {"content": [{"type": "text", "text": json.dumps({"error": f"Fatia '{slice_id}' não encontrada no estado atual."})}]}
         return {"content": [{"type": "text", "text": json.dumps(spec, indent=2, ensure_ascii=False)}]}
 
     elif name == "check_human_gate":
         gate_name = args.get("gate_name", "gate_ship_approved")
-        status = db.get_gate_status(gate_name)
+        status = db.get_gate_status(gate_name, project_id=target_pid)
         return {"content": [{"type": "text", "text": json.dumps(status, indent=2, ensure_ascii=False)}]}
 
     elif name == "context_pruner":
         retain_msgs = args.get("retain_last_messages", 3)
         retain_verdicts = args.get("retain_last_verdicts", 6)
-        res = db.prune_session_context(retain_last_messages=retain_msgs, retain_last_verdicts=retain_verdicts)
+        res = db.prune_session_context(retain_last_messages=retain_msgs, retain_last_verdicts=retain_verdicts, project_id=target_pid)
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
     elif name == "create_slice_worktree":
@@ -472,7 +518,7 @@ def handle_tool_call(name: str, args: dict) -> dict:
     elif name == "prepare_task_context":
         slice_id = args.get("slice_id", "")
         role_type = args.get("role_type", "implementer")
-        spec = db.get_slice_spec(slice_id)
+        spec = db.get_slice_spec(slice_id, project_id=target_pid)
         if not spec:
             return {"content": [{"type": "text", "text": json.dumps({"error": f"Fatia '{slice_id}' não encontrada."})}]}
         

@@ -177,6 +177,52 @@ body {
   gap: 12px;
 }
 
+.project-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.project-selector-wrapper:hover {
+  border-color: var(--border-strong);
+  background-color: var(--bg-card-hover);
+}
+
+.project-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #c084fc;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.project-dropdown {
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  max-width: 200px;
+  text-overflow: ellipsis;
+}
+
+.project-dropdown option {
+  background-color: #1e293b;
+  color: #f1f5f9;
+  padding: 6px 10px;
+}
+
 .epic-indicator {
   display: flex;
   align-items: center;

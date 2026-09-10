@@ -14,6 +14,10 @@ let hoveredGraphNode = null;
 let graphAnimationId = null;
 
 // DOM Elements
+const projectSelect = document.getElementById('project-select');
+let currentProjectId = localStorage.getItem('cockpit_project_id') || 'default';
+let knownProjects = [];
+
 const wsStatusText = document.getElementById('ws-status-text');
 const wsStatusPill = document.getElementById('ws-status');
 const epicTitle = document.getElementById('epic-title');
@@ -86,6 +90,83 @@ document.querySelectorAll('.nav-tab').forEach(btn => {
   });
 });
 
+// 1.5. PROJETOS / MULTI-WORKSPACE
+async function loadProjects() {
+  if (!projectSelect) return;
+  try {
+    const res = await fetch('/api/projects');
+    if (res.ok) {
+      const data = await res.json();
+      knownProjects = data.projects || [];
+      const serverCurrent = data.current_project_id || 'default';
+
+      if (!knownProjects.some(p => p.id === currentProjectId)) {
+        currentProjectId = serverCurrent;
+        localStorage.setItem('cockpit_project_id', currentProjectId);
+      }
+      renderProjectSelectOptions();
+    }
+  } catch (err) {
+    console.warn('[Projects] Falha ao carregar lista de projetos:', err);
+  }
+}
+
+function renderProjectSelectOptions() {
+  if (!projectSelect) return;
+  projectSelect.innerHTML = '';
+
+  if (knownProjects.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = 'default';
+    opt.textContent = 'Projeto Padrão';
+    projectSelect.appendChild(opt);
+    return;
+  }
+
+  knownProjects.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    const slicesInfo = p.total_slices > 0 ? ` (${p.approved_slices}/${p.total_slices})` : '';
+    opt.textContent = `${p.name}${slicesInfo}`;
+    if (p.id === currentProjectId) {
+      opt.selected = true;
+    }
+    projectSelect.appendChild(opt);
+  });
+}
+
+async function switchProject(projectId) {
+  if (!projectId || projectId === currentProjectId && state.nodes && state.nodes.length > 0) return;
+  currentProjectId = projectId;
+  localStorage.setItem('cockpit_project_id', currentProjectId);
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      action: 'SUBSCRIBE_PROJECT',
+      project_id: currentProjectId
+    }));
+  }
+
+  try {
+    const res = await fetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
+    if (res.ok) {
+      state = await res.json();
+      renderAll();
+      loadHandoff();
+      fetchGraph();
+    }
+  } catch (err) {
+    console.error('[Projects] Erro ao carregar estado do projeto:', err);
+  }
+  renderProjectSelectOptions();
+}
+
+if (projectSelect) {
+  projectSelect.addEventListener('change', (e) => {
+    switchProject(e.target.value);
+  });
+}
+
 // 2. WEBSOCKET
 function initWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -100,19 +181,34 @@ function initWebSocket() {
   socket.onopen = () => {
     if (led) led.className = 'pulse-led online';
     wsStatusText.textContent = 'WS Online';
+    
+    // Subscrição no canal do projeto ativo
+    socket.send(JSON.stringify({
+      action: 'SUBSCRIBE_PROJECT',
+      project_id: currentProjectId
+    }));
   };
 
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data.event === 'STATE_FULL') {
-        state = data.payload;
-        renderAll();
+      if (data.event === 'PROJECTS_UPDATED') {
+        knownProjects = data.payload || [];
+        renderProjectSelectOptions();
+      } else if (data.event === 'STATE_FULL') {
+        if (!data.project_id || data.project_id === currentProjectId) {
+          state = data.payload;
+          renderAll();
+        }
       } else if (data.event === 'STEERING_RECEIVED' || data.event === 'ORCHESTRATOR_MESSAGE') {
-        renderChatMessages();
+        if (!data.project_id || data.project_id === currentProjectId) {
+          renderChatMessages();
+        }
       } else if (data.event === 'PULSE_UPDATED' || data.event === 'VERDICT_LOGGED' || data.event === 'GATE_APPROVED' || data.event === 'HANDOFF_UPDATED') {
-        renderAll();
-        loadHandoff();
+        if (!data.project_id || data.project_id === currentProjectId) {
+          renderAll();
+          loadHandoff();
+        }
       }
     } catch (e) {
       console.error('Erro processando mensagem WebSocket:', e);
@@ -183,7 +279,7 @@ async function loadHandoff() {
   if (!handoffRenderedContent) return;
   handoffRenderedContent.textContent = 'Carregando handoff em disco...';
   try {
-    const res = await fetch('/api/handoff');
+    const res = await fetch(`/api/handoff?project_id=${encodeURIComponent(currentProjectId)}`);
     const data = await res.json();
     if (data.status === 'NO_HANDOFF_FOUND') {
       if (handoffDirDisplay) handoffDirDisplay.textContent = 'Nenhum detectado';
@@ -218,12 +314,12 @@ if (btnHumanGate) {
     const isApproved = state.human_gates && state.human_gates.gate_ship_approved;
     if (!isApproved) {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ action: 'APPROVE_GATE', gate: 'gate_ship_approved' }));
+        socket.send(JSON.stringify({ action: 'APPROVE_GATE', gate: 'gate_ship_approved', project_id: currentProjectId }));
       } else {
         fetch('/api/gates/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gate: 'gate_ship_approved', approved_by: 'user' })
+          body: JSON.stringify({ gate: 'gate_ship_approved', approved_by: 'user', project_id: currentProjectId })
         }).then(r => r.json()).then(() => renderAll());
       }
     }
@@ -462,12 +558,12 @@ chatForm.addEventListener('submit', (e) => {
   if (!text) return;
 
   if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ action: 'USER_STEERING', text }));
+    socket.send(JSON.stringify({ action: 'USER_STEERING', text, project_id: currentProjectId }));
   } else {
     fetch('/api/steering', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text, project_id: currentProjectId })
     });
   }
   chatInput.value = '';
@@ -476,7 +572,7 @@ chatForm.addEventListener('submit', (e) => {
 // Fallback Polling a cada 2s (garante atualização automática sem F5 mesmo se o WebSocket falhar)
 setInterval(async () => {
   try {
-    const res = await fetch('/api/state');
+    const res = await fetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
     if (res.ok) {
       const remoteState = await res.json();
       if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
@@ -1277,11 +1373,15 @@ drawerTabs.forEach(tab => {
 
 // TOPBAR ACTIONS
 btnReset.addEventListener('click', () => {
-  if (confirm('Restaurar o estado do Cockpit para os valores iniciais?')) {
+  if (confirm(`Restaurar o estado do projeto ativo (${currentProjectId}) para os valores iniciais?`)) {
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ action: 'RESET_STATE' }));
+      socket.send(JSON.stringify({ action: 'RESET_STATE', project_id: currentProjectId }));
     } else {
-      fetch('/api/reset', { method: 'POST' });
+      fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: currentProjectId })
+      });
     }
   }
 });
@@ -1296,7 +1396,7 @@ btnTestCycle.addEventListener('click', () => {
   fetch('/api/steering', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: `Simulação de pulso: ${node.id} movido para ${nextStatus}` })
+    body: JSON.stringify({ text: `Simulação de pulso: ${node.id} movido para ${nextStatus}`, project_id: currentProjectId })
   });
 });
 
@@ -1362,5 +1462,6 @@ if (btnAutostart) {
 }
 
 // Inicializa
+loadProjects();
 initWebSocket();
 checkAutostartStatus();
