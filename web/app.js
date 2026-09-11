@@ -167,6 +167,33 @@ if (projectSelect) {
   });
 }
 
+const btnScanProjects = document.getElementById('btn-scan-projects');
+async function triggerScanProjects() {
+  if (btnScanProjects) {
+    btnScanProjects.disabled = true;
+    btnScanProjects.style.opacity = '0.5';
+  }
+  try {
+    const res = await fetch('/api/projects/scan', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      knownProjects = data.projects || [];
+      renderProjectSelectOptions();
+    }
+  } catch (err) {
+    console.warn('[Projects] Erro ao escanear projetos:', err);
+  } finally {
+    if (btnScanProjects) {
+      btnScanProjects.disabled = false;
+      btnScanProjects.style.opacity = '1';
+    }
+  }
+}
+
+if (btnScanProjects) {
+  btnScanProjects.addEventListener('click', triggerScanProjects);
+}
+
 // 2. WEBSOCKET
 function initWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

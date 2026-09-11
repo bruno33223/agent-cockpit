@@ -5,11 +5,10 @@ import time
 import subprocess
 import urllib.request
 
-def run_tests():
-    print("=" * 60)
-    print("INICIANDO TESTES DO AGENT COCKPIT (CORE & MCP)")
-    print("=" * 60)
+import tempfile
+import shutil
 
+def _run_suite():
     # 1. Test StateStore
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "server"))
     from state_store import db
@@ -481,6 +480,23 @@ def run_tests():
 
     finally:
         server.should_exit = True
+
+def run_tests():
+    print("=" * 60)
+    print("INICIANDO TESTES DO AGENT COCKPIT (CORE & MCP)")
+    print("=" * 60)
+
+    test_states_dir = tempfile.mkdtemp(prefix="cockpit_test_states_")
+    test_legacy_file = os.path.join(test_states_dir, "workflow_state.json")
+    os.environ["COCKPIT_STATES_DIR"] = test_states_dir
+    os.environ["COCKPIT_LEGACY_FILE"] = test_legacy_file
+
+    try:
+        _run_suite()
+    finally:
+        shutil.rmtree(test_states_dir, ignore_errors=True)
+        os.environ.pop("COCKPIT_STATES_DIR", None)
+        os.environ.pop("COCKPIT_LEGACY_FILE", None)
 
     print("\n" + "=" * 60)
     print("TODOS OS TESTES FORAM CONCLUÍDOS COM SUCESSO! 100% OPERACIONAL.")

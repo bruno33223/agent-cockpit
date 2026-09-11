@@ -223,6 +223,27 @@ body {
   padding: 6px 10px;
 }
 
+.project-scan-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.project-scan-btn:hover {
+  color: #c084fc;
+  background-color: rgba(192, 132, 252, 0.15);
+  transform: rotate(90deg);
+}
+
 .epic-indicator {
   display: flex;
   align-items: center;

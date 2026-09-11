@@ -8,9 +8,9 @@ import time
 from typing import List, Dict, Any, Optional, Callable
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-STATES_DIR = os.path.join(BASE_DIR, 'states')
+STATES_DIR = os.getenv("COCKPIT_STATES_DIR") or os.path.join(BASE_DIR, 'states')
 INDEX_FILE = os.path.join(STATES_DIR, 'projects_index.json')
-LEGACY_STATE_FILE = os.path.join(BASE_DIR, 'workflow_state.json')
+LEGACY_STATE_FILE = os.getenv("COCKPIT_LEGACY_FILE") or os.path.join(BASE_DIR, 'workflow_state.json')
 
 def canonical_project_id(project_path_or_name: Optional[str]) -> str:
     """Gera um identificador estável e canônico para um projeto a partir do seu caminho ou nome."""
@@ -643,6 +643,77 @@ class StateStore:
                     pass
             self._notify("PROJECTS_UPDATED", self.list_projects())
             return True
+
+    def sync_from_legacy_if_modified(self) -> Optional[str]:
+        """Sincroniza workflow_state.json caso processos legados MCP o tenham modificado recentemente."""
+        if not os.path.exists(self.legacy_file):
+            return None
+        try:
+            with self.lock:
+                leg_mtime = os.path.getmtime(self.legacy_file)
+                with open(self.legacy_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                root = data.get("project_root")
+                pid = canonical_project_id(root) if root else self.get_current_project_id()
+                pfile = self._get_project_file(pid)
+                
+                target_mtime = os.path.getmtime(pfile) if os.path.exists(pfile) else 0
+                if leg_mtime > target_mtime:
+                    with open(pfile, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    epic_name = data.get("epic", {}).get("name", os.path.basename(root) if root else "Projeto")
+                    self._update_index_entry(pid, epic_name, root, data)
+                    
+                    index_data = self._read_index()
+                    if index_data.get("current_project_id") != pid:
+                        index_data["current_project_id"] = pid
+                        self._save_index(index_data)
+                    return pid
+        except Exception as e:
+            print(f"[StateStore] Falha ao sincronizar estado legado: {e}")
+        return None
+
+    def scan_local_projects(self, base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Descobre repositórios e projetos reais em ~/Projects e os registra no Cockpit."""
+        target_dir = os.path.abspath(os.path.expanduser(base_dir or "~/Projects"))
+        if not os.path.exists(target_dir):
+            return self.list_projects()
+
+        with self.lock:
+            index_data = self._read_index()
+            projects = index_data.setdefault("projects", {})
+            existing_roots = {p.get("project_root") for p in projects.values() if p.get("project_root")}
+
+            found_any = False
+            for entry in os.scandir(target_dir):
+                if not entry.is_dir() or entry.name.startswith("."):
+                    continue
+                p_path = entry.path
+                if p_path in existing_roots:
+                    continue
+
+                pid = canonical_project_id(p_path)
+                pfile = self._get_project_file(pid)
+                
+                if not os.path.exists(pfile):
+                    initial_state = default_initial_state(project_name=entry.name, project_root=p_path)
+                    with open(pfile, 'w', encoding='utf-8') as f:
+                        json.dump(initial_state, f, indent=2, ensure_ascii=False)
+                    self._update_index_entry(pid, entry.name, p_path, initial_state)
+                    found_any = True
+                elif pid not in projects:
+                    try:
+                        with open(pfile, 'r', encoding='utf-8') as f:
+                            s_data = json.load(f)
+                    except Exception:
+                        s_data = default_initial_state(project_name=entry.name, project_root=p_path)
+                    self._update_index_entry(pid, entry.name, p_path, s_data)
+                    found_any = True
+
+            if found_any:
+                self._notify("PROJECTS_UPDATED", self.list_projects())
+
+        return self.list_projects()
 
     @property
     def file_path(self) -> str:

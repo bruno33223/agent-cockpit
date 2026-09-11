@@ -86,13 +86,16 @@ manager = ConnectionManager()
 db.register_listener(manager.broadcast_sync)
 
 async def file_watch_loop():
-    """Monitora modificações nos arquivos de estado em states/ em tempo real.
+    """Monitora modificações nos arquivos de estado em states/ e workflow_state.json legado em tempo real.
     Garante que atualizações feitas pelo mcp_server (outro processo) sejam propagadas via WebSocket sem F5.
     """
     last_mtimes: Dict[str, float] = {}
     states_dir = db.states_dir
+    legacy_file = db.legacy_file
+
     while True:
         try:
+            # 1. Monitora states/*.json
             if os.path.exists(states_dir):
                 for entry in os.scandir(states_dir):
                     if entry.is_file() and entry.name.endswith(".json"):
@@ -110,6 +113,20 @@ async def file_watch_loop():
                                 pid = fname[:-5]  # remove .json
                                 state = db.get_state(pid)
                                 await manager._broadcast("STATE_FULL", state, project_id=pid)
+
+            # 2. Monitora workflow_state.json legado
+            if os.path.exists(legacy_file):
+                leg_mtime = os.path.getmtime(legacy_file)
+                prev_leg = last_mtimes.get("workflow_state.json", 0)
+                if prev_leg == 0:
+                    last_mtimes["workflow_state.json"] = leg_mtime
+                elif leg_mtime > prev_leg:
+                    last_mtimes["workflow_state.json"] = leg_mtime
+                    sync_pid = db.sync_from_legacy_if_modified()
+                    if sync_pid:
+                        await manager._broadcast("PROJECTS_UPDATED", db.list_projects())
+                        state = db.get_state(sync_pid)
+                        await manager._broadcast("STATE_FULL", state, project_id=sync_pid)
         except Exception:
             pass
         await asyncio.sleep(0.3)
@@ -202,6 +219,17 @@ def post_switch_project(payload: SwitchProjectPayload):
 def delete_project_endpoint(project_id: str):
     success = db.delete_project(project_id)
     return {"status": "ok" if success else "error", "projects": db.list_projects()}
+
+@app.get("/api/projects/scan")
+@app.post("/api/projects/scan")
+def scan_projects():
+    """Descobre projetos reais em ~/Projects e atualiza a lista de workspaces."""
+    projects = db.scan_local_projects()
+    return {
+        "status": "ok",
+        "current_project_id": db.get_current_project_id(),
+        "projects": projects
+    }
 
 # ROTAS DE ESTADO
 @app.get("/api/state")
