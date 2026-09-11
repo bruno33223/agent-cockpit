@@ -447,7 +447,9 @@ def _run_suite():
             print(" [OK] Static Web Dashboard (index.html com project-select e btn-autostart) OK")
 
         # Autostart API endpoint check
+        # Autostart Tests
         import autostart
+        orig_autostart = autostart.is_autostart_enabled()
         with urllib.request.urlopen("http://127.0.0.1:8766/api/autostart") as resp:
             data = json.loads(resp.read().decode("utf-8"))
             assert "enabled" in data
@@ -477,6 +479,10 @@ def _run_suite():
             assert data["enabled"] is False
             assert autostart.is_autostart_enabled() is False
             print(" [OK] Endpoint POST /api/autostart (disable) OK")
+
+        # Restaura o autostart se estava previamente habilitado
+        if orig_autostart:
+            autostart.enable_autostart()
 
     finally:
         server.should_exit = True
