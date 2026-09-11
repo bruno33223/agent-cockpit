@@ -15,6 +15,7 @@ def run_tests():
     from state_store import db
 
     print("[TEST 1] StateStore Inicial...")
+    db.switch_current_project(db.resolve_project_id(project_root=os.getcwd()))
     db.reset_state()
     s = db.get_state()
     assert len(s["nodes"]) == 3, "Deveria ter 3 nós iniciais"
