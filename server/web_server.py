@@ -401,6 +401,17 @@ async def websocket_endpoint(websocket: WebSocket):
                         "current_project_id": db.get_current_project_id()
                     }, ensure_ascii=False))
 
+                elif action == "UPDATE_SETTINGS":
+                    updates = msg.get("settings", {})
+                    db.update_settings(updates, project_id=target_pid)
+
+                elif action == "GET_SETTINGS":
+                    await websocket.send_text(json.dumps({
+                        "event": "SETTINGS_UPDATED",
+                        "payload": db.get_settings(target_pid),
+                        "project_id": target_pid
+                    }, ensure_ascii=False))
+
             except Exception as e:
                 print(f"[WebSocket] Erro ao processar mensagem do cliente: {e}")
     except WebSocketDisconnect:
@@ -571,6 +582,27 @@ def post_autostart_toggle(payload: AutostartPayload):
     info["success"] = success
     return info
 
+# ROTAS DE CONFIGURAÇÕES GERAIS
+class SettingsPayload(BaseModel):
+    delegate_styles_to_cloud: Optional[bool] = None
+    model: Optional[str] = None
+    auto_start_ollama: Optional[bool] = None
+    circuit_breaker_threshold: Optional[int] = None
+    project_root: Optional[str] = None
+    project_id: Optional[str] = None
+
+@app.get("/api/settings")
+def get_settings_endpoint(project_id: Optional[str] = None):
+    """Retorna as configurações do Cockpit, incluindo a opção 'DEIXAR ESTILOS COM A NUVEM'."""
+    return db.get_settings(project_id=project_id)
+
+@app.post("/api/settings")
+def post_settings_endpoint(payload: SettingsPayload):
+    """Atualiza configurações do Cockpit e notifica clientes conectados."""
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    updates = {k: v for k, v in data.items() if v is not None and k != "project_id"}
+    return db.update_settings(updates, project_id=payload.project_id)
+
 # ROTAS DO LOCAL WORKER (Fatia 3)
 try:
     from workers.local_llm_client import LocalLLMClient
@@ -671,7 +703,8 @@ def get_local_worker_status(project_id: Optional[str] = None):
         "model": cfg.get("model", "qwen2.5-coder:7b-instruct-q4_k_m"),
         "circuit_breaker_threshold": cfg.get("circuit_breaker_threshold", 2),
         "consecutive_failures": cfg.get("consecutive_failures", {}),
-        "auto_start_ollama": cfg.get("auto_start_ollama", True)
+        "auto_start_ollama": cfg.get("auto_start_ollama", True),
+        "delegate_styles_to_cloud": cfg.get("delegate_styles_to_cloud", False)
     }
     if ollama_process_manager:
         res["server_status"] = ollama_process_manager.get_status()

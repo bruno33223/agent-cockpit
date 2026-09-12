@@ -679,7 +679,21 @@ def execute_local_builder(
     threshold = cfg.get("circuit_breaker_threshold", 2)
     attempts = db.get_local_worker_attempts(slice_id, project_id=project_id)
 
-    # Circuit breaker check: limite de tentativas consecutivas por fatia
+    # 1. Verifica se a opção 'DEIXAR ESTILOS COM A NUVEM' está ativa para arquivos CSS/UI
+    st = db.get_settings(project_id=project_id) if hasattr(db, "get_settings") else {}
+    delegate_styles = bool(st.get("delegate_styles_to_cloud", cfg.get("delegate_styles_to_cloud", False)))
+    ext = os.path.splitext(target_file)[1].lower()
+    is_style_file = ext in [".css", ".scss", ".sass", ".less", ".style"]
+
+    if delegate_styles and is_style_file:
+        return {
+            "status": "DELEGATED_TO_CLOUD",
+            "slice_id": slice_id,
+            "target_file": target_file,
+            "message": "Estilização configurada para execução na Nuvem ('DEIXAR ESTILOS COM A NUVEM' ativo). O harness de nuvem tem autorização para gerar a folha de estilo diretamente com alto padrão estético."
+        }
+
+    # 2. Circuit breaker check: limite de tentativas consecutivas por fatia
     if attempts >= threshold:
         return {
             "status": "ESCALATION_REQUIRED",

@@ -83,6 +83,13 @@
           </svg>
           <span class="tab-label">Local Worker</span>
         </button>
+        <button class="nav-tab" data-view="view-settings" id="nav-tab-settings" data-tooltip="Configurações">
+          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span class="tab-label">Configurações</span>
+        </button>
       </nav>
 
       <!-- SIDEBAR FOOTER -->
@@ -671,6 +678,159 @@
               <div class="inpage-terminal-logs" id="inpage-ollama-logs">
                 <div class="terminal-placeholder">Aguardando logs do processo Ollama...</div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 7: CONFIGURAÇÕES & MODELOS -->
+      <section class="tab-view" id="view-settings">
+        <div class="settings-view-container">
+          <!-- HEADER -->
+          <div class="settings-header">
+            <div class="settings-header-info">
+              <div class="settings-header-title-row">
+                <h2>Configurações do Cockpit & Orquestração Híbrida</h2>
+                <span class="settings-badge">Governança Spec-Driven</span>
+              </div>
+              <p class="settings-header-desc">
+                Ajuste fino de delegação entre modelos de fronteira em nuvem e inferência local na GPU (Ollama), limites do circuit breaker e parâmetros de execução.
+              </p>
+            </div>
+            <div class="settings-header-actions">
+              <button class="action-btn secondary" id="btn-refresh-settings" title="Recarregar configurações do servidor">
+                ⟳ Recarregar
+              </button>
+            </div>
+          </div>
+
+          <!-- CARD PRINCIPAL: DELEGAÇÃO DE ESTILOS (DEIXAR ESTILOS COM A NUVEM) -->
+          <div class="settings-card highlight-card">
+            <div class="settings-card-header">
+              <div class="settings-card-title-group">
+                <span class="settings-icon">🎨</span>
+                <div>
+                  <div class="settings-card-title">DEIXAR ESTILOS COM A NUVEM</div>
+                  <div class="settings-card-subtitle">Delegação Seletiva de Design System, CSS e Interfaces para Modelos Frontier</div>
+                </div>
+              </div>
+              <div class="settings-toggle-wrapper">
+                <label class="switch-control" for="toggle-delegate-styles">
+                  <input type="checkbox" id="toggle-delegate-styles">
+                  <span class="switch-slider"></span>
+                </label>
+                <span class="switch-label" id="delegate-styles-status-label">Desativado (100% Local)</span>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="settings-explainer-box">
+                <div class="explainer-header">
+                  <span class="explainer-icon">💡</span>
+                  <strong>Por que e quando usar esta opção?</strong>
+                </div>
+                <div class="explainer-content">
+                  <p>
+                    <strong>O Desafio Estético dos Modelos Locais:</strong> Modelos locais de 7B a 14B rodando na GPU (como o Qwen 2.5 Coder) são extremamente rápidos e excelentes em raciocínio, sintaxe, lógica de backend e testes unitários. No entanto, costumam gerar layouts brutos, cores sem contraste harmonioso e fontes padrão serifadas quando encarregados de CSS moderno.
+                  </p>
+                  <p>
+                    <strong>A Solução Híbrida Inteligente:</strong> Ao ativar <strong>"DEIXAR ESTILOS COM A NUVEM"</strong>, a responsabilidade de criar ou modificar folhas de estilo (<code>.css</code>, <code>.scss</code>, <code>.sass</code>, <code>.less</code>) e regras visuais é delegada diretamente para os modelos de fronteira em nuvem (Claude 3.7 Sonnet, Gemini 2.5 Pro ou GPT-4o), garantindo design contemporâneo no padrão Linear/Vercel (Glassmorphism cyberpunk, gradientes neon sutis, tipografia fluida e micro-interações).
+                  </p>
+                  <p>
+                    <strong>Economia Máxima de Tokens:</strong> O modelo local na sua GPU continua encarregado de 100% da lógica pesada — controladores, domínio, contratos, algoritmos e todos os testes automatizados TDD. Você desfruta do melhor dos dois mundos com custo quase zero de tokens de nuvem.
+                  </p>
+                </div>
+              </div>
+
+              <div class="settings-pipeline-comparison">
+                <div class="pipeline-col">
+                  <div class="col-badge local">💻 QUANDO DESATIVADO (PADRÃO)</div>
+                  <ul>
+                    <li>100% dos arquivos (lógica + CSS) gerados pelo modelo local no Ollama</li>
+                    <li>Custo de tokens: <strong>$0.00 absoluto</strong></li>
+                    <li>Qualidade visual depende da sofisticação do modelo local (requer Qwen 14B+)</li>
+                  </ul>
+                </div>
+                <div class="pipeline-col">
+                  <div class="col-badge cloud">☁️ QUANDO ATIVADO (RECOMENDADO PARA UI)</div>
+                  <ul>
+                    <li>Estilos e Design System gerados pelo modelo Frontier na nuvem</li>
+                    <li>Lógica de backend, contratos e testes 100% no modelo local (GPU)</li>
+                    <li>Visual profissional de alto padrão com consumo insignificante de tokens</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD: MODELO ATIVO & RUNTIME LOCAL -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-title-group">
+                <span class="settings-icon">⚡</span>
+                <div>
+                  <div class="settings-card-title">Motor do Local Worker & GPU</div>
+                  <div class="settings-card-subtitle">Configuração do modelo ativo no Ollama e tolerância a falhas</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="settings-form-grid">
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settings-model-select">Modelo Ativo para Escrita de Código Local:</label>
+                  <div class="settings-input-row">
+                    <select id="settings-model-select" class="settings-select-styled">
+                      <option value="">Carregando modelos instalados...</option>
+                    </select>
+                    <button class="action-btn primary btn-sm" id="btn-save-model-choice">Aplicar</button>
+                  </div>
+                  <span class="settings-hint">Dica: Use <code>qwen2.5-coder:14b</code> para raciocínio superior ou <code>7b</code> para máxima velocidade na VRAM.</span>
+                </div>
+
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settings-breaker-threshold">Limite do Circuit Breaker (Tentativas antes de Escalar para Nuvem):</label>
+                  <div class="settings-input-row">
+                    <input type="number" id="settings-breaker-threshold" class="settings-input-styled" min="1" max="10" value="2">
+                    <button class="action-btn secondary btn-sm" id="btn-save-breaker-threshold">Salvar</button>
+                  </div>
+                  <span class="settings-hint">Quantidade de falhas consecutivas do worker local permitidas por fatia antes do fallback automático para a nuvem.</span>
+                </div>
+
+                <div class="settings-field full-width">
+                  <div class="settings-row-toggle">
+                    <div>
+                      <div class="settings-field-label">Inicialização Automática do Ollama:</div>
+                      <div class="settings-hint">Inicia o servidor Ollama em segundo plano automaticamente ao abrir o Agent Cockpit se a porta 11434 estiver fechada.</div>
+                    </div>
+                    <label class="switch-control" for="toggle-auto-start-ollama">
+                      <input type="checkbox" id="toggle-auto-start-ollama" checked>
+                      <span class="switch-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD: WORKSPACE & CAMINHO DO PROJETO -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-title-group">
+                <span class="settings-icon">📁</span>
+                <div>
+                  <div class="settings-card-title">Caminho da Raiz do Projeto (Workspace Root)</div>
+                  <div class="settings-card-subtitle">Diretório base onde as Git Worktrees isoladas (.worktrees/slice-N) são criadas</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="settings-input-row">
+                <input type="text" id="settings-project-root-input" class="settings-input-styled" placeholder="/caminho/do/projeto">
+                <button class="action-btn secondary" id="btn-save-project-root">Atualizar Raiz</button>
+              </div>
+              <span class="settings-hint">Garante que todas as ferramentas MCP e isolamento por worktree operem no diretório correto.</span>
             </div>
           </div>
         </div>

@@ -26,7 +26,8 @@ class TestLocalBuilder(unittest.TestCase):
         # Configura worktree falso para testes de isolamento
         self.worktree_dir = os.path.join(self.test_dir, ".worktrees", self.slice_id)
         os.makedirs(self.worktree_dir, exist_ok=True)
-        # Reseta contador de tentativas
+        # Reseta contador de tentativas e garante delegate_styles_to_cloud desativado nos testes base
+        db.set_local_worker_config({"delegate_styles_to_cloud": False})
         if hasattr(db, "reset_local_worker_attempts"):
             db.reset_local_worker_attempts(self.slice_id)
 

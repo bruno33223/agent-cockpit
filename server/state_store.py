@@ -129,7 +129,11 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
             "model": "qwen2.5-coder:7b-instruct-q4_k_m",
             "circuit_breaker_threshold": 2,
             "consecutive_failures": {},
-            "auto_start_ollama": True
+            "auto_start_ollama": True,
+            "delegate_styles_to_cloud": False
+        },
+        "settings": {
+            "delegate_styles_to_cloud": False
         },
         "project_root": project_root
     }
@@ -953,6 +957,8 @@ class StateStore:
             })
             if "auto_start_ollama" not in cfg:
                 cfg["auto_start_ollama"] = True
+            if "delegate_styles_to_cloud" not in cfg:
+                cfg["delegate_styles_to_cloud"] = state.get("settings", {}).get("delegate_styles_to_cloud", False)
             return dict(cfg)
 
     def set_local_worker_config(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
@@ -965,11 +971,17 @@ class StateStore:
                 "model": "qwen2.5-coder:7b-instruct-q4_k_m",
                 "circuit_breaker_threshold": 2,
                 "consecutive_failures": {},
-                "auto_start_ollama": True
+                "auto_start_ollama": True,
+                "delegate_styles_to_cloud": False
             })
             if "auto_start_ollama" not in cfg:
                 cfg["auto_start_ollama"] = True
+            if "delegate_styles_to_cloud" not in cfg:
+                cfg["delegate_styles_to_cloud"] = False
             cfg.update(updates)
+            if "delegate_styles_to_cloud" in updates:
+                st = state.setdefault("settings", {})
+                st["delegate_styles_to_cloud"] = bool(updates["delegate_styles_to_cloud"])
             self._save_state(state, target_pid)
         self._notify("LOCAL_WORKER_CONFIG_UPDATED", cfg, target_pid)
         self._notify("STATE_FULL", state, target_pid)
@@ -977,6 +989,56 @@ class StateStore:
 
     def update_local_worker_config(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
         return self.set_local_worker_config(updates, project_id=project_id)
+
+    def get_settings(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Retorna configurações gerais do Cockpit, incluindo delegação de estilos para a nuvem."""
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {})
+            st = state.setdefault("settings", {})
+            delegate_styles = st.get("delegate_styles_to_cloud", cfg.get("delegate_styles_to_cloud", False))
+            return {
+                "delegate_styles_to_cloud": bool(delegate_styles),
+                "model": cfg.get("model", "qwen2.5-coder:7b-instruct-q4_k_m"),
+                "endpoint": cfg.get("endpoint", "http://127.0.0.1:11434"),
+                "auto_start_ollama": cfg.get("auto_start_ollama", True),
+                "circuit_breaker_threshold": cfg.get("circuit_breaker_threshold", 2),
+                "project_root": state.get("project_root")
+            }
+
+    def update_settings(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Atualiza configurações gerais e propaga via listeners/WebSocket."""
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {})
+            st = state.setdefault("settings", {})
+
+            if "delegate_styles_to_cloud" in updates:
+                val = bool(updates["delegate_styles_to_cloud"])
+                st["delegate_styles_to_cloud"] = val
+                cfg["delegate_styles_to_cloud"] = val
+
+            if "model" in updates and updates["model"]:
+                cfg["model"] = str(updates["model"]).strip()
+
+            if "auto_start_ollama" in updates:
+                cfg["auto_start_ollama"] = bool(updates["auto_start_ollama"])
+
+            if "circuit_breaker_threshold" in updates:
+                cfg["circuit_breaker_threshold"] = int(updates["circuit_breaker_threshold"])
+
+            if "project_root" in updates and updates["project_root"]:
+                state["project_root"] = os.path.abspath(updates["project_root"])
+
+            self._save_state(state, target_pid)
+
+        updated = self.get_settings(project_id=target_pid)
+        self._notify("SETTINGS_UPDATED", updated, target_pid)
+        self._notify("LOCAL_WORKER_CONFIG_UPDATED", cfg, target_pid)
+        self._notify("STATE_FULL", state, target_pid)
+        return updated
 
     def get_local_worker_attempts(self, slice_id: str, project_id: Optional[str] = None) -> int:
         target_pid = self.resolve_project_id(project_id)
