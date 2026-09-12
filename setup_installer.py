@@ -113,14 +113,34 @@ def configure_mcp(base_dir):
         }
         print(json.dumps(manual, indent=2))
 
+def export_mcp_schemas(base_dir):
+    print("\n[3.5/5] Gerando schemas de ferramentas MCP para Antigravity Lazy-Loading...")
+    sys.path.insert(0, os.path.join(base_dir, "server"))
+    try:
+        from mcp_server import TOOLS_DEFINITIONS
+        mcp_schema_dir = Path.home() / ".gemini" / "antigravity" / "mcp" / "agent-cockpit"
+        mcp_schema_dir.mkdir(parents=True, exist_ok=True)
+        count = 0
+        for tool in TOOLS_DEFINITIONS:
+            schema_data = {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool.get("inputSchema", {"type": "object", "properties": {}})
+            }
+            target_json = mcp_schema_dir / f"{tool['name']}.json"
+            with open(target_json, "w", encoding="utf-8") as f:
+                json.dump(schema_data, f, ensure_ascii=False, indent=2)
+            count += 1
+        print(f"      [OK] {count} schemas de ferramentas MCP gerados em: {mcp_schema_dir}")
+    except Exception as e:
+        print(f"      [AVISO] Erro ao exportar schemas MCP: {e}")
+
 def configure_autostart(base_dir, enable=None):
     print("\n[5/5] Configurando inicializacao automatica com o sistema operacional...")
     sys.path.insert(0, os.path.join(base_dir, "server"))
     try:
         import autostart
         if enable is None:
-            # Se não especificado e estiver em terminal interativo, pergunta ao usuário.
-            # Caso contrário, habilita por padrão se for Linux.
             if sys.stdin.isatty():
                 try:
                     resp = input("      Deseja iniciar o Agent Cockpit automaticamente ao ligar o computador? (S/n): ").strip().lower()
@@ -134,6 +154,14 @@ def configure_autostart(base_dir, enable=None):
             if autostart.enable_autostart():
                 print(f"      [OK] Inicializacao automatica configurada com sucesso!")
                 print(f"      Arquivo registrado: {autostart.AUTOSTART_FILE}")
+                # Recarrega e inicia o servico systemd se estiver no Linux
+                if sys.platform.startswith("linux"):
+                    try:
+                        subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+                        subprocess.run(["systemctl", "--user", "restart", "agent-cockpit.service"], check=False)
+                        print("      [OK] Servico systemd agent-cockpit.service iniciado com sucesso!")
+                    except Exception as e:
+                        print(f"      [AVISO] Nao foi possivel reiniciar o servico systemd: {e}")
             else:
                 print("      [AVISO] Nao foi possivel configurar o autostart.")
         else:
@@ -165,18 +193,103 @@ def copy_skills(base_dir):
     except Exception as e:
         print(f"      [AVISO] Nao foi possivel copiar skills automaticamente: {e}")
 
+def uninstall_cockpit(base_dir):
+    print("=" * 65)
+    print("       >>> AGENT COCKPIT - DESINSTALADOR <<<")
+    print("=" * 65)
+
+    home = Path.home()
+    # 1. Parar e desabilitar systemd service
+    print("\n[1/4] Desativando servicos do sistema...")
+    sys.path.insert(0, os.path.join(base_dir, "server"))
+    try:
+        import autostart
+        autostart.disable_autostart()
+        print("      [OK] Autostart desativado.")
+    except Exception as e:
+        print(f"      [AVISO] Falha ao desativar autostart: {e}")
+
+    if sys.platform.startswith("linux"):
+        try:
+            subprocess.run(["systemctl", "--user", "stop", "agent-cockpit.service"], capture_output=True, check=False)
+            subprocess.run(["systemctl", "--user", "disable", "agent-cockpit.service"], capture_output=True, check=False)
+            svc_file = home / ".config" / "systemd" / "user" / "agent-cockpit.service"
+            if svc_file.exists():
+                svc_file.unlink()
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True, check=False)
+            print("      [OK] Servico systemd parado e removido.")
+        except Exception as e:
+            print(f"      [AVISO] Erro ao limpar systemd: {e}")
+
+    # 2. Remover schemas MCP e limpar mcp_config.json
+    print("\n[2/4] Removendo configuracoes e schemas MCP...")
+    mcp_schema_dir = home / ".gemini" / "antigravity" / "mcp" / "agent-cockpit"
+    if mcp_schema_dir.exists():
+        shutil.rmtree(mcp_schema_dir)
+        print(f"      [OK] Removido diretorio de schemas: {mcp_schema_dir}")
+
+    target_configs = [
+        home / ".gemini" / "config" / "mcp_config.json",
+        home / ".gemini" / "antigravity" / "mcp_config.json",
+    ]
+    for cfg in target_configs:
+        if cfg.exists():
+            try:
+                with open(cfg, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if "mcpServers" in data and "agent-cockpit" in data["mcpServers"]:
+                    del data["mcpServers"]["agent-cockpit"]
+                    with open(cfg, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    print(f"      [OK] Removido registro de {cfg}")
+            except Exception as e:
+                print(f"      [AVISO] Falha ao atualizar {cfg}: {e}")
+
+    # 3. Remover skills instaladas
+    print("\n[3/4] Removendo skills instaladas...")
+    skills_src = os.path.join(base_dir, "skills")
+    dest_skills = home / ".gemini" / "config" / "skills"
+    if os.path.exists(skills_src) and dest_skills.exists():
+        removed_count = 0
+        for item in os.listdir(skills_src):
+            target = dest_skills / item
+            if target.exists():
+                if target.is_dir():
+                    shutil.rmtree(target)
+                else:
+                    target.unlink()
+                removed_count += 1
+        print(f"      [OK] {removed_count} skills removidas de {dest_skills}")
+
+    print("\n[4/4] Finalizando desinstalacao...")
+    print("\n" + "=" * 65)
+    print("       >>> DESINSTALACAO CONCLUIDA COM SUCESSO! <<<")
+    print("=" * 65)
+
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Instalador do Agent Cockpit")
+    parser = argparse.ArgumentParser(description="Instalador e Desinstalador do Agent Cockpit")
     parser.add_argument("--autostart", dest="autostart", action="store_true", default=None, help="Ativar inicializacao automatica com o sistema")
     parser.add_argument("--no-autostart", dest="autostart", action="store_false", help="Nao ativar inicializacao automatica com o sistema")
+    parser.add_argument("--uninstall", action="store_true", help="Desinstalar o Agent Cockpit (servico, skills, mcp)")
+    parser.add_argument("--reinstall", action="store_true", help="Desinstalar versao anterior e reinstalar limpa")
     args, _ = parser.parse_known_args()
 
     base_dir = os.path.abspath(os.path.dirname(__file__))
+
+    if args.uninstall:
+        uninstall_cockpit(base_dir)
+        return
+
+    if args.reinstall:
+        uninstall_cockpit(base_dir)
+        print("\nIniciando nova instalacao limpa...\n")
+
     print_banner()
     check_python()
     install_dependencies(base_dir)
     configure_mcp(base_dir)
+    export_mcp_schemas(base_dir)
     copy_skills(base_dir)
     configure_autostart(base_dir, enable=args.autostart)
 

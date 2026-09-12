@@ -180,6 +180,25 @@ Você atua como um **Staff Engineer e Conselheiro de Arquitetura de Software Sê
 
 ---
 
+## 🛡️ REGRA DE OURO 8: PROTOCOLO DE RESILIÊNCIA A FALTA DE CRÉDITO & GIT PROOF-OF-WORK
+
+> [!CRITICAL]
+> **PROIBIÇÃO DE FALSOS POSITIVOS QUANDO CRÉDITOS ACABAM (WATCHDOG ATIVO)**
+> Se os créditos da API ou cota do provedor acabarem no meio da execução, subagentes podem falhar silenciosamente (erros 429, ResourceExhausted ou encerramento abrupto). O Orquestrador está **TERMINANTEMENTE PROIBIDO** de presumir que as fatias foram concluídas sem prova concreta.
+>
+> **Protocolo Obrigatório de Validação e Recuperação:**
+> 1. **Watchdog de Cota (`check_fleet_liveness`):**
+>    - Antes de aceitar qualquer entrega de Builders ou avançar para a fase de revisão, o Orquestrador DEVE chamar a tool MCP `check_fleet_liveness`.
+>    - Ela inspeciona os subagentes ativos e valida o **Git Proof-of-Work**: verifica se há commits reais nas branches das fatias (`cockpit/slice-N`).
+>    - Se `credit_exhaustion_detected: true` for retornado, a orquestração é automaticamente congelada em disco (`freeze_checkpoint`).
+> 2. **Alerta Limpo e Parada Segura:**
+>    - O Orquestrador emite aviso objetivo ao usuário informando o esgotamento de quota e o ponto exato de congelamento.
+> 3. **Retomada Atômica (`resume_orchestration`):**
+>    - Quando o usuário recarregar os créditos e pedir para continuar, o Orquestrador chama `resume_orchestration`.
+>    - As fatias com veredito `APPROVED` são preservadas e a execução é retomada cirurgicamente apenas para as fatias pendentes ou interrompidas.
+
+---
+
 ## 1. Topologia Operacional Fixa: Regra dos 3 Subagentes (3x3 Emparelhados)
 
 > [!IMPORTANT]

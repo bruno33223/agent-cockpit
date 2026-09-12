@@ -59,10 +59,11 @@ Quando o usuário disser:
 | **2. Isolamento** | `using-git-worktrees` | `create_slice_worktree` | Workspaces isolados em `.worktrees/slice-N` sem poluir a branch principal. |
 | **3. Context Briefing** | `subagent-driven-development`, `dispatching-parallel-agents` | `prepare_task_context`, `get_slice_spec` | Briefing cirúrgico isolado por fatia; despacho simultâneo da frota 3x3. |
 | **4. Construção TDD** | `test-driven-development` | `run_project_tests(tdd_mode='verify_red' / 'verify_green')`, `update_agent_pulse` | TDD Iron Law: teste falha antes de codar; passa após codar; telemetria em tempo real. |
+| **4.5. Quota Watchdog & Git PoW** | `verification-before-completion` | `check_fleet_liveness` | Watchdog de créditos/quota e validação de Proof of Work Git; bloqueia falsos positivos se subagentes caírem silenciosamente por falta de crédito. |
 | **5. Auditoria Cega** | `requesting-code-review`, `receiving-code-review`, `gauntlet-loop` | `run_project_tests`, `log_critique_verdict` | Inspeção cega de `git diff` e métricas estruturadas (`critical`, `important`, `minor`). |
 | **6. Diagnóstico** | `systematic-debugging` | `get_slice_failure_report` | Causa-raiz obrigatória antes de propor correção; zero tokens no chat principal. |
 | **7. Anti-Slop Gate** | `verification-before-completion` | `verify_completion_evidence` | Bloqueio de conclusão se o teste tiver >180s ou falhas não resolvidas. |
-| **8. Finalização** | `finishing-a-development-branch` | `cleanup_slice_worktree`, `check_human_gate`, `generate_handoff`, `context_pruner` | Limpeza de worktree, portão humano, emissão de handoff e compactação de contexto. |
+| **8. Finalização & Retomada** | `finishing-a-development-branch` | `cleanup_slice_worktree`, `check_human_gate`, `generate_handoff`, `context_pruner`, `resume_orchestration` | Limpeza de worktree, portão humano, emissão de handoff, compactação de contexto e retomada atômica após recarga de créditos. |
 
 ---
 
