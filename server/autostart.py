@@ -31,17 +31,29 @@ def get_cockpit_paths():
 def generate_desktop_entry_content() -> str:
     """Gera o conteúdo padrão de um arquivo .desktop de acordo com a especificação FreeDesktop."""
     base_dir, run_script, python_exec = get_cockpit_paths()
+    desktop_bin = Path.home() / ".local" / "bin" / "agent-cockpit-desktop"
+    icon_file = Path.home() / ".local" / "share" / "icons" / "hicolor" / "128x128" / "apps" / "agent-cockpit.png"
+    
+    if desktop_bin.exists():
+        exec_cmd = str(desktop_bin)
+        icon_path = str(icon_file) if icon_file.exists() else "utilities-system-monitor"
+        comment = "Painel de Telemetria e Orquestração Multiagente (Tauri Desktop)"
+    else:
+        exec_cmd = f"{python_exec} {run_script}"
+        icon_path = "utilities-system-monitor"
+        comment = "Painel de Telemetria e Orquestração Multiagente"
+
     return f"""[Desktop Entry]
 Type=Application
 Version=1.0
 Name=Agent Cockpit
-Comment=Painel de Telemetria e Orquestração Multiagente
-Exec={python_exec} {run_script}
+Comment={comment}
+Exec={exec_cmd}
 Path={base_dir}
-Icon=utilities-system-monitor
+Icon={icon_path}
 Terminal=false
-Categories=Development;
-StartupNotify=false
+Categories=Development;Utility;
+StartupNotify=true
 X-GNOME-Autostart-enabled=true
 """
 
