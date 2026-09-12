@@ -4,6 +4,7 @@ import json
 import time
 import socket
 import asyncio
+import threading
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
@@ -752,12 +753,25 @@ def post_local_worker_pull(payload: LocalWorkerPullPayload):
         raise HTTPException(status_code=400, detail="Nome do modelo não pode ser vazio.")
 
     client, _ = _get_local_worker_client(payload.project_id)
-    res = client.pull_model(model_name, stream=False)
-    status_str = res.get("status", "ok") if isinstance(res, dict) else "ok"
+
+    def _bg_pull():
+        try:
+            res = client.pull_model(model_name)
+            if isinstance(res, dict) and res.get("status") == "error":
+                err_msg = res.get("message", "Falha ao baixar modelo")
+                manager.broadcast_sync("model_pull_complete", {"model": model_name, "status": "error", "message": err_msg})
+            else:
+                manager.broadcast_sync("model_pull_complete", {"model": model_name, "status": "success"})
+        except Exception as e:
+            manager.broadcast_sync("model_pull_complete", {"model": model_name, "status": "error", "message": str(e)})
+
+    thread = threading.Thread(target=_bg_pull, daemon=True)
+    thread.start()
+
     return {
-        "status": status_str,
+        "status": "pulling",
         "model": model_name,
-        "details": res
+        "message": f"Download de '{model_name}' iniciado em segundo plano no Ollama. Acompanhe o progresso no Console de Logs."
     }
 
 # Monta arquivos estáticos do dashboard visual

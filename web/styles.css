@@ -2270,6 +2270,13 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.pull-feedback-msg.info {
+  display: block;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
 /* --- LOCAL WORKER CONTROLS & OLLAMA TERMINAL CONSOLE --- */
 
 .lw-process-row {

@@ -126,8 +126,27 @@ class TestLocalWorkerAPI(unittest.TestCase):
         target_model = "deepseek-coder:6.7b"
         status_code, data = self._http_post("/api/local-worker/pull", {"model": target_model})
         self.assertEqual(status_code, 200)
-        self.assertIn(data.get("status"), ["ok", "success", "pulling", "started", "error"])
+        self.assertEqual(data.get("status"), "pulling")
         self.assertEqual(data.get("model"), target_model)
+        self.assertIn("Acompanhe o progresso no Console de Logs", data.get("message", ""))
+
+    def test_post_local_worker_pull_broadcast(self):
+        """Verifica se thread de background chama client.pull_model e faz broadcast_sync com model_pull_complete."""
+        from unittest.mock import patch, MagicMock
+        with patch("web_server._get_local_worker_client") as mock_get_client, \
+             patch("web_server.manager.broadcast_sync") as mock_broadcast:
+            mock_client = MagicMock()
+            mock_client.pull_model.return_value = {"status": "success"}
+            mock_get_client.return_value = (mock_client, {})
+
+            status_code, data = self._http_post("/api/local-worker/pull", {"model": "qwen2.5-coder:7b"})
+            self.assertEqual(status_code, 200)
+            self.assertEqual(data.get("status"), "pulling")
+
+            # Aguarda a thread terminar
+            time.sleep(0.2)
+            mock_client.pull_model.assert_called_with("qwen2.5-coder:7b")
+            mock_broadcast.assert_called_with("model_pull_complete", {"model": "qwen2.5-coder:7b", "status": "success"})
 
     def test_post_local_worker_pull_validation(self):
         """Verifica se payload inválido em POST /api/local-worker/pull é rejeitado."""

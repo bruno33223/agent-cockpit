@@ -274,6 +274,24 @@ function initWebSocket() {
         }
       } else if (data.event === 'ollama_log' || data.type === 'ollama_log' || data.event === 'OLLAMA_LOG') {
         renderOllamaLogLine(data.payload || data.line || data.message || data);
+      } else if (data.event === 'model_pull_complete') {
+        loadLocalWorkerModels();
+        const payload = data.payload || {};
+        if (payload.status === 'success') {
+          if (pullFeedbackMsg) {
+            pullFeedbackMsg.textContent = `Download do modelo "${payload.model}" concluído com sucesso!`;
+            pullFeedbackMsg.className = 'pull-feedback-msg success';
+            pullFeedbackMsg.style.display = 'block';
+          }
+          alert(`Download do modelo "${payload.model}" concluído com sucesso!`);
+        } else {
+          if (pullFeedbackMsg) {
+            pullFeedbackMsg.textContent = `Erro ao baixar modelo "${payload.model}": ${payload.message || 'Falha no download'}`;
+            pullFeedbackMsg.className = 'pull-feedback-msg error';
+            pullFeedbackMsg.style.display = 'block';
+          }
+          alert(`Erro no download do modelo "${payload.model}": ${payload.message || 'Falha desconhecida'}`);
+        }
       } else if (data.event === 'STEERING_RECEIVED' || data.event === 'ORCHESTRATOR_MESSAGE') {
         if (!data.project_id || data.project_id === currentProjectId) {
           renderChatMessages();
@@ -1639,6 +1657,10 @@ async function loadLocalWorker() {
   }
 }
 
+async function loadLocalWorkerModels() {
+  await loadLocalWorker();
+}
+
 function renderLocalWorkerUI() {
   // 1. Atualiza LEDs e Badges de Conexão e Processo
   const isOnline = localWorkerStatus.online;
@@ -1734,13 +1756,13 @@ async function pullLocalModel(modelName) {
   if (!target) return;
 
   if (pullStatusBox) pullStatusBox.style.display = 'flex';
-  if (pullStatusMessage) pullStatusMessage.textContent = `Baixando modelo "${target}"... Isso pode levar alguns minutos.`;
+  if (pullStatusMessage) pullStatusMessage.textContent = `Disparando download de "${target}"...`;
   if (pullFeedbackMsg) {
     pullFeedbackMsg.style.display = 'none';
     pullFeedbackMsg.className = 'pull-feedback-msg';
   }
 
-  // Desabilita botões durante o download
+  // Desabilita botões durante o envio da solicitação
   if (btnStartPull) btnStartPull.disabled = true;
   document.querySelectorAll('.btn-quick-pull').forEach(b => b.disabled = true);
 
@@ -1754,15 +1776,14 @@ async function pullLocalModel(modelName) {
     const data = await res.json();
     if (res.ok && data.status !== 'error') {
       if (pullFeedbackMsg) {
-        pullFeedbackMsg.textContent = `Modelo "${target}" baixado e registrado com sucesso!`;
-        pullFeedbackMsg.className = 'pull-feedback-msg success';
+        pullFeedbackMsg.textContent = data.message || `Download de '${target}' iniciado em segundo plano no Ollama. Acompanhe o progresso no Console de Logs.`;
+        pullFeedbackMsg.className = 'pull-feedback-msg info';
         pullFeedbackMsg.style.display = 'block';
       }
       if (inputCustomModel) inputCustomModel.value = '';
-      await loadLocalWorker();
     } else {
       if (pullFeedbackMsg) {
-        pullFeedbackMsg.textContent = `Erro ao baixar modelo: ${data.details?.message || data.status || 'Falha no download'}`;
+        pullFeedbackMsg.textContent = `Erro ao iniciar download: ${data.message || data.details?.message || data.status || 'Falha no download'}`;
         pullFeedbackMsg.className = 'pull-feedback-msg error';
         pullFeedbackMsg.style.display = 'block';
       }
