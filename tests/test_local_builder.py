@@ -85,6 +85,24 @@ class TestLocalBuilder(unittest.TestCase):
         self.assertIn("+1 -1", diff_summary)
         self.assertEqual(new_content, "def add(a, b):\n    return a + b\n")
 
+    def test_apply_surgical_patch_direct_new_file(self):
+        # Arquivo novo recebendo código em markdown fence diretamente
+        original = ""
+        patch_block = "```html\n<!DOCTYPE html>\n<html><body><h1>Olá Mundo</h1></body></html>\n```"
+        new_content, hunks, diff_summary = apply_surgical_patch(original, patch_block)
+        self.assertEqual(hunks, 1)
+        self.assertIn("+2 -0 lines", diff_summary)
+        self.assertIn("<h1>Olá Mundo</h1>", new_content)
+
+    def test_apply_surgical_patch_whole_file_update(self):
+        # Arquivo pequeno atualizado completamente sem marcadores SEARCH/REPLACE
+        original = "/* CSS */\nbody { background: #000; }\n"
+        patch_block = "```css\n/* CSS */\nbody { background: #090d16; }\n.btn { color: cyan; }\n```"
+        new_content, hunks, diff_summary = apply_surgical_patch(original, patch_block)
+        self.assertEqual(hunks, 1)
+        self.assertIn("whole-file update", diff_summary)
+        self.assertIn(".btn { color: cyan; }", new_content)
+
     def test_apply_surgical_patch_atomic_failure(self):
         original = "def hello():\n    print('world')\n"
         # SEARCH que não existe no arquivo

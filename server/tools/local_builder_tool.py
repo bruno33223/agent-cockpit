@@ -65,73 +65,92 @@ def resolve_safe_worktree_path(slice_id: str, target_file: str, repo_root: Optio
 
 def apply_surgical_patch(existing_content: str, patch_text: str) -> Tuple[str, int, str]:
     """
-    Aplica cirurgicamente blocos SEARCH/REPLACE (estilo Aider) ao conteúdo existente.
-    Garante atomicidade total: se qualquer bloco falhar o match, lança ValueError sem alterar o arquivo.
+    Aplica cirurgicamente alterações ao conteúdo existente.
+    Suporta:
+    1. Criação direta de arquivo novo/vazio via bloco de código ou conteúdo limpo.
+    2. Blocos cirúrgicos SEARCH/REPLACE (estilo Aider).
+    3. Para arquivos curtos (<= 150 linhas), aceita reescrita completa via bloco de código.
     """
+    # 1. Arquivo novo ou vazio: aceita o código diretamente
+    if not existing_content.strip():
+        # Se veio com marcadores SEARCH/REPLACE
+        matches = SEARCH_REPLACE_REGEX.findall(patch_text)
+        if matches:
+            replace_code = matches[0][1].replace("\r\n", "\n").strip()
+            lines_added = len(replace_code.splitlines())
+            return replace_code + "\n", 1, f"+{lines_added} -0 lines"
+
+        clean_text = patch_text.strip()
+        fence_match = re.search(r'```(?:[a-zA-Z0-9_-]+)?\s*\n(.*?)\n```', clean_text, re.DOTALL)
+        if fence_match:
+            clean_text = fence_match.group(1).strip()
+        clean_text = re.sub(r'<{5,9}\s*SEARCH.*?\n={5,9}\n?', '', clean_text, flags=re.DOTALL)
+        clean_text = re.sub(r'>{5,9}', '', clean_text).strip()
+        if not clean_text:
+            raise ValueError("Resposta do modelo local vazia para criação do arquivo.")
+        lines_added = len(clean_text.splitlines())
+        return clean_text + "\n", 1, f"+{lines_added} -0 lines"
+
+    # 2. Arquivo existente: tenta blocos SEARCH/REPLACE primeiro
     matches = SEARCH_REPLACE_REGEX.findall(patch_text)
-    if not matches:
-        # Se não encontrou blocos SEARCH/REPLACE formais mas o arquivo é novo/vazio
-        if not existing_content.strip():
-            clean_text = patch_text.strip()
-            fence_match = re.search(r'```(?:python|javascript|js|html|css)?\s*\n(.*?)\n```', clean_text, re.DOTALL)
-            if fence_match:
-                clean_text = fence_match.group(1).strip()
-            if clean_text.startswith("SEARCH"):
-                clean_text = re.sub(r'^SEARCH\s*\n?', '', clean_text).strip()
-            if ">>>>>>>" in clean_text or "<<<<<<<" in clean_text:
-                raise ValueError("Patch inválido com marcadores residuais para arquivo novo.")
-            lines_added = len(clean_text.splitlines())
-            return clean_text, 1, f"+{lines_added} -0 lines"
-        raise ValueError("Nenhum bloco SEARCH/REPLACE válido encontrado na resposta do modelo.")
+    if matches:
+        content = existing_content
+        total_added = 0
+        total_removed = 0
+        hunks_applied = 0
 
-    content = existing_content
-    total_added = 0
-    total_removed = 0
-    hunks_applied = 0
+        for search_block, replace_block in matches:
+            norm_search = search_block.replace("\r\n", "\n")
+            norm_replace = replace_block.replace("\r\n", "\n")
+            norm_content = content.replace("\r\n", "\n")
 
-    for search_block, replace_block in matches:
-        # Normaliza quebras de linha
-        norm_search = search_block.replace("\r\n", "\n")
-        norm_replace = replace_block.replace("\r\n", "\n")
-        norm_content = content.replace("\r\n", "\n")
+            if not norm_search.strip():
+                # Se SEARCH estiver vazio ou apenas espaços, faz append no final do arquivo
+                content = norm_content.rstrip() + "\n\n" + norm_replace.strip() + "\n"
+                total_added += len(norm_replace.splitlines())
+                hunks_applied += 1
+                continue
 
-        # Se o arquivo estiver vazio, o replace_block é a criação inicial completa do arquivo
-        if not norm_content.strip():
-            content = norm_replace
-            total_added += len(norm_replace.splitlines())
-            hunks_applied += 1
-            continue
+            occurrences = norm_content.count(norm_search)
+            if occurrences == 0:
+                # Tenta match com strip de trailing whitespace em cada linha
+                search_lines = [l.rstrip() for l in norm_search.splitlines()]
+                clean_search = "\n".join(search_lines)
+                content_lines = [l.rstrip() for l in norm_content.splitlines()]
+                clean_content = "\n".join(content_lines)
 
-        if not norm_search:
-            raise ValueError("Bloco SEARCH vazio não permitido em arquivos não vazios.")
-
-        occurrences = norm_content.count(norm_search)
-        if occurrences == 0:
-            # Tenta com strip de trailing whitespace em cada linha
-            search_lines = [l.rstrip() for l in norm_search.splitlines()]
-            clean_search = "\n".join(search_lines)
-            content_lines = [l.rstrip() for l in norm_content.splitlines()]
-            clean_content = "\n".join(content_lines)
-            
-            if clean_content.count(clean_search) == 1:
-                idx = clean_content.find(clean_search)
-                # Reconstitui substituição
-                content = norm_content[:idx] + norm_replace + norm_content[idx + len(clean_search):]
+                if clean_content.count(clean_search) == 1:
+                    idx = clean_content.find(clean_search)
+                    content = norm_content[:idx] + norm_replace + norm_content[idx + len(clean_search):]
+                else:
+                    raise ValueError(f"SEARCH block match failure: o bloco a ser substituído não foi encontrado no arquivo.\nSEARCH:\n{norm_search}")
+            elif occurrences > 1:
+                raise ValueError(f"SEARCH block match failure: o bloco foi encontrado {occurrences} vezes. O bloco deve ser único.")
             else:
-                raise ValueError(f"SEARCH block match failure: o bloco a ser substituído não foi encontrado no arquivo.\nSEARCH:\n{norm_search}")
-        elif occurrences > 1:
-            raise ValueError(f"SEARCH block match failure: o bloco foi encontrado {occurrences} vezes. O bloco deve ser único.")
-        else:
-            content = norm_content.replace(norm_search, norm_replace, 1)
+                content = norm_content.replace(norm_search, norm_replace, 1)
 
-        removed_lines = len(norm_search.splitlines())
-        added_lines = len(norm_replace.splitlines())
-        total_removed += removed_lines
-        total_added += added_lines
-        hunks_applied += 1
+            removed_lines = len(norm_search.splitlines())
+            added_lines = len(norm_replace.splitlines())
+            total_removed += removed_lines
+            total_added += added_lines
+            hunks_applied += 1
 
-    diff_summary = f"+{total_added} -{total_removed} lines"
-    return content, hunks_applied, diff_summary
+        diff_summary = f"+{total_added} -{total_removed} lines"
+        return content, hunks_applied, diff_summary
+
+    # 3. Se não encontrou SEARCH/REPLACE mas o arquivo é pequeno (<= 150 linhas),
+    # verifica se o modelo retornou o arquivo completo atualizado em um bloco de código markdown
+    if len(existing_content.splitlines()) <= 150:
+        clean_text = patch_text.strip()
+        fence_match = re.search(r'```(?:[a-zA-Z0-9_-]+)?\s*\n(.*?)\n```', clean_text, re.DOTALL)
+        if fence_match:
+            new_code = fence_match.group(1).strip() + "\n"
+            if len(new_code.splitlines()) >= 3:
+                added = len(new_code.splitlines())
+                removed = len(existing_content.splitlines())
+                return new_code, 1, f"+{added} -{removed} lines (whole-file update)"
+
+    raise ValueError("Nenhum bloco SEARCH/REPLACE válido nem código de substituição encontrado na resposta do modelo.")
 
 def build_local_prompt(
     instruction: str,
@@ -140,7 +159,40 @@ def build_local_prompt(
     context_content: Optional[str] = None,
     error_feedback: Optional[str] = None
 ) -> str:
-    """Constrói o prompt cirúrgico para o LLM local de 7B no padrão SEARCH/REPLACE."""
+    """Constrói o prompt otimizado para o LLM local de 7B no padrão Direct / SEARCH/REPLACE."""
+    # Caso 1: Arquivo novo ou vazio -> Modo Direct Generation (Whole File)
+    if not existing_content.strip():
+        prompt_parts = [
+            "Você é um engenheiro de software sênior. Crie o código completo para o arquivo alvo solicitado.",
+            f"\nArquivo Alvo: {target_file}",
+            f"\nInstrução:\n{instruction}"
+        ]
+        if error_feedback:
+            prompt_parts.append(f"\nFeedback de Erros da Tentativa Anterior:\n{error_feedback}")
+        if context_content:
+            prompt_parts.append(f"\nArquivos de Contexto (Apenas Leitura):\n{context_content}")
+        prompt_parts.append("\nResponda EXCLUSIVAMENTE com o código completo do arquivo dentro de um bloco markdown:")
+        prompt_parts.append("```\n[código completo aqui]\n```")
+        return "\n".join(prompt_parts)
+
+    # Caso 2: Arquivo pequeno (<= 150 linhas) -> Permite reescrita completa ou patch
+    if len(existing_content.splitlines()) <= 150:
+        prompt_parts = [
+            "Você é um engenheiro de software sênior. Modifique o arquivo alvo de acordo com a instrução.",
+            f"\nArquivo Alvo: {target_file}",
+            f"\nInstrução:\n{instruction}",
+            f"\nConteúdo Atual de {target_file}:\n```\n{existing_content}\n```"
+        ]
+        if error_feedback:
+            prompt_parts.append(f"\nFeedback de Erros da Tentativa Anterior:\n{error_feedback}")
+        if context_content:
+            prompt_parts.append(f"\nArquivos de Contexto (Apenas Leitura):\n{context_content}")
+        prompt_parts.append("\nVocê pode responder com:")
+        prompt_parts.append("Opção 1: O código COMPLETO atualizado do arquivo dentro de um bloco markdown ```:\n```\n[código completo atualizado]\n```")
+        prompt_parts.append("Opção 2: OU blocos SEARCH/REPLACE cirúrgicos:\n<<<<<<< SEARCH\n[código original a substituir]\n=======\n[novo código]\n>>>>>>>")
+        return "\n".join(prompt_parts)
+
+    # Caso 3: Arquivo grande (> 150 linhas) -> Força SEARCH/REPLACE cirúrgico
     prompt_parts = [
         "Você é um Local Coder cirúrgico. Implemente a instrução solicitada modificando o arquivo fornecido.",
         "REGRAS ESTRITAS:",
@@ -152,24 +204,16 @@ def build_local_prompt(
         "novo código modificado",
         ">>>>>>>",
         "3. O código dentro de SEARCH deve ser idêntico ao código atual do arquivo (incluindo indentação).",
-        "4. NÃO inclua explicações, comentários fora do código ou tags de markdown (como ```python).",
+        "4. NÃO inclua explicações ou comentários fora do código.",
         f"\nArquivo Alvo: {target_file}",
         f"\nInstrução:\n{instruction}"
     ]
-
     if error_feedback:
         prompt_parts.append(f"\nFeedback de Erros da Tentativa Anterior:\n{error_feedback}")
-
     if context_content:
         prompt_parts.append(f"\nArquivos de Contexto (Apenas Leitura):\n{context_content}")
-
-    if not existing_content.strip():
-        prompt_parts.append("\nATENÇÃO: O arquivo alvo é NOVO e está VAZIO. Coloque todo o código do arquivo entre ======= e >>>>>>>:")
-        prompt_parts.append("<<<<<<< SEARCH\n=======\n[todo o código novo completo aqui]\n>>>>>>>")
-    else:
-        prompt_parts.append(f"\nConteúdo Atual de {target_file}:\n```\n{existing_content}\n```")
+    prompt_parts.append(f"\nConteúdo Atual de {target_file}:\n```\n{existing_content}\n```")
     prompt_parts.append("\nGere os blocos SEARCH/REPLACE:")
-
     return "\n".join(prompt_parts)
 
 def call_local_llm(
