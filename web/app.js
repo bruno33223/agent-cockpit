@@ -274,6 +274,9 @@ function initWebSocket() {
           }
           loadLocalWorker();
         }
+      } else if (data.event === 'worker_queue_updated' || data.type === 'worker_queue_updated') {
+        const queuePayload = data.payload || data;
+        renderWorkerQueue(queuePayload);
       } else if (data.event === 'ollama_log' || data.type === 'ollama_log' || data.event === 'OLLAMA_LOG') {
         renderOllamaLogLine(data.payload || data.line || data.message || data);
       } else if (data.event === 'model_pull_progress') {
@@ -1709,11 +1712,125 @@ async function loadLocalWorker() {
     }
 
     renderLocalWorkerUI();
+    loadWorkerQueue();
   } catch (err) {
     console.warn('[LocalWorker] Falha ao carregar status/modelos:', err);
     localWorkerStatus.online = false;
     localWorkerStatus.running = false;
     renderLocalWorkerUI();
+    loadWorkerQueue();
+  }
+}
+
+async function loadWorkerQueue() {
+  try {
+    const res = await apiFetch('/api/local-worker/queue');
+    if (res.ok) {
+      const data = await res.json();
+      renderWorkerQueue(data);
+    }
+  } catch (err) {
+    console.warn('[LocalWorkerQueue] Falha ao carregar status da fila:', err);
+  }
+}
+
+function renderWorkerQueue(queueData) {
+  if (!queueData) return;
+
+  const isBusy = !!queueData.is_busy;
+  const activeTask = queueData.active_task;
+  const queueLength = queueData.queue_length || 0;
+  const queuedTasks = queueData.queued_tasks || [];
+
+  // 1. Status Indicator & Badges
+  const queueStatusBadge = document.getElementById('lw-queue-status-badge');
+  const queueLed = document.getElementById('lw-queue-led');
+  const queueLengthBadge = document.getElementById('lw-queue-length-badge');
+
+  if (queueStatusBadge) {
+    if (isBusy) {
+      queueStatusBadge.className = 'lw-badge busy';
+      queueStatusBadge.textContent = 'PROCESSANDO NA GPU';
+    } else {
+      queueStatusBadge.className = 'lw-badge ready';
+      queueStatusBadge.textContent = 'LIVRE';
+    }
+  }
+
+  if (queueLed) {
+    queueLed.className = isBusy ? 'pulse-led busy' : 'pulse-led online';
+  }
+
+  if (queueLengthBadge) {
+    queueLengthBadge.textContent = `${queueLength} na fila`;
+  }
+
+  // 2. Active Task Container
+  const activeContainer = document.getElementById('lw-active-task-container');
+  if (activeContainer) {
+    if (isBusy && activeTask) {
+      const elapsed = activeTask.elapsed_seconds !== undefined ? `${activeTask.elapsed_seconds}s` : 'Iniciando...';
+      activeContainer.innerHTML = `
+        <div class="active-task-card">
+          <div class="active-task-header">
+            <span class="active-task-slice">${escapeHtml(activeTask.slice_id || 'Fatia')}</span>
+            <span class="active-task-file"><code>${escapeHtml(activeTask.target_file || '')}</code></span>
+            <span class="active-task-timer">⏱ Decorrido: <strong>${elapsed}</strong></span>
+          </div>
+          <div class="active-task-instruction">
+            ${escapeHtml(activeTask.instruction_summary || 'Executando geração de código...')}
+          </div>
+        </div>
+      `;
+    } else {
+      activeContainer.innerHTML = `
+        <div class="queue-empty-placeholder">
+          <span class="empty-icon">✓</span>
+          <span>A GPU está ociosa e pronta para processar novas requisições.</span>
+        </div>
+      `;
+    }
+  }
+
+  // 3. Waiting Queue List / Table
+  const queueListContainer = document.getElementById('lw-queue-list-container');
+  if (queueListContainer) {
+    if (queuedTasks.length > 0) {
+      const rowsHtml = queuedTasks.map(task => `
+        <tr class="queue-row">
+          <td class="col-pos"><span class="queue-pos-badge">#${task.position}</span></td>
+          <td class="col-slice"><strong>${escapeHtml(task.slice_id)}</strong></td>
+          <td class="col-file"><code>${escapeHtml(task.target_file)}</code></td>
+          <td class="col-inst">${escapeHtml(task.instruction_summary || '-')}</td>
+          <td class="col-time">${task.waiting_seconds !== undefined ? `${task.waiting_seconds}s` : '-'}</td>
+        </tr>
+      `).join('');
+
+      queueListContainer.innerHTML = `
+        <div class="queue-table-wrapper">
+          <table class="queue-table">
+            <thead>
+              <tr>
+                <th>Posição</th>
+                <th>Fatia</th>
+                <th>Arquivo Alvo</th>
+                <th>Instrução</th>
+                <th>Espera</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      queueListContainer.innerHTML = `
+        <div class="queue-empty-subtext">
+          Nenhuma fatia aguardando na fila.
+        </div>
+      `;
+    }
   }
 }
 

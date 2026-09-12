@@ -455,6 +455,48 @@
             </div>
           </div>
 
+          <!-- CARD: FILA DE TAREFAS DA GPU (QUEUE) -->
+          <div class="worker-grid-card queue-card" id="worker-queue-card">
+            <div class="worker-card-header">
+              <div class="worker-card-title">
+                <span class="pulse-led online" id="lw-queue-led"></span>
+                <span>Fila de Tarefas da GPU (Queue)</span>
+                <span class="queue-subdesc">Coordenação sequencial FIFO para inferência local sem contenção</span>
+              </div>
+              <div class="worker-card-badges">
+                <span class="lw-badge ready" id="lw-queue-status-badge">LIVRE</span>
+                <span class="lw-badge info" id="lw-queue-length-badge">0 na fila</span>
+              </div>
+            </div>
+
+            <div class="worker-card-body">
+              <!-- ATIVIDADE ATUAL NA GPU -->
+              <div class="queue-active-section">
+                <div class="queue-section-label">
+                  <span class="label-dot">●</span> Tarefa Ativa em Processamento na GPU:
+                </div>
+                <div id="lw-active-task-container">
+                  <div class="queue-empty-placeholder">
+                    <span class="empty-icon">✓</span>
+                    <span>A GPU está ociosa e pronta para processar novas requisições.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- LISTA DE ESPERA -->
+              <div class="queue-waiting-section">
+                <div class="queue-section-label">
+                  <span class="label-dot">⏳</span> Fatias Aguardando na Fila:
+                </div>
+                <div id="lw-queue-list-container">
+                  <div class="queue-empty-subtext">
+                    Nenhuma fatia aguardando na fila.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- REAL-TIME DOWNLOAD PROGRESS BANNER -->
           <div class="worker-pull-banner" id="worker-pull-progress-banner" style="display: none;">
             <div class="pull-banner-header">

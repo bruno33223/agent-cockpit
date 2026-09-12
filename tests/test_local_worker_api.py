@@ -161,6 +161,34 @@ class TestLocalWorkerAPI(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertIn(e.code, [400, 422])
 
+    def test_get_local_worker_queue(self):
+        """Verifica se GET /api/local-worker/queue retorna a estrutura completa da fila."""
+        status_code, data = self._http_get("/api/local-worker/queue")
+        self.assertEqual(status_code, 200)
+        self.assertIn("is_busy", data)
+        self.assertIn("active_task", data)
+        self.assertIn("queue_length", data)
+        self.assertIn("queued_tasks", data)
+        self.assertIn("message", data)
+
+    def test_local_worker_queue_broadcast_on_update(self):
+        """Verifica se enfileiramento e liberação disparam broadcast de worker_queue_updated."""
+        from unittest.mock import patch
+        from workers.worker_queue import local_worker_queue
+
+        with patch("web_server.manager.broadcast_sync") as mock_broadcast:
+            ticket = local_worker_queue.enqueue("slice-api-test", "test.html", "Instrução de teste da API")
+            mock_broadcast.assert_called_with("worker_queue_updated", local_worker_queue.get_queue_status())
+
+            # Consulta com slice_id
+            status_code, data = self._http_get("/api/local-worker/queue?slice_id=slice-api-test")
+            self.assertEqual(status_code, 200)
+            self.assertEqual(data.get("your_position"), 1)
+
+            # Liberação
+            local_worker_queue.release_worker(ticket, status="cancelled")
+            mock_broadcast.assert_called_with("worker_queue_updated", local_worker_queue.get_queue_status())
+
     def test_local_worker_ui_elements(self):
         """Verifica se todos os elementos visuais do Local Worker estão presentes no HTML servido."""
         req = urllib.request.Request(f"{self.base_url}/", method="GET")
@@ -174,7 +202,13 @@ class TestLocalWorkerAPI(unittest.TestCase):
             self.assertIn("qwen2.5-coder:7b", html, "Modelo qwen2.5-coder:7b ausente nas recomendações do modal")
             self.assertIn("deepseek-coder:6.7b", html, "Modelo deepseek-coder:6.7b ausente nas recomendações do modal")
             self.assertIn("input-custom-model", html, "Input input-custom-model ausente no formulário do modal")
+            # Elementos da Fila de Tarefas da GPU
+            self.assertIn("worker-queue-card", html, "Card worker-queue-card ausente no HTML")
+            self.assertIn("lw-queue-status-badge", html, "Badge lw-queue-status-badge ausente no HTML")
+            self.assertIn("lw-active-task-container", html, "Container lw-active-task-container ausente no HTML")
+            self.assertIn("lw-queue-list-container", html, "Container lw-queue-list-container ausente no HTML")
 
 
 if __name__ == "__main__":
     unittest.main()
+

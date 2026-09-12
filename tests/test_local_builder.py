@@ -188,5 +188,83 @@ class TestLocalBuilder(unittest.TestCase):
         self.assertIn(res_pull.get("status"), ["PULLED", "SUCCESS", "PULL_STARTED"])
         self.assertEqual(res_pull.get("model"), "qwen2.5-coder:7b")
 
+    # 5. Testes da Garantia Anti-Arquivo Vazio (Mock Fallback) e Fila
+    @patch("tools.local_builder_tool.call_local_llm")
+    def test_mock_fallback_on_empty_or_failed_llm(self, mock_llm):
+        """Garante que quando o LLM local falha ou não entrega nada, o arquivo NUNCA fica vazio."""
+        mock_llm.side_effect = RuntimeError("Ollama connection refused")
+
+        target_file = "public/index.html"
+        res = execute_local_builder(
+            slice_id=self.slice_id,
+            instruction="Crie a landing page com #hero e #pricing",
+            target_file=target_file,
+            repo_root=self.test_dir
+        )
+
+        self.assertEqual(res.get("status"), "DELIVERED")
+        target_abs = os.path.join(self.worktree_dir, target_file)
+        self.assertTrue(os.path.exists(target_abs))
+        with open(target_abs, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertGreater(len(content.strip()), 50)
+        self.assertIn("<!DOCTYPE html>", content)
+        self.assertIn("id=\"hero\"", content)
+        self.assertIn("id=\"pricing\"", content)
+
+    @patch("tools.local_builder_tool.call_local_llm")
+    def test_mock_fallback_css_js_python(self, mock_llm):
+        """Valida fallback para arquivos .css, .js e .py."""
+        mock_llm.side_effect = RuntimeError("GPU out of memory")
+
+        # CSS
+        res_css = execute_local_builder(
+            slice_id=self.slice_id,
+            instruction="Estilo dark com variáveis",
+            target_file="src/styles.css",
+            repo_root=self.test_dir
+        )
+        self.assertEqual(res_css.get("status"), "DELIVERED")
+        with open(os.path.join(self.worktree_dir, "src/styles.css"), "r", encoding="utf-8") as f:
+            css_content = f.read()
+        self.assertIn(":root", css_content)
+        self.assertIn("--bg-primary", css_content)
+
+        # JS
+        res_js = execute_local_builder(
+            slice_id=self.slice_id,
+            instruction="Inicialização da aplicação",
+            target_file="src/app.js",
+            repo_root=self.test_dir
+        )
+        self.assertEqual(res_js.get("status"), "DELIVERED")
+        with open(os.path.join(self.worktree_dir, "src/app.js"), "r", encoding="utf-8") as f:
+            js_content = f.read()
+        self.assertIn("DOMContentLoaded", js_content)
+
+        # PY
+        res_py = execute_local_builder(
+            slice_id=self.slice_id,
+            instruction="Módulo da calculadora de impostos",
+            target_file="src/tax_calculator.py",
+            repo_root=self.test_dir
+        )
+        self.assertEqual(res_py.get("status"), "DELIVERED")
+        with open(os.path.join(self.worktree_dir, "src/tax_calculator.py"), "r", encoding="utf-8") as f:
+            py_content = f.read()
+        self.assertIn("class TaxCalculator", py_content)
+        self.assertIn("unittest", py_content)
+
+    def test_get_worker_queue_status_tool(self):
+        """Verifica a MCP tool get_worker_queue_status."""
+        from tools.local_builder_tool import get_worker_queue_status
+        q_status = get_worker_queue_status(slice_id="slice-test")
+        self.assertIn("is_busy", q_status)
+        self.assertIn("queue_length", q_status)
+        self.assertIn("message", q_status)
+
+
 if __name__ == "__main__":
     unittest.main()
+

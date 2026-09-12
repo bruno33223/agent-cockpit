@@ -88,6 +88,20 @@ manager = ConnectionManager()
 # Registra o broadcast no StateStore para eventos automáticos
 db.register_listener(manager.broadcast_sync)
 
+# FILA DO LOCAL WORKER
+try:
+    from workers.worker_queue import local_worker_queue
+except ImportError:
+    try:
+        from server.workers.worker_queue import local_worker_queue
+    except ImportError:
+        local_worker_queue = None
+
+if local_worker_queue:
+    local_worker_queue.register_listener(
+        lambda status: manager.broadcast_sync("worker_queue_updated", status)
+    )
+
 # GERENCIADOR DE PROCESSO DO OLLAMA
 try:
     from workers.ollama_process_manager import OllamaProcessManager
@@ -96,6 +110,7 @@ except ImportError:
         from server.workers.ollama_process_manager import OllamaProcessManager
     except ImportError:
         OllamaProcessManager = None
+
 
 if OllamaProcessManager is None:
     import collections
@@ -629,6 +644,20 @@ def _get_local_worker_client(project_id: Optional[str] = None):
                 return {"status": "error", "message": str(e)}
 
     return _FallbackLocalLLMClient(base_url=endpoint), cfg
+
+@app.get("/api/local-worker/queue")
+def get_local_worker_queue(slice_id: Optional[str] = None, ticket_id: Optional[str] = None):
+    """Retorna o status atual da fila de tarefas da GPU do Local Worker."""
+    if local_worker_queue:
+        return local_worker_queue.get_queue_status(slice_id=slice_id, ticket_id=ticket_id)
+    return {
+        "is_busy": False,
+        "active_task": None,
+        "queue_length": 0,
+        "queued_tasks": [],
+        "your_position": None,
+        "message": "Fila do Local Worker não inicializada."
+    }
 
 @app.get("/api/local-worker/status")
 def get_local_worker_status(project_id: Optional[str] = None):

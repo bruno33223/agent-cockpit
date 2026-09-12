@@ -356,6 +356,23 @@ TOOLS_DEFINITIONS = [
             },
             "required": ["action"]
         }
+    },
+    {
+        "name": "get_worker_queue_status",
+        "description": "Consulta a fila de tarefas da GPU do Local Worker (Ollama), retornando se está ocupado, a tarefa ativa, a posição da sua fatia na fila e mensagem explicativa em PT-BR.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {
+                    "type": "string",
+                    "description": "ID da fatia vertical para verificar a posição na fila (ex: 'slice-1')."
+                },
+                "ticket_id": {
+                    "type": "string",
+                    "description": "ID opcional do ticket retornado anteriormente."
+                }
+            }
+        }
     }
 ]
 
@@ -718,6 +735,14 @@ def handle_tool_call(name: str, args: dict) -> dict:
             model_name=args.get("model_name"),
             endpoint=args.get("endpoint"),
             project_id=target_pid
+        )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
+
+    elif name == "get_worker_queue_status":
+        from tools.local_builder_tool import get_worker_queue_status
+        res = get_worker_queue_status(
+            slice_id=args.get("slice_id"),
+            ticket_id=args.get("ticket_id")
         )
         return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
