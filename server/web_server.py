@@ -651,23 +651,31 @@ def get_local_worker_status(project_id: Optional[str] = None):
 def post_local_worker_start_server():
     """Inicia o processo local do Ollama."""
     if not ollama_process_manager:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail="OllamaProcessManager não está disponível.")
-    res = ollama_process_manager.start()
-    status = ollama_process_manager.get_status()
-    manager.broadcast_sync("ollama_status", status)
-    return res
+        return {"status": "ERROR", "error": "OllamaProcessManager não está disponível.", "installed": False}
+    try:
+        res = ollama_process_manager.start()
+        status = ollama_process_manager.get_status()
+        manager.broadcast_sync("ollama_status", status)
+        return res
+    except (RuntimeError, Exception) as e:
+        status = ollama_process_manager.get_status() if ollama_process_manager else {"installed": False, "running": False}
+        manager.broadcast_sync("ollama_status", status)
+        return {"status": "ERROR", "error": str(e), "installed": False}
 
 @app.post("/api/local-worker/stop-server")
 def post_local_worker_stop_server():
     """Encerra o processo local do Ollama caso tenha sido iniciado pelo Cockpit."""
     if not ollama_process_manager:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail="OllamaProcessManager não está disponível.")
-    res = ollama_process_manager.stop()
-    status = ollama_process_manager.get_status()
-    manager.broadcast_sync("ollama_status", status)
-    return res
+        return {"status": "ERROR", "error": "OllamaProcessManager não está disponível.", "installed": False}
+    try:
+        res = ollama_process_manager.stop()
+        status = ollama_process_manager.get_status()
+        manager.broadcast_sync("ollama_status", status)
+        return res
+    except (RuntimeError, Exception) as e:
+        status = ollama_process_manager.get_status() if ollama_process_manager else {"installed": False, "running": False}
+        manager.broadcast_sync("ollama_status", status)
+        return {"status": "ERROR", "error": str(e), "installed": status.get("installed", False)}
 
 @app.get("/api/local-worker/server-logs")
 def get_local_worker_server_logs(limit: int = 100):

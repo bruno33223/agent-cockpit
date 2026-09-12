@@ -488,14 +488,14 @@ def handle_tool_call(name: str, args: dict) -> dict:
     elif name == "run_project_tests":
         from test_runner import run_distilled_tests
         cmd = args.get("test_command")
-        cwd = args.get("working_dir", ".")
+        cwd = args.get("working_dir") or db.get_project_root(target_pid) or "."
         timeout = args.get("timeout_sec", 60)
         log_dir = args.get("log_output_dir")
         tdd_mode = args.get("tdd_mode", "standard")
         slice_id = args.get("slice_id")
         if not log_dir:
             import workflow_lock
-            found = workflow_lock.find_latest_blueprint_dir(".")
+            found = workflow_lock.find_latest_blueprint_dir(cwd)
             log_dir = found if found else cwd
         res = run_distilled_tests(
             cmd,

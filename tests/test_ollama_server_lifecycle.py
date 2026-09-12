@@ -68,9 +68,13 @@ class TestOllamaServerLifecycle(unittest.TestCase):
 
     def _http_get(self, endpoint):
         req = urllib.request.Request(f"{self.base_url}{endpoint}", method="GET")
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return resp.getcode(), data
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return resp.getcode(), data
+        except urllib.error.HTTPError as e:
+            data = json.loads(e.read().decode("utf-8"))
+            return e.code, data
 
     def _http_post(self, endpoint, payload=None):
         data_bytes = json.dumps(payload or {}).encode("utf-8")
@@ -80,16 +84,39 @@ class TestOllamaServerLifecycle(unittest.TestCase):
             headers={"Content-Type": "application/json"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return resp.getcode(), data
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return resp.getcode(), data
+        except urllib.error.HTTPError as e:
+            data = json.loads(e.read().decode("utf-8"))
+            return e.code, data
 
     def test_01_rest_endpoints_exist_and_respond(self):
         """Verifica a existência e funcionamento dos endpoints REST do servidor Ollama."""
-        # Teste de start-server
+        # Teste de start-server (quando Ollama não está instalado, deve responder graciosamente sem 500)
         status_code, data = self._http_post("/api/local-worker/start-server")
-        self.assertEqual(status_code, 200)
+        self.assertIn(status_code, [200, 400])
         self.assertIn("status", data)
+        if data.get("status") == "ERROR":
+            self.assertFalse(data.get("installed", True))
+            self.assertIn("error", data)
+        else:
+            self.assertIn(data.get("status"), ["started", "already_running"])
+
+        # Teste de start-server mockando inicialização com sucesso
+        if web_server.ollama_process_manager:
+            with patch.object(web_server.ollama_process_manager, "start", return_value={
+                "status": "started",
+                "running": True,
+                "managed": True,
+                "pid": 99999,
+                "port": 11434,
+                "message": "Subprocesso Ollama iniciado."
+            }):
+                status_code, data = self._http_post("/api/local-worker/start-server")
+                self.assertEqual(status_code, 200)
+                self.assertEqual(data.get("status"), "started")
 
         # Teste de server-logs
         status_code, data = self._http_get("/api/local-worker/server-logs")
@@ -100,7 +127,7 @@ class TestOllamaServerLifecycle(unittest.TestCase):
 
         # Teste de stop-server
         status_code, data = self._http_post("/api/local-worker/stop-server")
-        self.assertEqual(status_code, 200)
+        self.assertIn(status_code, [200, 400])
         self.assertIn("status", data)
 
     def test_02_server_lifecycle_autostart_logic(self):
