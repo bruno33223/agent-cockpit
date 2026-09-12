@@ -110,6 +110,8 @@ window.switchTab = function(viewId) {
     initOrRefreshGraph();
   } else if (viewId === 'view-handoff') {
     loadHandoff();
+  } else if (viewId === 'view-worker') {
+    loadLocalWorker();
   }
 };
 
@@ -278,29 +280,70 @@ function initWebSocket() {
         const payload = data.payload || {};
         const chunk = payload.progress || {};
         const model = payload.model || '';
+
+        // Atualiza banner na página dedicada do Worker
+        const workerBanner = document.getElementById('worker-pull-progress-banner');
+        const workerPullTitle = document.getElementById('worker-pull-title');
+        const workerPullPercent = document.getElementById('worker-pull-percent');
+        const workerPullBar = document.getElementById('worker-pull-bar');
+        const workerPullDetails = document.getElementById('worker-pull-details');
+
+        let percent = 0;
+        let detailsText = chunk.status || 'Processando...';
+
+        if (chunk.completed !== undefined && chunk.total && chunk.total > 0) {
+          percent = Math.round((chunk.completed * 100) / chunk.total);
+          const mbCompleted = (chunk.completed / (1024 * 1024)).toFixed(1);
+          const mbTotal = (chunk.total / (1024 * 1024)).toFixed(1);
+          detailsText = `${mbCompleted} MB / ${mbTotal} MB • ${chunk.status || 'downloading'}`;
+        }
+
+        if (workerBanner) {
+          workerBanner.style.display = 'block';
+          if (workerPullTitle) workerPullTitle.textContent = `Baixando modelo: ${model}`;
+          if (workerPullPercent) workerPullPercent.textContent = `${percent}%`;
+          if (workerPullBar) workerPullBar.style.width = `${percent}%`;
+          if (workerPullDetails) workerPullDetails.textContent = detailsText;
+        }
+
+        // Atualiza feedback no modal (se aberto)
         if (pullFeedbackMsg) {
           pullFeedbackMsg.style.display = 'block';
           pullFeedbackMsg.className = 'pull-feedback-msg info';
-          if (chunk.completed !== undefined && chunk.total && chunk.total > 0) {
-            const percent = Math.round((chunk.completed * 100) / chunk.total);
-            const mbCompleted = (chunk.completed / (1024 * 1024)).toFixed(1);
-            const mbTotal = (chunk.total / (1024 * 1024)).toFixed(1);
-            const statusText = chunk.status ? ` - ${chunk.status}` : '';
-            pullFeedbackMsg.textContent = `Baixando ${model || 'modelo'}: ${percent}% (${mbCompleted} MB / ${mbTotal} MB)${statusText}`;
-          } else if (chunk.status) {
-            pullFeedbackMsg.textContent = `${model ? model + ': ' : ''}${chunk.status}`;
-          }
+          pullFeedbackMsg.textContent = `Baixando ${model || 'modelo'}: ${percent}% (${detailsText})`;
         }
       } else if (data.event === 'model_pull_complete') {
         loadLocalWorkerModels();
         const payload = data.payload || {};
+
+        const workerBanner = document.getElementById('worker-pull-progress-banner');
+        const workerPullTitle = document.getElementById('worker-pull-title');
+        const workerPullPercent = document.getElementById('worker-pull-percent');
+        const workerPullBar = document.getElementById('worker-pull-bar');
+        const workerPullDetails = document.getElementById('worker-pull-details');
+
         if (payload.status === 'success') {
+          if (workerBanner) {
+            if (workerPullTitle) workerPullTitle.textContent = `✓ Download Concluído: ${payload.model}`;
+            if (workerPullPercent) workerPullPercent.textContent = `100%`;
+            if (workerPullBar) workerPullBar.style.width = `100%`;
+            if (workerPullDetails) workerPullDetails.textContent = `Modelo ${payload.model} instalado e pronto para uso!`;
+            setTimeout(() => {
+              if (workerBanner) workerBanner.style.display = 'none';
+            }, 6000);
+          }
+
           if (pullFeedbackMsg) {
             pullFeedbackMsg.textContent = `Download do modelo "${payload.model}" concluído com sucesso!`;
             pullFeedbackMsg.className = 'pull-feedback-msg success';
             pullFeedbackMsg.style.display = 'block';
           }
         } else {
+          if (workerBanner) {
+            if (workerPullTitle) workerPullTitle.textContent = `Falha no Download: ${payload.model}`;
+            if (workerPullDetails) workerPullDetails.textContent = payload.message || 'Erro desconhecido';
+          }
+
           if (pullFeedbackMsg) {
             pullFeedbackMsg.textContent = `Erro ao baixar modelo "${payload.model}": ${payload.message || 'Falha no download'}`;
             pullFeedbackMsg.className = 'pull-feedback-msg error';
@@ -1689,6 +1732,11 @@ function renderLocalWorkerUI() {
     lwPillLed.title = isOnline ? 'Ollama Online' : 'Ollama Offline / Inacessível';
   }
 
+  const lwCardLed = document.getElementById('lw-card-led');
+  if (lwCardLed) {
+    lwCardLed.className = `pulse-led ${isOnline ? 'online' : 'offline'}`;
+  }
+
   if (lwStatusBadge) {
     lwStatusBadge.className = `lw-badge ${isOnline ? 'online' : 'offline'}`;
     lwStatusBadge.textContent = isOnline ? 'Online' : 'Offline';
@@ -1712,7 +1760,7 @@ function renderLocalWorkerUI() {
     lwProcessPid.textContent = pidText;
   }
 
-  // 2. Popula os selects (topbar e sidebar)
+  // 2. Popula os selects (topbar e página dedicada)
   const modelsToDisplay = [...localWorkerStatus.installed];
   if (localWorkerStatus.model && !modelsToDisplay.includes(localWorkerStatus.model)) {
     modelsToDisplay.unshift(localWorkerStatus.model);
@@ -1746,6 +1794,78 @@ function renderLocalWorkerUI() {
 
   updateSelect(lwTopbarSelect);
   updateSelect(lwSidebarSelect);
+
+  // 3. Renderiza Grid de Modelos Já Instalados (Baixados)
+  const installedGrid = document.getElementById('lw-installed-models-grid');
+  const installedCount = document.getElementById('lw-installed-count');
+  if (installedCount) {
+    const count = localWorkerStatus.installed.length;
+    installedCount.textContent = `${count} ${count === 1 ? 'modelo baixado' : 'modelos baixados'}`;
+  }
+
+  if (installedGrid) {
+    installedGrid.innerHTML = '';
+    if (!localWorkerStatus.installed || localWorkerStatus.installed.length === 0) {
+      installedGrid.innerHTML = `
+        <div class="empty-installed-card">
+          <p>Nenhum modelo baixado no Ollama ainda.</p>
+          <span style="font-size: 11px; color: var(--text-muted);">
+            Selecione um dos modelos recomendados abaixo (ex: <strong>qwen2.5-coder:7b</strong>) para baixar com 1 clique e começar a programar localmente.
+          </span>
+        </div>
+      `;
+    } else {
+      localWorkerStatus.installed.forEach(modelName => {
+        const isActive = modelName === localWorkerStatus.model;
+        const card = document.createElement('div');
+        card.className = `installed-model-card ${isActive ? 'active' : ''}`;
+        card.innerHTML = `
+          <div class="installed-model-card-top">
+            <span class="installed-model-name">${modelName}</span>
+            ${isActive ? '<span class="installed-model-badge-active">EM USO NO HARNESS</span>' : ''}
+          </div>
+          <div class="installed-model-meta">
+            <span>● GPU Vulkan Ready</span>
+            <span>● Custo Zero de Tokens</span>
+          </div>
+          <div class="installed-model-actions">
+            ${isActive 
+              ? '<button class="action-btn success btn-sm" disabled style="opacity: 0.9;">✓ Modelo Ativo</button>'
+              : `<button class="action-btn secondary btn-sm btn-select-model" data-model="${modelName}">Ativar no Harness</button>`
+            }
+          </div>
+        `;
+        installedGrid.appendChild(card);
+      });
+
+      installedGrid.querySelectorAll('.btn-select-model').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const m = btn.getAttribute('data-model');
+          selectLocalModel(m);
+        });
+      });
+    }
+  }
+
+  // 4. Atualiza estado dos cards de modelos recomendados
+  const recGrid = document.getElementById('lw-recommended-models-grid');
+  if (recGrid) {
+    recGrid.querySelectorAll('.rec-model-card').forEach(card => {
+      const model = card.getAttribute('data-model');
+      const btn = card.querySelector('.btn-quick-pull');
+      if (model && btn) {
+        if (localWorkerStatus.installed.includes(model)) {
+          btn.textContent = '✓ Já Instalado';
+          btn.className = 'action-btn secondary btn-sm';
+          btn.title = 'Este modelo já está presente no seu disco local.';
+        } else {
+          btn.textContent = '⬇ Baixar Modelo';
+          btn.className = 'action-btn primary btn-sm btn-quick-pull';
+          btn.disabled = false;
+        }
+      }
+    });
+  }
 }
 
 async function selectLocalModel(modelName) {
@@ -1762,6 +1882,7 @@ async function selectLocalModel(modelName) {
       localWorkerStatus.model = data.model;
       if (lwTopbarSelect) lwTopbarSelect.value = data.model;
       if (lwSidebarSelect) lwSidebarSelect.value = data.model;
+      renderLocalWorkerUI();
     }
   } catch (err) {
     console.error('[LocalWorker] Erro ao selecionar modelo:', err);
@@ -1777,6 +1898,21 @@ async function pullLocalModel(modelName) {
   if (pullFeedbackMsg) {
     pullFeedbackMsg.style.display = 'none';
     pullFeedbackMsg.className = 'pull-feedback-msg';
+  }
+
+  // Atualiza banner da página do Worker
+  const workerBanner = document.getElementById('worker-pull-progress-banner');
+  const workerPullTitle = document.getElementById('worker-pull-title');
+  const workerPullPercent = document.getElementById('worker-pull-percent');
+  const workerPullBar = document.getElementById('worker-pull-bar');
+  const workerPullDetails = document.getElementById('worker-pull-details');
+
+  if (workerBanner) {
+    workerBanner.style.display = 'block';
+    if (workerPullTitle) workerPullTitle.textContent = `Iniciando download: ${target}...`;
+    if (workerPullPercent) workerPullPercent.textContent = `0%`;
+    if (workerPullBar) workerPullBar.style.width = `2%`;
+    if (workerPullDetails) workerPullDetails.textContent = 'Enviando requisição ao Ollama...';
   }
 
   // Desabilita botões durante o envio da solicitação
@@ -1839,16 +1975,11 @@ async function startOllamaServer() {
     btnStart.textContent = 'Iniciando...';
   }
   try {
-    const res = await apiFetch('/api/local-worker/start-server', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: currentProjectId })
-    });
+    const res = await apiFetch('/api/local-worker/start-server', { method: 'POST' });
     const data = await res.json();
     renderOllamaLogLine(`[SISTEMA] Iniciar Ollama: ${data.status || 'OK'}`);
     await loadLocalWorker();
   } catch (err) {
-    console.error('[LocalWorker] Erro ao iniciar Ollama:', err);
     renderOllamaLogLine(`[ERRO] Falha ao iniciar Ollama: ${err.message}`);
   } finally {
     if (btnStart) {
@@ -1865,16 +1996,11 @@ async function stopOllamaServer() {
     btnStop.textContent = 'Parando...';
   }
   try {
-    const res = await apiFetch('/api/local-worker/stop-server', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: currentProjectId })
-    });
+    const res = await apiFetch('/api/local-worker/stop-server', { method: 'POST' });
     const data = await res.json();
     renderOllamaLogLine(`[SISTEMA] Parar Ollama: ${data.status || 'OK'}`);
     await loadLocalWorker();
   } catch (err) {
-    console.error('[LocalWorker] Erro ao parar Ollama:', err);
     renderOllamaLogLine(`[ERRO] Falha ao parar Ollama: ${err.message}`);
   } finally {
     if (btnStop) {
@@ -1886,47 +2012,19 @@ async function stopOllamaServer() {
 
 let ollamaLogsPollingInterval = null;
 
-async function loadOllamaLogs() {
-  try {
-    const res = await apiFetch(`/api/local-worker/server-logs?project_id=${encodeURIComponent(currentProjectId)}&limit=100`);
-    if (res.ok) {
-      const data = await res.json();
-      const logs = data.logs || (Array.isArray(data) ? data : []);
-      const terminal = document.getElementById('ollama-terminal-logs');
-      if (terminal && logs.length > 0) {
-        terminal.innerHTML = '';
-        logs.forEach(line => renderOllamaLogLine(line));
-      }
-      if (data.running !== undefined || data.pid !== undefined) {
-        if (data.running !== undefined) localWorkerStatus.running = !!data.running;
-        if (data.pid !== undefined) localWorkerStatus.pid = data.pid || null;
-        renderLocalWorkerUI();
-      }
-    }
-  } catch (err) {
-    console.warn('[LocalWorker] Falha ao carregar logs históricos:', err);
-  }
-}
-
 function openOllamaConsole() {
-  const modal = document.getElementById('modal-ollama-console');
-  if (modal) {
-    modal.style.display = 'flex';
-    loadOllamaLogs();
-    if (ollamaLogsPollingInterval) {
-      clearInterval(ollamaLogsPollingInterval);
+  if (modalOllamaConsole) {
+    modalOllamaConsole.style.display = 'flex';
+    fetchOllamaLogs();
+    if (!ollamaLogsPollingInterval) {
+      ollamaLogsPollingInterval = setInterval(fetchOllamaLogs, 3000);
     }
-    // Polling fallback temporizado para manter logs e status atualizados caso WS oscile
-    ollamaLogsPollingInterval = setInterval(() => {
-      loadOllamaLogs();
-    }, 4000);
   }
 }
 
 function closeOllamaConsole() {
-  const modal = document.getElementById('modal-ollama-console');
-  if (modal) {
-    modal.style.display = 'none';
+  if (modalOllamaConsole) {
+    modalOllamaConsole.style.display = 'none';
   }
   if (ollamaLogsPollingInterval) {
     clearInterval(ollamaLogsPollingInterval);
@@ -1934,58 +2032,89 @@ function closeOllamaConsole() {
   }
 }
 
+async function fetchOllamaLogs() {
+  try {
+    const res = await apiFetch('/api/local-worker/server-logs?limit=80');
+    if (res.ok) {
+      const data = await res.json();
+      const logs = data.logs || [];
+      if (logs.length > 0) {
+        logs.forEach(line => renderOllamaLogLine(line));
+      }
+    }
+  } catch (err) {
+    console.warn('[Ollama] Falha ao consultar histórico de logs:', err);
+  }
+}
+
 function renderOllamaLogLine(line) {
   const terminal = document.getElementById('ollama-terminal-logs');
-  if (!terminal) return;
+  const inpageTerminal = document.getElementById('inpage-ollama-logs');
+  if (!terminal && !inpageTerminal) return;
 
-  const placeholder = terminal.querySelector('.terminal-placeholder');
-  if (placeholder) {
-    placeholder.remove();
+  const removePlaceholder = (term) => {
+    if (!term) return;
+    const placeholder = term.querySelector('.terminal-placeholder');
+    if (placeholder) placeholder.remove();
+  };
+
+  removePlaceholder(terminal);
+  removePlaceholder(inpageTerminal);
+
+  const createLineElem = () => {
+    const lineElem = document.createElement('div');
+    lineElem.className = 'ollama-log-line';
+
+    let text = '';
+    let timestamp = '';
+
+    if (typeof line === 'string') {
+      text = line;
+    } else if (line && typeof line === 'object') {
+      text = line.message || line.text || line.line || JSON.stringify(line);
+      timestamp = line.timestamp || line.time || '';
+    }
+
+    if (/error|err|fail|fatal/i.test(text)) {
+      lineElem.classList.add('error');
+    } else if (/warn|warning/i.test(text)) {
+      lineElem.classList.add('warn');
+    } else if (/system|init|started|listening/i.test(text)) {
+      lineElem.classList.add('system');
+    }
+
+    if (timestamp) {
+      const tsSpan = document.createElement('span');
+      tsSpan.className = 'log-timestamp';
+      tsSpan.textContent = `[${timestamp}] `;
+      lineElem.appendChild(tsSpan);
+    }
+
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'log-content';
+    contentSpan.textContent = text;
+    lineElem.appendChild(contentSpan);
+
+    return lineElem;
+  };
+
+  if (terminal) {
+    terminal.appendChild(createLineElem());
+    const counter = document.getElementById('terminal-log-counter');
+    if (counter) {
+      const totalLines = terminal.querySelectorAll('.ollama-log-line').length;
+      counter.textContent = `${totalLines} linha${totalLines === 1 ? '' : 's'}`;
+    }
+    if (isOllamaAutoScrollEnabled) {
+      terminal.scrollTop = terminal.scrollHeight;
+    }
   }
 
-  const lineElem = document.createElement('div');
-  lineElem.className = 'ollama-log-line';
-
-  let text = '';
-  let timestamp = '';
-
-  if (typeof line === 'string') {
-    text = line;
-  } else if (line && typeof line === 'object') {
-    text = line.message || line.text || line.line || JSON.stringify(line);
-    timestamp = line.timestamp || line.time || '';
-  }
-
-  if (/error|err|fail|fatal/i.test(text)) {
-    lineElem.classList.add('error');
-  } else if (/warn|warning/i.test(text)) {
-    lineElem.classList.add('warn');
-  } else if (/system|init|started|listening/i.test(text)) {
-    lineElem.classList.add('system');
-  }
-
-  if (timestamp) {
-    const tsSpan = document.createElement('span');
-    tsSpan.className = 'log-timestamp';
-    tsSpan.textContent = `[${timestamp}] `;
-    lineElem.appendChild(tsSpan);
-  }
-
-  const contentSpan = document.createElement('span');
-  contentSpan.className = 'log-content';
-  contentSpan.textContent = text;
-  lineElem.appendChild(contentSpan);
-
-  terminal.appendChild(lineElem);
-
-  const counter = document.getElementById('terminal-log-counter');
-  if (counter) {
-    const totalLines = terminal.querySelectorAll('.ollama-log-line').length;
-    counter.textContent = `${totalLines} linha${totalLines === 1 ? '' : 's'}`;
-  }
-
-  if (isOllamaAutoScrollEnabled) {
-    terminal.scrollTop = terminal.scrollHeight;
+  if (inpageTerminal) {
+    inpageTerminal.appendChild(createLineElem());
+    if (isOllamaAutoScrollEnabled) {
+      inpageTerminal.scrollTop = inpageTerminal.scrollHeight;
+    }
   }
 }
 
@@ -2050,6 +2179,55 @@ function initLocalWorkerEvents() {
     });
   }
 
+  // Controles na Página Dedicada (#view-worker)
+  const btnRefreshWorker = document.getElementById('btn-refresh-worker');
+  if (btnRefreshWorker) {
+    btnRefreshWorker.addEventListener('click', () => {
+      btnRefreshWorker.textContent = '⟳ Atualizando...';
+      loadLocalWorker().then(() => {
+        setTimeout(() => { btnRefreshWorker.textContent = '⟳ Atualizar Status'; }, 500);
+      });
+    });
+  }
+
+  const btnClearInpageLogs = document.getElementById('btn-clear-inpage-logs');
+  if (btnClearInpageLogs) {
+    btnClearInpageLogs.addEventListener('click', () => {
+      const term = document.getElementById('inpage-ollama-logs');
+      if (term) {
+        term.innerHTML = '<div class="terminal-placeholder">Logs limpos. Aguardando novos registros...</div>';
+      }
+    });
+  }
+
+  const btnToggleInpageAutoscroll = document.getElementById('btn-toggle-inpage-autoscroll');
+  if (btnToggleInpageAutoscroll) {
+    btnToggleInpageAutoscroll.addEventListener('click', () => {
+      isOllamaAutoScrollEnabled = !isOllamaAutoScrollEnabled;
+      btnToggleInpageAutoscroll.textContent = `Auto-scroll: ${isOllamaAutoScrollEnabled ? 'ON' : 'OFF'}`;
+      btnToggleInpageAutoscroll.classList.toggle('active', isOllamaAutoScrollEnabled);
+      if (btnToggleAutoscroll) {
+        btnToggleAutoscroll.textContent = `Auto-Scroll: ${isOllamaAutoScrollEnabled ? 'ON' : 'OFF'}`;
+        btnToggleAutoscroll.classList.toggle('active', isOllamaAutoScrollEnabled);
+      }
+    });
+  }
+
+  const btnWorkerViewLogs = document.getElementById('btn-worker-view-logs');
+  if (btnWorkerViewLogs) {
+    btnWorkerViewLogs.addEventListener('click', openOllamaConsole);
+  }
+
+  // Clicar na pílula do Topbar abre a aba dedicada do Local Worker
+  const topbarPill = document.getElementById('local-worker-pill');
+  if (topbarPill) {
+    topbarPill.addEventListener('click', (e) => {
+      if (e.target.tagName.toLowerCase() !== 'select') {
+        window.switchTab('view-worker');
+      }
+    });
+  }
+
   if (formCustomPull) {
     formCustomPull.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -2057,8 +2235,18 @@ function initLocalWorkerEvents() {
     });
   }
 
+  // Form custom pull na página do worker
+  const btnInpagePull = document.getElementById('btn-start-pull');
+  if (btnInpagePull) {
+    btnInpagePull.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (inputCustomModel) pullLocalModel(inputCustomModel.value);
+    });
+  }
+
   document.querySelectorAll('.btn-quick-pull').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const model = btn.getAttribute('data-model');
       pullLocalModel(model);
     });
