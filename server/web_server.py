@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import time
+import socket
 import asyncio
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
@@ -85,6 +87,192 @@ manager = ConnectionManager()
 # Registra o broadcast no StateStore para eventos automáticos
 db.register_listener(manager.broadcast_sync)
 
+# GERENCIADOR DE PROCESSO DO OLLAMA
+try:
+    from workers.ollama_process_manager import OllamaProcessManager
+except ImportError:
+    try:
+        from server.workers.ollama_process_manager import OllamaProcessManager
+    except ImportError:
+        OllamaProcessManager = None
+
+if OllamaProcessManager is None:
+    import collections
+    import shutil
+    import subprocess
+    import threading
+
+    class _FallbackOllamaProcessManager:
+        """Gerenciador de ciclo de vida nativo do Ollama (Fallback / KISS)."""
+        def __init__(self, port: int = 11434, max_logs: int = 500, log_callback=None):
+            self.port = port
+            self.logs = collections.deque(maxlen=max_logs)
+            self.log_callback = log_callback
+            self.process: Optional[subprocess.Popen] = None
+            self.managed_by_cockpit = False
+            self._reader_thread = None
+            self._lock = threading.Lock()
+
+        def set_log_callback(self, callback):
+            self.log_callback = callback
+
+        def is_installed(self) -> bool:
+            return shutil.which("ollama") is not None or os.path.exists("/usr/local/bin/ollama")
+
+        def is_port_open(self, port: Optional[int] = None) -> bool:
+            p = port or self.port
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                return s.connect_ex(("127.0.0.1", p)) == 0
+
+        def start(self, auto_wait: bool = True) -> Dict[str, Any]:
+            with self._lock:
+                if self.is_port_open():
+                    return {
+                        "status": "already_running",
+                        "running": True,
+                        "managed_by_cockpit": self.managed_by_cockpit,
+                        "port": self.port,
+                        "pid": self.process.pid if self.process else None
+                    }
+
+                if not self.is_installed():
+                    return {
+                        "status": "not_installed",
+                        "running": False,
+                        "error": "Binário do Ollama não foi encontrado no sistema."
+                    }
+
+                ollama_bin = shutil.which("ollama") or "/usr/local/bin/ollama"
+                try:
+                    self.process = subprocess.Popen(
+                        [ollama_bin, "serve"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1
+                    )
+                    self.managed_by_cockpit = True
+
+                    def _stream_logs():
+                        try:
+                            for line in iter(self.process.stdout.readline, ""):
+                                clean_line = line.rstrip("\r\n")
+                                if clean_line:
+                                    self.logs.append(clean_line)
+                                    if self.log_callback:
+                                        try:
+                                            self.log_callback(clean_line)
+                                        except Exception:
+                                            pass
+                        except Exception:
+                            pass
+
+                    self._reader_thread = threading.Thread(target=_stream_logs, daemon=True)
+                    self._reader_thread.start()
+
+                    if auto_wait:
+                        for _ in range(30):
+                            if self.is_port_open():
+                                break
+                            time.sleep(0.1)
+
+                    return {
+                        "status": "started",
+                        "running": self.is_port_open(),
+                        "managed_by_cockpit": True,
+                        "pid": self.process.pid,
+                        "port": self.port
+                    }
+                except Exception as e:
+                    return {
+                        "status": "error",
+                        "running": False,
+                        "error": str(e)
+                    }
+
+        def stop(self) -> Dict[str, Any]:
+            with self._lock:
+                if not self.process:
+                    return {
+                        "status": "not_running",
+                        "running": self.is_port_open(),
+                        "managed_by_cockpit": False
+                    }
+
+                pid = self.process.pid
+                try:
+                    self.process.terminate()
+                    try:
+                        self.process.wait(timeout=3.0)
+                    except subprocess.TimeoutExpired:
+                        self.process.kill()
+                        self.process.wait(timeout=2.0)
+                except Exception as e:
+                    return {"status": "error", "error": str(e), "pid": pid}
+                finally:
+                    self.process = None
+                    self.managed_by_cockpit = False
+
+                return {
+                    "status": "stopped",
+                    "running": False,
+                    "managed_by_cockpit": False,
+                    "pid": pid
+                }
+
+        def get_status(self) -> Dict[str, Any]:
+            running = self.is_port_open()
+            return {
+                "installed": self.is_installed(),
+                "running": running,
+                "managed_by_cockpit": self.managed_by_cockpit and running,
+                "pid": self.process.pid if self.process else None,
+                "port": self.port,
+                "log_count": len(self.logs)
+            }
+
+        def get_logs(self, limit: int = 100) -> List[str]:
+            with self._lock:
+                logs_list = list(self.logs)
+                if limit and limit > 0:
+                    return logs_list[-limit:]
+                return logs_list
+
+    OllamaProcessManager = _FallbackOllamaProcessManager
+
+def _on_ollama_log(line: str):
+    """Callback disparado a cada linha emitida pelo processo Ollama para envio via WebSocket."""
+    manager.broadcast_sync("ollama_log", {"line": line})
+
+try:
+    ollama_process_manager = OllamaProcessManager(log_callback=_on_ollama_log)
+except TypeError:
+    ollama_process_manager = OllamaProcessManager()
+    if hasattr(ollama_process_manager, "set_log_callback"):
+        ollama_process_manager.set_log_callback(_on_ollama_log)
+    else:
+        ollama_process_manager.log_callback = _on_ollama_log
+
+async def auto_start_ollama_task():
+    """Inicialização automática do Ollama em segundo plano se configurado e porta fechada."""
+    try:
+        cfg = db.get_local_worker_config() if hasattr(db, "get_local_worker_config") else {}
+        auto_start = cfg.get("auto_start_ollama", True)
+        if os.getenv("COCKPIT_NO_OLLAMA") == "1":
+            auto_start = False
+
+        if auto_start and ollama_process_manager and ollama_process_manager.is_installed():
+            if not ollama_process_manager.is_port_open():
+                print("[Ollama] Detectado binário instalado e porta 11434 fechada. Iniciando em background...")
+                loop = asyncio.get_running_loop()
+                res = await loop.run_in_executor(None, ollama_process_manager.start)
+                print(f"[Ollama] Inicialização em background concluída: {res.get('status')}")
+                status = ollama_process_manager.get_status()
+                manager.broadcast_sync("ollama_status", status)
+    except Exception as e:
+        print(f"[Ollama] Erro durante inicialização em background: {e}")
+
 async def file_watch_loop():
     """Monitora modificações nos arquivos de estado em states/ e workflow_state.json legado em tempo real.
     Garante que atualizações feitas pelo mcp_server (outro processo) sejam propagadas via WebSocket sem F5.
@@ -135,6 +323,20 @@ async def file_watch_loop():
 async def startup_event():
     manager.loop = asyncio.get_running_loop()
     asyncio.create_task(file_watch_loop())
+    asyncio.create_task(auto_start_ollama_task())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Ao encerrar o Cockpit, finaliza o processo do Ollama se foi iniciado pelo Cockpit."""
+    if ollama_process_manager:
+        is_managed = getattr(ollama_process_manager, "managed_by_cockpit", False)
+        if is_managed:
+            print("[Ollama] Encerrando processo gerenciado pelo Cockpit...")
+            try:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, ollama_process_manager.stop)
+            except Exception as e:
+                print(f"[Ollama] Erro ao encerrar processo: {e}")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -431,14 +633,56 @@ def _get_local_worker_client(project_id: Optional[str] = None):
 def get_local_worker_status(project_id: Optional[str] = None):
     client, cfg = _get_local_worker_client(project_id)
     online = client.healthcheck()
-    return {
+    res = {
         "status": "ok",
         "online": online,
         "provider": cfg.get("provider", "ollama"),
         "endpoint": cfg.get("endpoint", "http://127.0.0.1:11434"),
         "model": cfg.get("model", "qwen2.5-coder:7b-instruct-q4_k_m"),
         "circuit_breaker_threshold": cfg.get("circuit_breaker_threshold", 2),
-        "consecutive_failures": cfg.get("consecutive_failures", {})
+        "consecutive_failures": cfg.get("consecutive_failures", {}),
+        "auto_start_ollama": cfg.get("auto_start_ollama", True)
+    }
+    if ollama_process_manager:
+        res["server_status"] = ollama_process_manager.get_status()
+    return res
+
+@app.post("/api/local-worker/start-server")
+def post_local_worker_start_server():
+    """Inicia o processo local do Ollama."""
+    if not ollama_process_manager:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail="OllamaProcessManager não está disponível.")
+    res = ollama_process_manager.start()
+    status = ollama_process_manager.get_status()
+    manager.broadcast_sync("ollama_status", status)
+    return res
+
+@app.post("/api/local-worker/stop-server")
+def post_local_worker_stop_server():
+    """Encerra o processo local do Ollama caso tenha sido iniciado pelo Cockpit."""
+    if not ollama_process_manager:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail="OllamaProcessManager não está disponível.")
+    res = ollama_process_manager.stop()
+    status = ollama_process_manager.get_status()
+    manager.broadcast_sync("ollama_status", status)
+    return res
+
+@app.get("/api/local-worker/server-logs")
+def get_local_worker_server_logs(limit: int = 100):
+    """Retorna os logs recentes do servidor Ollama."""
+    if not ollama_process_manager:
+        return {"status": "unavailable", "logs": [], "count": 0}
+    logs = ollama_process_manager.get_logs(limit=limit)
+    status = ollama_process_manager.get_status()
+    return {
+        "status": "ok",
+        "logs": logs,
+        "count": len(logs),
+        "running": status.get("running", False),
+        "managed_by_cockpit": status.get("managed_by_cockpit", False),
+        "installed": status.get("installed", False)
     }
 
 @app.get("/api/local-worker/models")
