@@ -10,6 +10,7 @@ from typing import Dict, List, Any, Optional, Callable
 
 class LocalLLMClient:
     RECOMMENDED_MODELS = [
+        "deepseek-coder-v2:16b-q3_k_m",
         "deepseek-coder-v2:16b",
         "qwen2.5-coder:7b",
         "qwen2.5-coder:1.5b",
