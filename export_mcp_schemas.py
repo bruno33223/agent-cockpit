@@ -1,3 +1,8 @@
+"""
+Exporta as definições de schemas JSON das ferramentas MCP do Agent Cockpit,
+incluindo as ferramentas do Local Builder (execute_local_builder, manage_local_model),
+para o diretório de ferramentas MCP do Antigravity (~/.gemini/antigravity/mcp/agent-cockpit).
+"""
 import os
 import sys
 import json

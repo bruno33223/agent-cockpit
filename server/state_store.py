@@ -123,6 +123,13 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
             "approved_by": None
         },
         "last_handoff": None,
+        "local_worker": {
+            "provider": "ollama",
+            "endpoint": "http://127.0.0.1:11434",
+            "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+            "circuit_breaker_threshold": 2,
+            "consecutive_failures": {}
+        },
         "project_root": project_root
     }
 
@@ -928,6 +935,96 @@ class StateStore:
             "approved_slices": [n.get("id") for n in state.get("nodes", []) if n.get("kanban_status") == "APPROVED"],
             "pending_slices": [n.get("id") for n in state.get("nodes", []) if n.get("kanban_status") != "APPROVED"]
         }
+
+    def get_local_worker_config(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {
+                "provider": "ollama",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "circuit_breaker_threshold": 2,
+                "consecutive_failures": {}
+            })
+            return dict(cfg)
+
+    def set_local_worker_config(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {
+                "provider": "ollama",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "circuit_breaker_threshold": 2,
+                "consecutive_failures": {}
+            })
+            cfg.update(updates)
+            self._save_state(state, target_pid)
+        self._notify("LOCAL_WORKER_CONFIG_UPDATED", cfg, target_pid)
+        self._notify("STATE_FULL", state, target_pid)
+        return dict(cfg)
+
+    def update_local_worker_config(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+        return self.set_local_worker_config(updates, project_id=project_id)
+
+    def get_local_worker_attempts(self, slice_id: str, project_id: Optional[str] = None) -> int:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {
+                "provider": "ollama",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "circuit_breaker_threshold": 2,
+                "consecutive_failures": {}
+            })
+            failures = cfg.setdefault("consecutive_failures", {})
+            return int(failures.get(slice_id, 0))
+
+    def increment_local_worker_attempts(self, slice_id: str, project_id: Optional[str] = None) -> int:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {
+                "provider": "ollama",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "circuit_breaker_threshold": 2,
+                "consecutive_failures": {}
+            })
+            failures = cfg.setdefault("consecutive_failures", {})
+            failures[slice_id] = int(failures.get(slice_id, 0)) + 1
+            val = failures[slice_id]
+            self._save_state(state, target_pid)
+        self._notify("LOCAL_WORKER_ATTEMPTS_UPDATED", {"slice_id": slice_id, "attempts": val}, target_pid)
+        return val
+
+    def reset_local_worker_attempts(self, slice_id: str, project_id: Optional[str] = None) -> None:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {
+                "provider": "ollama",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "circuit_breaker_threshold": 2,
+                "consecutive_failures": {}
+            })
+            failures = cfg.setdefault("consecutive_failures", {})
+            failures[slice_id] = 0
+            self._save_state(state, target_pid)
+        self._notify("LOCAL_WORKER_ATTEMPTS_RESET", {"slice_id": slice_id}, target_pid)
+
+    def get_circuit_breaker_count(self, slice_id: str, project_id: Optional[str] = None) -> int:
+        return self.get_local_worker_attempts(slice_id, project_id=project_id)
+
+    def increment_circuit_breaker(self, slice_id: str, project_id: Optional[str] = None) -> int:
+        return self.increment_local_worker_attempts(slice_id, project_id=project_id)
+
+    def reset_circuit_breaker(self, slice_id: str, project_id: Optional[str] = None) -> None:
+        self.reset_local_worker_attempts(slice_id, project_id=project_id)
 
     @property
     def file_path(self) -> str:

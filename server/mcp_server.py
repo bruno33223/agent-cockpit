@@ -308,6 +308,54 @@ TOOLS_DEFINITIONS = [
                 "project_root": {"type": "string", "description": "Caminho raiz do projeto opcional."}
             }
         }
+    },
+    {
+        "name": "execute_local_builder",
+        "description": "Delega a implementação física de código para o LLM local dentro da worktree isolada da fatia (.worktrees/{slice_id}/) usando patching cirúrgico SEARCH/REPLACE e circuit breaker.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "slice_id": {"type": "string", "description": "Identificador da fatia (ex: 'slice-1'), mapeada em .worktrees/{slice_id}."},
+                "instruction": {"type": "string", "description": "Descrição direta da alteração requerida."},
+                "target_file": {"type": "string", "description": "Caminho relativo do arquivo que sofrerá alteração dentro da worktree."},
+                "context_files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Lista opcional de arquivos adicionais para o modelo ler como contexto (somente leitura)."
+                },
+                "error_feedback": {"type": "string", "description": "Opcional. Mensagem de erro de testes ou apontamentos do Harsh Critic para ciclo de correção."},
+                "repo_root": {"type": "string", "description": "Diretório raiz do repositório (padrão: .)."},
+                "project_id": {"type": "string", "description": "ID do projeto opcional."}
+            },
+            "required": ["slice_id", "instruction", "target_file"]
+        }
+    },
+    {
+        "name": "manage_local_model",
+        "description": "Gerencia o modelo e runtime local (Ollama/llama.cpp) para o Local Builder: consulta status, lista modelos instalados, seleciona o modelo ativo ou solicita pull.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "Ação a executar: 'status', 'list', 'select' ou 'pull'.",
+                    "enum": ["status", "list", "select", "pull"]
+                },
+                "model_name": {
+                    "type": "string",
+                    "description": "Nome do modelo (obrigatório para 'select' e 'pull', ex: 'qwen2.5-coder:7b-instruct-q4_k_m')."
+                },
+                "endpoint": {
+                    "type": "string",
+                    "description": "URL base do servidor local de inferência (padrão: http://127.0.0.1:11434)."
+                },
+                "project_id": {
+                    "type": "string",
+                    "description": "ID do projeto opcional."
+                }
+            },
+            "required": ["action"]
+        }
     }
 ]
 
@@ -649,6 +697,29 @@ def handle_tool_call(name: str, args: dict) -> dict:
             project_root=args.get("project_root")
         )
         return {"content": [{"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=False)}]}
+
+    elif name == "execute_local_builder":
+        from tools.local_builder_tool import execute_local_builder
+        res = execute_local_builder(
+            slice_id=args.get("slice_id", ""),
+            instruction=args.get("instruction", ""),
+            target_file=args.get("target_file", ""),
+            context_files=args.get("context_files"),
+            error_feedback=args.get("error_feedback"),
+            repo_root=args.get("repo_root"),
+            project_id=target_pid
+        )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
+
+    elif name == "manage_local_model":
+        from tools.local_builder_tool import manage_local_model
+        res = manage_local_model(
+            action=args.get("action", "status"),
+            model_name=args.get("model_name"),
+            endpoint=args.get("endpoint"),
+            project_id=target_pid
+        )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2, ensure_ascii=False)}]}
 
     else:
         return {"isError": True, "content": [{"type": "text", "text": f"Ferramenta desconhecida: {name}"}]}
