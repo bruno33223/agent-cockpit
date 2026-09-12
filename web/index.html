@@ -397,6 +397,22 @@
             <span class="lw-meta-label">Endpoint:</span>
             <code class="lw-endpoint-code" id="lw-endpoint-display">http://127.0.0.1:11434</code>
           </div>
+          <div class="lw-process-row">
+            <span class="lw-meta-label">Processo:</span>
+            <span class="lw-proc-badge stopped" id="lw-process-status">Parado</span>
+            <span class="lw-process-pid" id="lw-process-pid">PID: -</span>
+          </div>
+          <div class="lw-controls-row">
+            <button class="action-btn success btn-sm" id="btn-start-ollama" title="Iniciar processo do Ollama">
+              ▶ Iniciar Ollama
+            </button>
+            <button class="action-btn danger btn-sm" id="btn-stop-ollama" title="Parar processo do Ollama">
+              ⏹ Parar
+            </button>
+            <button class="action-btn secondary btn-sm" id="btn-open-ollama-console" title="Abrir Console de Logs do Ollama em tempo real">
+              📟 Console de Logs
+            </button>
+          </div>
           <div class="lw-actions-row">
             <button class="action-btn secondary btn-sm lw-manage-btn" id="btn-open-pull-modal" title="Baixar novos modelos de IA local">
               ⬇ Baixar Novos Modelos
@@ -512,6 +528,35 @@
           </div>
         </div>
         <div class="pull-feedback-msg" id="pull-feedback-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE TERMINAL DE LOGS (OLLAMA CONSOLE) -->
+  <div class="modal-backdrop" id="modal-ollama-console" style="display: none;">
+    <div class="modal-card terminal-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge terminal-badge">TERMINAL</span>
+          <h3>📟 Console de Logs do Ollama</h3>
+          <span class="lw-proc-badge stopped" id="terminal-process-status">Parado</span>
+        </div>
+        <div class="terminal-header-actions">
+          <button class="action-btn secondary btn-sm" id="btn-clear-ollama-logs" title="Limpar console">Limpar</button>
+          <button class="action-btn secondary btn-sm active" id="btn-toggle-autoscroll" title="Fixar rolagem automática">Auto-Scroll: ON</button>
+          <button class="modal-close-btn" id="btn-close-ollama-console" aria-label="Fechar">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body terminal-modal-body">
+        <div class="ollama-terminal-container">
+          <div class="ollama-terminal-toolbar">
+            <span class="terminal-host-info">host: 127.0.0.1:11434 • tail -f output</span>
+            <span class="terminal-log-counter" id="terminal-log-counter">0 linhas</span>
+          </div>
+          <div class="ollama-terminal-logs" id="ollama-terminal-logs" role="log" aria-live="polite">
+            <div class="terminal-placeholder">Aguardando logs do processo Ollama...</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -2269,3 +2269,219 @@ body {
   color: var(--red-bright);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
+
+/* --- LOCAL WORKER CONTROLS & OLLAMA TERMINAL CONSOLE --- */
+
+.lw-process-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.lw-proc-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lw-proc-badge.running {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green-bright);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.lw-proc-badge.stopped {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red-bright);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.lw-process-pid {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.lw-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.action-btn.success {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--green-bright);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.action-btn.success:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+}
+
+.action-btn.danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--red-bright);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.action-btn.danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+/* Terminal Modal & Hacker Console */
+.terminal-modal-card {
+  max-width: 900px;
+  width: 92%;
+  height: 80vh;
+  max-height: 800px;
+  background: #080c14;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.15);
+}
+
+.terminal-badge {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--green-bright);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.terminal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terminal-header-actions .action-btn.active {
+  background: rgba(56, 189, 248, 0.25);
+  color: var(--cyan-bright);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.terminal-modal-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ollama-terminal-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  background: #05080e;
+  overflow: hidden;
+}
+
+.ollama-terminal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  background: #090e17;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.terminal-host-info {
+  color: var(--text-muted);
+}
+
+.terminal-log-counter {
+  color: var(--cyan-bright);
+  font-weight: 600;
+}
+
+.ollama-terminal-logs {
+  flex: 1;
+  padding: 14px 18px;
+  background-color: #05080e;
+  color: #38bdf8;
+  font-family: 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  user-select: text;
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.ollama-terminal-logs::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ollama-terminal-logs::-webkit-scrollbar-track {
+  background: #070b12;
+}
+
+.ollama-terminal-logs::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+.ollama-terminal-logs::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+.terminal-placeholder {
+  color: #475569;
+  font-style: italic;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.ollama-log-line {
+  display: flex;
+  gap: 8px;
+  word-break: break-all;
+  white-space: pre-wrap;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  transition: background 0.1s ease;
+}
+
+.ollama-log-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ollama-log-line .log-timestamp {
+  color: #64748b;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.ollama-log-line .log-content {
+  flex: 1;
+  color: #e2e8f0;
+}
+
+.ollama-log-line.error .log-content {
+  color: var(--red-bright);
+  font-weight: 600;
+}
+
+.ollama-log-line.warn .log-content {
+  color: var(--amber-bright);
+}
+
+.ollama-log-line.system .log-content {
+  color: var(--green-bright);
+}
+

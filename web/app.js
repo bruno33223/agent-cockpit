@@ -262,10 +262,18 @@ function initWebSocket() {
           renderAll();
           loadLocalWorker();
         }
-      } else if (data.event === 'LOCAL_WORKER_CONFIG_UPDATED') {
+      } else if (data.event === 'LOCAL_WORKER_CONFIG_UPDATED' || data.event === 'LOCAL_WORKER_STATUS_CHANGED' || data.event === 'ollama_status' || data.type === 'ollama_status') {
         if (!data.project_id || data.project_id === currentProjectId) {
+          if (data.payload && typeof data.payload === 'object') {
+            const p = data.payload;
+            if (p.running !== undefined) localWorkerStatus.running = !!p.running;
+            if (p.pid !== undefined) localWorkerStatus.pid = p.pid || null;
+            renderLocalWorkerUI();
+          }
           loadLocalWorker();
         }
+      } else if (data.event === 'ollama_log' || data.type === 'ollama_log' || data.event === 'OLLAMA_LOG') {
+        renderOllamaLogLine(data.payload || data.line || data.message || data);
       } else if (data.event === 'STEERING_RECEIVED' || data.event === 'ORCHESTRATOR_MESSAGE') {
         if (!data.project_id || data.project_id === currentProjectId) {
           renderChatMessages();
@@ -1563,8 +1571,25 @@ const pullStatusBox = document.getElementById('pull-status-box');
 const pullStatusMessage = document.getElementById('pull-status-message');
 const pullFeedbackMsg = document.getElementById('pull-feedback-msg');
 
+// Elementos de Controle e Terminal do Ollama (Local Worker)
+const btnStartOllama = document.getElementById('btn-start-ollama');
+const btnStopOllama = document.getElementById('btn-stop-ollama');
+const btnOpenOllamaConsole = document.getElementById('btn-open-ollama-console');
+const btnCloseOllamaConsole = document.getElementById('btn-close-ollama-console');
+const modalOllamaConsole = document.getElementById('modal-ollama-console');
+const ollamaTerminalLogs = document.getElementById('ollama-terminal-logs');
+const btnClearOllamaLogs = document.getElementById('btn-clear-ollama-logs');
+const btnToggleAutoscroll = document.getElementById('btn-toggle-autoscroll');
+const terminalProcessStatus = document.getElementById('terminal-process-status');
+const terminalLogCounter = document.getElementById('terminal-log-counter');
+const lwProcessStatus = document.getElementById('lw-process-status');
+const lwProcessPid = document.getElementById('lw-process-pid');
+let isOllamaAutoScrollEnabled = true;
+
 let localWorkerStatus = {
   online: false,
+  running: false,
+  pid: null,
   model: '',
   endpoint: 'http://127.0.0.1:11434',
   installed: [],
@@ -1580,7 +1605,12 @@ async function loadLocalWorker() {
 
     if (statusRes.ok) {
       const statusData = await statusRes.json();
+      const serverStatus = statusData.server_status || {};
       localWorkerStatus.online = !!statusData.online;
+      localWorkerStatus.running = statusData.running !== undefined
+        ? !!statusData.running
+        : (serverStatus.running !== undefined ? !!serverStatus.running : !!statusData.online);
+      localWorkerStatus.pid = statusData.pid || serverStatus.pid || null;
       localWorkerStatus.model = statusData.model || '';
       localWorkerStatus.endpoint = statusData.endpoint || 'http://127.0.0.1:11434';
     }
@@ -1594,6 +1624,9 @@ async function loadLocalWorker() {
       }
       if (modelsData.online !== undefined) {
         localWorkerStatus.online = !!modelsData.online;
+        if (localWorkerStatus.running === undefined) {
+          localWorkerStatus.running = !!modelsData.online;
+        }
       }
     }
 
@@ -1601,13 +1634,17 @@ async function loadLocalWorker() {
   } catch (err) {
     console.warn('[LocalWorker] Falha ao carregar status/modelos:', err);
     localWorkerStatus.online = false;
+    localWorkerStatus.running = false;
     renderLocalWorkerUI();
   }
 }
 
 function renderLocalWorkerUI() {
-  // 1. Atualiza LEDs e Badges de Conexão
+  // 1. Atualiza LEDs e Badges de Conexão e Processo
   const isOnline = localWorkerStatus.online;
+  const isRunning = !!(localWorkerStatus.running || localWorkerStatus.online);
+  const pidText = localWorkerStatus.pid ? `PID: ${localWorkerStatus.pid}` : (isRunning ? 'PID: Ativo' : 'PID: -');
+
   if (lwPillLed) {
     lwPillLed.className = `pulse-led ${isOnline ? 'online' : 'offline'}`;
     lwPillLed.title = isOnline ? 'Ollama Online' : 'Ollama Offline / Inacessível';
@@ -1620,6 +1657,20 @@ function renderLocalWorkerUI() {
 
   if (lwEndpointDisplay) {
     lwEndpointDisplay.textContent = localWorkerStatus.endpoint;
+  }
+
+  if (lwProcessStatus) {
+    lwProcessStatus.className = `lw-proc-badge ${isRunning ? 'running' : 'stopped'}`;
+    lwProcessStatus.textContent = isRunning ? 'Executando' : 'Parado';
+  }
+
+  if (terminalProcessStatus) {
+    terminalProcessStatus.className = `lw-proc-badge ${isRunning ? 'running' : 'stopped'}`;
+    terminalProcessStatus.textContent = isRunning ? 'Executando' : 'Parado';
+  }
+
+  if (lwProcessPid) {
+    lwProcessPid.textContent = pidText;
   }
 
   // 2. Popula os selects (topbar e sidebar)
@@ -1743,6 +1794,163 @@ function closeModelModal() {
   }
 }
 
+async function startOllamaServer() {
+  const btnStart = document.getElementById('btn-start-ollama');
+  if (btnStart) {
+    btnStart.disabled = true;
+    btnStart.textContent = 'Iniciando...';
+  }
+  try {
+    const res = await apiFetch('/api/local-worker/start-server', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: currentProjectId })
+    });
+    const data = await res.json();
+    renderOllamaLogLine(`[SISTEMA] Iniciar Ollama: ${data.status || 'OK'}`);
+    await loadLocalWorker();
+  } catch (err) {
+    console.error('[LocalWorker] Erro ao iniciar Ollama:', err);
+    renderOllamaLogLine(`[ERRO] Falha ao iniciar Ollama: ${err.message}`);
+  } finally {
+    if (btnStart) {
+      btnStart.disabled = false;
+      btnStart.textContent = '▶ Iniciar Ollama';
+    }
+  }
+}
+
+async function stopOllamaServer() {
+  const btnStop = document.getElementById('btn-stop-ollama');
+  if (btnStop) {
+    btnStop.disabled = true;
+    btnStop.textContent = 'Parando...';
+  }
+  try {
+    const res = await apiFetch('/api/local-worker/stop-server', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: currentProjectId })
+    });
+    const data = await res.json();
+    renderOllamaLogLine(`[SISTEMA] Parar Ollama: ${data.status || 'OK'}`);
+    await loadLocalWorker();
+  } catch (err) {
+    console.error('[LocalWorker] Erro ao parar Ollama:', err);
+    renderOllamaLogLine(`[ERRO] Falha ao parar Ollama: ${err.message}`);
+  } finally {
+    if (btnStop) {
+      btnStop.disabled = false;
+      btnStop.textContent = '⏹ Parar';
+    }
+  }
+}
+
+let ollamaLogsPollingInterval = null;
+
+async function loadOllamaLogs() {
+  try {
+    const res = await apiFetch(`/api/local-worker/server-logs?project_id=${encodeURIComponent(currentProjectId)}&limit=100`);
+    if (res.ok) {
+      const data = await res.json();
+      const logs = data.logs || (Array.isArray(data) ? data : []);
+      const terminal = document.getElementById('ollama-terminal-logs');
+      if (terminal && logs.length > 0) {
+        terminal.innerHTML = '';
+        logs.forEach(line => renderOllamaLogLine(line));
+      }
+      if (data.running !== undefined || data.pid !== undefined) {
+        if (data.running !== undefined) localWorkerStatus.running = !!data.running;
+        if (data.pid !== undefined) localWorkerStatus.pid = data.pid || null;
+        renderLocalWorkerUI();
+      }
+    }
+  } catch (err) {
+    console.warn('[LocalWorker] Falha ao carregar logs históricos:', err);
+  }
+}
+
+function openOllamaConsole() {
+  const modal = document.getElementById('modal-ollama-console');
+  if (modal) {
+    modal.style.display = 'flex';
+    loadOllamaLogs();
+    if (ollamaLogsPollingInterval) {
+      clearInterval(ollamaLogsPollingInterval);
+    }
+    // Polling fallback temporizado para manter logs e status atualizados caso WS oscile
+    ollamaLogsPollingInterval = setInterval(() => {
+      loadOllamaLogs();
+    }, 4000);
+  }
+}
+
+function closeOllamaConsole() {
+  const modal = document.getElementById('modal-ollama-console');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  if (ollamaLogsPollingInterval) {
+    clearInterval(ollamaLogsPollingInterval);
+    ollamaLogsPollingInterval = null;
+  }
+}
+
+function renderOllamaLogLine(line) {
+  const terminal = document.getElementById('ollama-terminal-logs');
+  if (!terminal) return;
+
+  const placeholder = terminal.querySelector('.terminal-placeholder');
+  if (placeholder) {
+    placeholder.remove();
+  }
+
+  const lineElem = document.createElement('div');
+  lineElem.className = 'ollama-log-line';
+
+  let text = '';
+  let timestamp = '';
+
+  if (typeof line === 'string') {
+    text = line;
+  } else if (line && typeof line === 'object') {
+    text = line.message || line.text || line.line || JSON.stringify(line);
+    timestamp = line.timestamp || line.time || '';
+  }
+
+  if (/error|err|fail|fatal/i.test(text)) {
+    lineElem.classList.add('error');
+  } else if (/warn|warning/i.test(text)) {
+    lineElem.classList.add('warn');
+  } else if (/system|init|started|listening/i.test(text)) {
+    lineElem.classList.add('system');
+  }
+
+  if (timestamp) {
+    const tsSpan = document.createElement('span');
+    tsSpan.className = 'log-timestamp';
+    tsSpan.textContent = `[${timestamp}] `;
+    lineElem.appendChild(tsSpan);
+  }
+
+  const contentSpan = document.createElement('span');
+  contentSpan.className = 'log-content';
+  contentSpan.textContent = text;
+  lineElem.appendChild(contentSpan);
+
+  terminal.appendChild(lineElem);
+
+  const counter = document.getElementById('terminal-log-counter');
+  if (counter) {
+    const totalLines = terminal.querySelectorAll('.ollama-log-line').length;
+    counter.textContent = `${totalLines} linha${totalLines === 1 ? '' : 's'}`;
+  }
+
+  if (isOllamaAutoScrollEnabled) {
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+}
+
 function initLocalWorkerEvents() {
   if (lwTopbarSelect) {
     lwTopbarSelect.addEventListener('change', (e) => selectLocalModel(e.target.value));
@@ -1764,6 +1972,43 @@ function initLocalWorkerEvents() {
   if (modalModelDownload) {
     modalModelDownload.addEventListener('click', (e) => {
       if (e.target === modalModelDownload) closeModelModal();
+    });
+  }
+
+  // Eventos de Iniciar, Parar e Console do Ollama
+  if (btnStartOllama) {
+    btnStartOllama.addEventListener('click', startOllamaServer);
+  }
+  if (btnStopOllama) {
+    btnStopOllama.addEventListener('click', stopOllamaServer);
+  }
+  if (btnOpenOllamaConsole) {
+    btnOpenOllamaConsole.addEventListener('click', openOllamaConsole);
+  }
+  if (btnCloseOllamaConsole) {
+    btnCloseOllamaConsole.addEventListener('click', closeOllamaConsole);
+  }
+
+  if (modalOllamaConsole) {
+    modalOllamaConsole.addEventListener('click', (e) => {
+      if (e.target === modalOllamaConsole) closeOllamaConsole();
+    });
+  }
+
+  if (btnClearOllamaLogs) {
+    btnClearOllamaLogs.addEventListener('click', () => {
+      if (ollamaTerminalLogs) {
+        ollamaTerminalLogs.innerHTML = '<div class="terminal-placeholder">Console limpo. Aguardando novos logs...</div>';
+      }
+      if (terminalLogCounter) terminalLogCounter.textContent = '0 linhas';
+    });
+  }
+
+  if (btnToggleAutoscroll) {
+    btnToggleAutoscroll.addEventListener('click', () => {
+      isOllamaAutoScrollEnabled = !isOllamaAutoScrollEnabled;
+      btnToggleAutoscroll.textContent = `Auto-Scroll: ${isOllamaAutoScrollEnabled ? 'ON' : 'OFF'}`;
+      btnToggleAutoscroll.classList.toggle('active', isOllamaAutoScrollEnabled);
     });
   }
 
@@ -1789,3 +2034,4 @@ initWebSocket();
 checkAutostartStatus();
 initLocalWorkerEvents();
 loadLocalWorker();
+
