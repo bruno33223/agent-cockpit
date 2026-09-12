@@ -184,6 +184,7 @@ async function switchProject(projectId) {
       renderAll();
       loadHandoff();
       fetchGraph();
+      loadLocalWorker();
     }
   } catch (err) {
     console.error('[Projects] Erro ao carregar estado do projeto:', err);
@@ -259,6 +260,11 @@ function initWebSocket() {
         if (!data.project_id || data.project_id === currentProjectId) {
           state = data.payload;
           renderAll();
+          loadLocalWorker();
+        }
+      } else if (data.event === 'LOCAL_WORKER_CONFIG_UPDATED') {
+        if (!data.project_id || data.project_id === currentProjectId) {
+          loadLocalWorker();
         }
       } else if (data.event === 'STEERING_RECEIVED' || data.event === 'ORCHESTRATOR_MESSAGE') {
         if (!data.project_id || data.project_id === currentProjectId) {
@@ -1536,8 +1542,250 @@ if (btnAutostart) {
   });
 }
 
+// ==========================================================================
+// LOCAL WORKER (OLLAMA) INTEGRATION (Fatia 3)
+// ==========================================================================
+const lwPillLed = document.getElementById('lw-pill-led');
+const lwTopbarSelect = document.getElementById('lw-topbar-select');
+const btnTopbarPullModal = document.getElementById('btn-topbar-pull-modal');
+
+const lwStatusBadge = document.getElementById('lw-status-badge');
+const lwSidebarSelect = document.getElementById('lw-sidebar-select');
+const lwEndpointDisplay = document.getElementById('lw-endpoint-display');
+const btnOpenPullModal = document.getElementById('btn-open-pull-modal');
+
+const modalModelDownload = document.getElementById('modal-model-download');
+const btnCloseModelModal = document.getElementById('btn-close-model-modal');
+const formCustomPull = document.getElementById('form-custom-pull');
+const inputCustomModel = document.getElementById('input-custom-model');
+const btnStartPull = document.getElementById('btn-start-pull');
+const pullStatusBox = document.getElementById('pull-status-box');
+const pullStatusMessage = document.getElementById('pull-status-message');
+const pullFeedbackMsg = document.getElementById('pull-feedback-msg');
+
+let localWorkerStatus = {
+  online: false,
+  model: '',
+  endpoint: 'http://127.0.0.1:11434',
+  installed: [],
+  recommended: []
+};
+
+async function loadLocalWorker() {
+  try {
+    const statusPromise = apiFetch(`/api/local-worker/status?project_id=${encodeURIComponent(currentProjectId)}`);
+    const modelsPromise = apiFetch(`/api/local-worker/models?project_id=${encodeURIComponent(currentProjectId)}`);
+
+    const [statusRes, modelsRes] = await Promise.all([statusPromise, modelsPromise]);
+
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      localWorkerStatus.online = !!statusData.online;
+      localWorkerStatus.model = statusData.model || '';
+      localWorkerStatus.endpoint = statusData.endpoint || 'http://127.0.0.1:11434';
+    }
+
+    if (modelsRes.ok) {
+      const modelsData = await modelsRes.json();
+      localWorkerStatus.installed = modelsData.installed || [];
+      localWorkerStatus.recommended = modelsData.recommended || [];
+      if (modelsData.current_model) {
+        localWorkerStatus.model = modelsData.current_model;
+      }
+      if (modelsData.online !== undefined) {
+        localWorkerStatus.online = !!modelsData.online;
+      }
+    }
+
+    renderLocalWorkerUI();
+  } catch (err) {
+    console.warn('[LocalWorker] Falha ao carregar status/modelos:', err);
+    localWorkerStatus.online = false;
+    renderLocalWorkerUI();
+  }
+}
+
+function renderLocalWorkerUI() {
+  // 1. Atualiza LEDs e Badges de Conexão
+  const isOnline = localWorkerStatus.online;
+  if (lwPillLed) {
+    lwPillLed.className = `pulse-led ${isOnline ? 'online' : 'offline'}`;
+    lwPillLed.title = isOnline ? 'Ollama Online' : 'Ollama Offline / Inacessível';
+  }
+
+  if (lwStatusBadge) {
+    lwStatusBadge.className = `lw-badge ${isOnline ? 'online' : 'offline'}`;
+    lwStatusBadge.textContent = isOnline ? 'Online' : 'Offline';
+  }
+
+  if (lwEndpointDisplay) {
+    lwEndpointDisplay.textContent = localWorkerStatus.endpoint;
+  }
+
+  // 2. Popula os selects (topbar e sidebar)
+  const modelsToDisplay = [...localWorkerStatus.installed];
+  if (localWorkerStatus.model && !modelsToDisplay.includes(localWorkerStatus.model)) {
+    modelsToDisplay.unshift(localWorkerStatus.model);
+  }
+
+  const updateSelect = (selectElem) => {
+    if (!selectElem) return;
+    selectElem.innerHTML = '';
+
+    if (modelsToDisplay.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = localWorkerStatus.model || '';
+      opt.textContent = localWorkerStatus.model ? `${localWorkerStatus.model} (padrão)` : '(Nenhum modelo detectado)';
+      selectElem.appendChild(opt);
+    } else {
+      modelsToDisplay.forEach(modelName => {
+        const opt = document.createElement('option');
+        opt.value = modelName;
+        opt.textContent = modelName;
+        if (modelName === localWorkerStatus.model) {
+          opt.selected = true;
+        }
+        selectElem.appendChild(opt);
+      });
+    }
+
+    if (localWorkerStatus.model) {
+      selectElem.value = localWorkerStatus.model;
+    }
+  };
+
+  updateSelect(lwTopbarSelect);
+  updateSelect(lwSidebarSelect);
+}
+
+async function selectLocalModel(modelName) {
+  if (!modelName) return;
+  try {
+    const res = await apiFetch('/api/local-worker/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelName, project_id: currentProjectId })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      localWorkerStatus.model = data.model;
+      if (lwTopbarSelect) lwTopbarSelect.value = data.model;
+      if (lwSidebarSelect) lwSidebarSelect.value = data.model;
+    }
+  } catch (err) {
+    console.error('[LocalWorker] Erro ao selecionar modelo:', err);
+  }
+}
+
+async function pullLocalModel(modelName) {
+  const target = (modelName || '').trim();
+  if (!target) return;
+
+  if (pullStatusBox) pullStatusBox.style.display = 'flex';
+  if (pullStatusMessage) pullStatusMessage.textContent = `Baixando modelo "${target}"... Isso pode levar alguns minutos.`;
+  if (pullFeedbackMsg) {
+    pullFeedbackMsg.style.display = 'none';
+    pullFeedbackMsg.className = 'pull-feedback-msg';
+  }
+
+  // Desabilita botões durante o download
+  if (btnStartPull) btnStartPull.disabled = true;
+  document.querySelectorAll('.btn-quick-pull').forEach(b => b.disabled = true);
+
+  try {
+    const res = await apiFetch('/api/local-worker/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: target, project_id: currentProjectId })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status !== 'error') {
+      if (pullFeedbackMsg) {
+        pullFeedbackMsg.textContent = `Modelo "${target}" baixado e registrado com sucesso!`;
+        pullFeedbackMsg.className = 'pull-feedback-msg success';
+        pullFeedbackMsg.style.display = 'block';
+      }
+      if (inputCustomModel) inputCustomModel.value = '';
+      await loadLocalWorker();
+    } else {
+      if (pullFeedbackMsg) {
+        pullFeedbackMsg.textContent = `Erro ao baixar modelo: ${data.details?.message || data.status || 'Falha no download'}`;
+        pullFeedbackMsg.className = 'pull-feedback-msg error';
+        pullFeedbackMsg.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    if (pullFeedbackMsg) {
+      pullFeedbackMsg.textContent = `Falha de conexão com o servidor: ${err.message}`;
+      pullFeedbackMsg.className = 'pull-feedback-msg error';
+      pullFeedbackMsg.style.display = 'block';
+    }
+  } finally {
+    if (pullStatusBox) pullStatusBox.style.display = 'none';
+    if (btnStartPull) btnStartPull.disabled = false;
+    document.querySelectorAll('.btn-quick-pull').forEach(b => b.disabled = false);
+  }
+}
+
+function openModelModal() {
+  if (modalModelDownload) {
+    modalModelDownload.style.display = 'flex';
+    if (pullFeedbackMsg) pullFeedbackMsg.style.display = 'none';
+    if (pullStatusBox) pullStatusBox.style.display = 'none';
+  }
+}
+
+function closeModelModal() {
+  if (modalModelDownload) {
+    modalModelDownload.style.display = 'none';
+  }
+}
+
+function initLocalWorkerEvents() {
+  if (lwTopbarSelect) {
+    lwTopbarSelect.addEventListener('change', (e) => selectLocalModel(e.target.value));
+  }
+  if (lwSidebarSelect) {
+    lwSidebarSelect.addEventListener('change', (e) => selectLocalModel(e.target.value));
+  }
+
+  if (btnTopbarPullModal) {
+    btnTopbarPullModal.addEventListener('click', openModelModal);
+  }
+  if (btnOpenPullModal) {
+    btnOpenPullModal.addEventListener('click', openModelModal);
+  }
+  if (btnCloseModelModal) {
+    btnCloseModelModal.addEventListener('click', closeModelModal);
+  }
+
+  if (modalModelDownload) {
+    modalModelDownload.addEventListener('click', (e) => {
+      if (e.target === modalModelDownload) closeModelModal();
+    });
+  }
+
+  if (formCustomPull) {
+    formCustomPull.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (inputCustomModel) pullLocalModel(inputCustomModel.value);
+    });
+  }
+
+  document.querySelectorAll('.btn-quick-pull').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const model = btn.getAttribute('data-model');
+      pullLocalModel(model);
+    });
+  });
+}
+
 // Inicializa
 initSidebar();
 loadProjects();
 initWebSocket();
 checkAutostartStatus();
+initLocalWorkerEvents();
+loadLocalWorker();

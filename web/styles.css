@@ -1847,3 +1847,425 @@ body {
   margin-top: 14px;
   margin-bottom: 8px;
 }
+
+/* ==========================================================================
+   LOCAL WORKER (OLLAMA) - INTERFACE & INTEGRAÇÃO (Fatia 3)
+   ========================================================================== */
+
+/* Pílula no Topbar */
+.local-worker-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 0.2s ease;
+}
+
+.local-worker-pill:hover {
+  border-color: var(--border-strong);
+  background-color: var(--bg-card-hover);
+}
+
+.lw-pill-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.lw-topbar-dropdown {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+  max-width: 140px;
+}
+
+.lw-topbar-dropdown option {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.lw-pull-btn {
+  background: var(--cyan-dim);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--cyan-bright);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lw-pull-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: var(--cyan-bright);
+}
+
+/* Card na Sidebar */
+.local-worker-block {
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.lw-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.lw-badge.online {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green-bright);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.lw-badge.offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red-bright);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.lw-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.lw-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lw-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.lw-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.lw-select {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lw-select:hover, .lw-select:focus {
+  border-color: var(--border-focus);
+}
+
+.lw-select option {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.lw-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.lw-meta-label {
+  color: var(--text-muted);
+}
+
+.lw-endpoint-code {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--cyan-bright);
+  font-size: 10px;
+}
+
+.lw-actions-row {
+  display: flex;
+  margin-top: 4px;
+}
+
+.lw-manage-btn {
+  width: 100%;
+  justify-content: center;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+/* Modal de Download de Modelos */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(3, 7, 18, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 620px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(56, 189, 248, 0.15);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-badge {
+  background: var(--cyan-dim);
+  color: var(--cyan-bright);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.modal-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  color: var(--red-bright);
+  background: var(--red-dim);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-section h4 {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.rec-models-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-model-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.rec-model-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-card-hover);
+}
+
+.rec-model-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rec-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cyan-bright);
+}
+
+.rec-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.rec-tag.recommended {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green-bright);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.rec-tag.fast {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--cyan-bright);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.rec-tag.specialist {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--purple-bright);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.rec-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.rec-model-card .btn-quick-pull {
+  align-self: flex-end;
+  margin-top: 4px;
+}
+
+.custom-pull-form {
+  display: flex;
+  gap: 8px;
+}
+
+.custom-model-input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.custom-model-input:focus {
+  border-color: var(--border-focus);
+}
+
+.pull-status-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pull-status-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pull-spinner {
+  animation: spin 1.5s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pull-status-message {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.pull-feedback-msg {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: none;
+}
+
+.pull-feedback-msg.success {
+  display: block;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green-bright);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.pull-feedback-msg.error {
+  display: block;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red-bright);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
