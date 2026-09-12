@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Cockpit</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-container">
+            <div class="brand">
+                <span class="brand-logo">⚡</span>
+                <span class="brand-name">Agent Cockpit</span>
+                <span class="badge-version">v2.4</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#hero" class="nav-link">Hero</a>
+                <a href="#architecture" class="nav-link">Arquitetura</a>
+                <a href="#simulator" class="nav-link">Simulador</a>
+                <a href="#hardware" class="nav-link">Hardware</a>
+            </nav>
+            <div class="header-actions">
+                <a href="#simulator" class="btn-cyber-cyan">Ver Demo</a>
+                <a href="https://github.com" class="btn-cyber-purple">GitHub</a>
+            </div>
+        </div>
+    </header>
+    <section id="hero" class="hero-section">
+        <div class="hero-badge">
+            <span class="pulse-glow"></span> Orquestração Multiagente 3x3
+        </div>
+        <h1 class="hero-title">Engenharia Autônoma <span class="text-gradient-cyan">Spec-Driven</span> & Gauntlet Loop</h1>
+        <p class="hero-subtitle">Construído para rodar local na GPU com o Qwen 7B via Ollama. Zero token-fluff, isolamento por Git Worktrees e auditoria cega adversária.</p>
+        <div class="hero-cta-group">
+            <a href="#simulator" class="btn-cyber-cyan">Experimentar Simulador</a>
+            <a href="#architecture" class="btn-cyber-purple">Ver Arquitetura 3x3</a>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-num">3x3</div>
+                <div class="stat-label">Pares Concorrentes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">100%</div>
+                <div class="stat-label">Inferência GPU Local</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">0</div>
+                <div class="stat-label">Token Fluff</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">4.7 GB</div>
+                <div class="stat-label">VRAM Alocada</div>
+            </div>
+        </div>
+    </section>
+    <section id="architecture" class="architecture-section">
+        <h2 class="section-title">Arquitetura da Frota 3x3</h2>
+        <p class="section-subtitle">3 Builders implementam fatias isoladas em paralelo enquanto 3 Harsh Critics auditam o git diff em banca revisora rigorosa.</p>
+        <div class="fleet-grid">
+            <div class="agent-pair-card">
+                <div class="pair-header">
+                    <span class="pair-badge">Par 1</span>
+                    <span class="status-pill">Ativo</span>
+                </div>
+                <h3>Infra & Contratos</h3>
+                <div class="builder-box">Executor 1 (TDD)</div>
+                <div class="critic-box">Harsh Critic 1</div>
+            </div>
+            <div class="agent-pair-card">
+                <div class="pair-header">
+                    <span class="pair-badge">Par 2</span>
+                    <span class="status-pill">Ativo</span>
+                </div>
+                <h3>Domínio & Regras</h3>
+                <div class="builder-box">Executor 2 (TDD)</div>
+                <div class="critic-box">Harsh Critic 2</div>
+            </div>
+            <div class="agent-pair-card">
+                <div class="pair-header">
+                    <span class="pair-badge">Par 3</span>
+                    <span class="status-pill">Ativo</span>
+                </div>
+                <h3>UI & Integração</h3>
+                <div class="builder-box">Executor 3 (TDD)</div>
+                <div class="critic-box">Harsh Critic 3</div>
+            </div>
+        </div>
+    </section>
+    <section id="simulator" class="simulator-section">
+        <h2 class="section-title">Simulador de Telemetria em Tempo Real</h2>
+        <div class="terminal-window">
+            <div class="terminal-topbar">
+                <div class="window-dots">
+                    <span class="dot-red"></span>
+                    <span class="dot-yellow"></span>
+                    <span class="dot-green"></span>
+                </div>
+                <span class="terminal-title">Agent Cockpit Telemetry Stream</span>
+            </div>
+            <div class="terminal-body">
+                <div id="logStream" class="log-stream"></div>
+            </div>
+            <div class="controls-bar">
+                <button id="btnStartSim" class="btn-action">▶ Iniciar Simulação 3x3</button>
+                <button id="btnResetSim" class="btn-action secondary">↺ Resetar</button>
+                <span class="metric-pill">⚡ Local Worker: Ollama Qwen 7B</span>
+            </div>
+        </div>
+    </section>
+    <section id="hardware" class="hardware-section">
+        <h2 class="section-title">Matriz de Hardware Local vs Cloud</h2>
+        <div class="table-card">
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Provedor</th>
+                        <th>Velocidade</th>
+                        <th>Custo/Token</th>
+                        <th>Privacidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="matrix-row">
+                        <td class="badge-optimal">Local GPU Ollama (Qwen 7B)</td>
+                        <td>~25 tks/s</td>
+                        <td>$0.00</td>
+                        <td>100% Local / Zero Vazamento</td>
+                    </tr>
+                    <tr class="matrix-row">
+                        <td>Cloud Frontier (Claude/OpenAI)</td>
+                        <td>~40 tks/s</td>
+                        <td>Por Milhão</td>
+                        <td>Nuvem de Terceiros</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-brand">Agent Cockpit v2.4</div>
+            <div class="footer-links">
+                <a href="#hero">Home</a>
+                <a href="#architecture">Arquitetura</a>
+                <a href="#simulator">Simulador</a>
+            </div>
+            <p class="footer-copy">&copy; 2026 Agent Cockpit. Governança Multiagente Spec-Driven.</p>
+        </div>
+    </footer>
+    <script src="app.js"></script>
+</body>
+</html>
