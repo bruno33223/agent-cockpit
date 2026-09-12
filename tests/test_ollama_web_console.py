@@ -97,9 +97,10 @@ class TestOllamaWebConsole(unittest.TestCase):
         """Verifica chamadas aos endpoints REST de controle do servidor Ollama e carregamento de logs históricos."""
         self.assertIn("/api/local-worker/start-server", self.js, "Endpoint /api/local-worker/start-server não invocado em app.js")
         self.assertIn("/api/local-worker/stop-server", self.js, "Endpoint /api/local-worker/stop-server não invocado em app.js")
-        self.assertTrue(
-            "/api/local-worker/logs" in self.js or "loadOllamaLogs" in self.js,
-            "Carregamento de logs históricos (/api/local-worker/logs) ausente em app.js"
+        self.assertIn(
+            "/api/local-worker/server-logs",
+            self.js,
+            "Endpoint formal /api/local-worker/server-logs deve ser invocado para carregamento de logs históricos"
         )
 
     def test_js_websocket_ollama_log_handling(self):
@@ -110,6 +111,19 @@ class TestOllamaWebConsole(unittest.TestCase):
             "Tratamento do evento WebSocket 'ollama_log' ausente em app.js"
         )
         self.assertIn("renderOllamaLogLine", self.js, "renderOllamaLogLine não é chamada no fluxo do app.js")
+
+    def test_js_websocket_ollama_status_and_pid_handling(self):
+        """Verifica tratamento do evento WebSocket 'ollama_status' e extração de PID/server_status."""
+        self.assertRegex(
+            self.js,
+            r"['\"]ollama_status['\"]",
+            "Tratamento do evento WebSocket 'ollama_status' ausente em app.js"
+        )
+        self.assertIn(
+            "server_status",
+            self.js,
+            "Extração de metadados do processo a partir de server_status ausente em app.js"
+        )
 
 
 if __name__ == "__main__":

@@ -262,8 +262,14 @@ function initWebSocket() {
           renderAll();
           loadLocalWorker();
         }
-      } else if (data.event === 'LOCAL_WORKER_CONFIG_UPDATED' || data.event === 'LOCAL_WORKER_STATUS_CHANGED') {
+      } else if (data.event === 'LOCAL_WORKER_CONFIG_UPDATED' || data.event === 'LOCAL_WORKER_STATUS_CHANGED' || data.event === 'ollama_status' || data.type === 'ollama_status') {
         if (!data.project_id || data.project_id === currentProjectId) {
+          if (data.payload && typeof data.payload === 'object') {
+            const p = data.payload;
+            if (p.running !== undefined) localWorkerStatus.running = !!p.running;
+            if (p.pid !== undefined) localWorkerStatus.pid = p.pid || null;
+            renderLocalWorkerUI();
+          }
           loadLocalWorker();
         }
       } else if (data.event === 'ollama_log' || data.type === 'ollama_log' || data.event === 'OLLAMA_LOG') {
@@ -1599,9 +1605,12 @@ async function loadLocalWorker() {
 
     if (statusRes.ok) {
       const statusData = await statusRes.json();
+      const serverStatus = statusData.server_status || {};
       localWorkerStatus.online = !!statusData.online;
-      localWorkerStatus.running = statusData.running !== undefined ? !!statusData.running : !!statusData.online;
-      localWorkerStatus.pid = statusData.pid || null;
+      localWorkerStatus.running = statusData.running !== undefined
+        ? !!statusData.running
+        : (serverStatus.running !== undefined ? !!serverStatus.running : !!statusData.online);
+      localWorkerStatus.pid = statusData.pid || serverStatus.pid || null;
       localWorkerStatus.model = statusData.model || '';
       localWorkerStatus.endpoint = statusData.endpoint || 'http://127.0.0.1:11434';
     }
@@ -1837,9 +1846,11 @@ async function stopOllamaServer() {
   }
 }
 
+let ollamaLogsPollingInterval = null;
+
 async function loadOllamaLogs() {
   try {
-    const res = await apiFetch(`/api/local-worker/logs?project_id=${encodeURIComponent(currentProjectId)}`);
+    const res = await apiFetch(`/api/local-worker/server-logs?project_id=${encodeURIComponent(currentProjectId)}&limit=100`);
     if (res.ok) {
       const data = await res.json();
       const logs = data.logs || (Array.isArray(data) ? data : []);
@@ -1847,6 +1858,11 @@ async function loadOllamaLogs() {
       if (terminal && logs.length > 0) {
         terminal.innerHTML = '';
         logs.forEach(line => renderOllamaLogLine(line));
+      }
+      if (data.running !== undefined || data.pid !== undefined) {
+        if (data.running !== undefined) localWorkerStatus.running = !!data.running;
+        if (data.pid !== undefined) localWorkerStatus.pid = data.pid || null;
+        renderLocalWorkerUI();
       }
     }
   } catch (err) {
@@ -1859,6 +1875,13 @@ function openOllamaConsole() {
   if (modal) {
     modal.style.display = 'flex';
     loadOllamaLogs();
+    if (ollamaLogsPollingInterval) {
+      clearInterval(ollamaLogsPollingInterval);
+    }
+    // Polling fallback temporizado para manter logs e status atualizados caso WS oscile
+    ollamaLogsPollingInterval = setInterval(() => {
+      loadOllamaLogs();
+    }, 4000);
   }
 }
 
@@ -1866,6 +1889,10 @@ function closeOllamaConsole() {
   const modal = document.getElementById('modal-ollama-console');
   if (modal) {
     modal.style.display = 'none';
+  }
+  if (ollamaLogsPollingInterval) {
+    clearInterval(ollamaLogsPollingInterval);
+    ollamaLogsPollingInterval = null;
   }
 }
 
