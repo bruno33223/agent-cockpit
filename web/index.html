@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Cockpit - Telemetria & Orquestração Multiagente</title>
+  <title>AGENT COCKPIT - Telemetria & Orquestração Multiagente</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -115,6 +115,15 @@
               <option value="default">Carregando projetos...</option>
             </select>
             <button id="btn-scan-projects" class="project-scan-btn" title="Escanear e sincronizar projetos reais em ~/Projects">⟳</button>
+          </div>
+
+          <div class="local-worker-pill" id="local-worker-pill" title="Status e Seletor do Local Worker (Ollama)">
+            <span class="pulse-led online" id="lw-pill-led"></span>
+            <span class="lw-pill-label">WORKER:</span>
+            <select id="lw-topbar-select" class="lw-topbar-dropdown" aria-label="Selecione o Modelo Local">
+              <option value="">Carregando...</option>
+            </select>
+            <button id="btn-topbar-pull-modal" class="lw-pull-btn" title="Baixar novos modelos">⬇</button>
           </div>
 
           <div class="conn-pill" id="ws-status">
@@ -369,6 +378,33 @@
         </div>
       </div>
 
+      <!-- LOCAL WORKER CARD (OLLAMA) -->
+      <div class="sidebar-block local-worker-block" id="local-worker-card">
+        <div class="block-header">
+          <span class="block-title">Local Worker (Ollama)</span>
+          <span class="lw-badge" id="lw-status-badge">Detectando...</span>
+        </div>
+        <div class="lw-card-body">
+          <div class="lw-field-row">
+            <label for="lw-sidebar-select" class="lw-label">Modelo Ativo:</label>
+            <div class="lw-select-container">
+              <select id="lw-sidebar-select" class="lw-select" aria-label="Selecione o Modelo Local">
+                <option value="">Detectando modelos...</option>
+              </select>
+            </div>
+          </div>
+          <div class="lw-meta-row">
+            <span class="lw-meta-label">Endpoint:</span>
+            <code class="lw-endpoint-code" id="lw-endpoint-display">http://127.0.0.1:11434</code>
+          </div>
+          <div class="lw-actions-row">
+            <button class="action-btn secondary btn-sm lw-manage-btn" id="btn-open-pull-modal" title="Baixar novos modelos de IA local">
+              ⬇ Baixar Novos Modelos
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- HUMAN STEERING CHAT -->
       <div class="sidebar-block chat-block">
         <div class="block-header">
@@ -411,6 +447,71 @@
         <div class="drawer-tab-content" id="tab-gauntlet">
           <div class="gauntlet-timeline" id="drawer-gauntlet-content"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE DOWNLOAD DE MODELOS (LOCAL WORKER) -->
+  <div class="modal-backdrop" id="modal-model-download" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">OLLAMA</span>
+          <h3>Baixar Modelos para Local Worker</h3>
+        </div>
+        <button class="modal-close-btn" id="btn-close-model-modal" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Baixe e instale modelos de IA especializados em programação diretamente no seu Ollama local para execução com custo zero de tokens e máxima velocidade.</p>
+        
+        <div class="modal-section">
+          <h4>Modelos Populares Recomendados</h4>
+          <div class="rec-models-grid" id="rec-models-grid">
+            <div class="rec-model-card">
+              <div class="rec-model-header">
+                <span class="rec-name">qwen2.5-coder:7b</span>
+                <span class="rec-tag recommended">Recomendado</span>
+              </div>
+              <p class="rec-desc">7B parâmetros • Melhor qualidade em refatorações complexas e patches exatos.</p>
+              <button class="action-btn primary btn-sm btn-quick-pull" data-model="qwen2.5-coder:7b">Baixar</button>
+            </div>
+            <div class="rec-model-card">
+              <div class="rec-model-header">
+                <span class="rec-name">qwen2.5-coder:1.5b</span>
+                <span class="rec-tag fast">Ultra Leve</span>
+              </div>
+              <p class="rec-desc">1.5B parâmetros • Ultrarrápido, baixo consumo de RAM/VRAM.</p>
+              <button class="action-btn primary btn-sm btn-quick-pull" data-model="qwen2.5-coder:1.5b">Baixar</button>
+            </div>
+            <div class="rec-model-card">
+              <div class="rec-model-header">
+                <span class="rec-name">deepseek-coder:6.7b</span>
+                <span class="rec-tag specialist">Especialista</span>
+              </div>
+              <p class="rec-desc">6.7B parâmetros • Treinado extensivamente em código aberto.</p>
+              <button class="action-btn primary btn-sm btn-quick-pull" data-model="deepseek-coder:6.7b">Baixar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <h4>Baixar Outro Modelo (Input Livre)</h4>
+          <form class="custom-pull-form" id="form-custom-pull">
+            <input type="text" id="input-custom-model" class="custom-model-input" placeholder="Ex: codellama:7b, llama3.2:3b, qwen2.5-coder:32b..." autocomplete="off">
+            <button type="submit" class="action-btn primary" id="btn-start-pull">Baixar Modelo</button>
+          </form>
+        </div>
+
+        <div class="pull-status-box" id="pull-status-box" style="display: none;">
+          <div class="pull-status-info">
+            <span class="pull-spinner">⏳</span>
+            <span class="pull-status-message" id="pull-status-message">Iniciando download...</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill animated" id="pull-progress-bar" style="width: 100%;"></div>
+          </div>
+        </div>
+        <div class="pull-feedback-msg" id="pull-feedback-msg"></div>
       </div>
     </div>
   </div>

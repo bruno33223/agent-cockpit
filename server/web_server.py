@@ -353,6 +353,161 @@ def post_autostart_toggle(payload: AutostartPayload):
     info["success"] = success
     return info
 
+# ROTAS DO LOCAL WORKER (Fatia 3)
+try:
+    from workers.local_llm_client import LocalLLMClient
+except ImportError:
+    try:
+        from server.workers.local_llm_client import LocalLLMClient
+    except ImportError:
+        LocalLLMClient = None
+
+def _get_local_worker_client(project_id: Optional[str] = None):
+    cfg = {}
+    if hasattr(db, "get_local_worker_config"):
+        cfg = db.get_local_worker_config(project_id)
+    else:
+        state = db.get_state(project_id)
+        cfg = state.get("local_worker", {
+            "provider": "ollama",
+            "endpoint": "http://127.0.0.1:11434",
+            "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+            "circuit_breaker_threshold": 2,
+            "consecutive_failures": {}
+        })
+    endpoint = cfg.get("endpoint", "http://127.0.0.1:11434")
+    if LocalLLMClient:
+        return LocalLLMClient(base_url=endpoint), cfg
+
+    class _FallbackLocalLLMClient:
+        RECOMMENDED_MODELS = [
+            "qwen2.5-coder:7b",
+            "qwen2.5-coder:1.5b",
+            "deepseek-coder:6.7b",
+            "codellama:7b",
+            "llama3.2:3b",
+        ]
+        def __init__(self, base_url="http://127.0.0.1:11434", timeout=5.0):
+            self.base_url = base_url.rstrip("/")
+            self.timeout = timeout
+
+        def healthcheck(self) -> bool:
+            import urllib.request
+            try:
+                req = urllib.request.Request(f"{self.base_url}/api/tags")
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    return resp.getcode() == 200
+            except Exception:
+                return False
+
+        def list_models(self) -> Dict[str, Any]:
+            import urllib.request
+            try:
+                req = urllib.request.Request(f"{self.base_url}/api/tags")
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    installed = [m.get("name", "") for m in data.get("models", []) if "name" in m]
+                    return {"online": True, "installed": installed, "recommended": list(self.RECOMMENDED_MODELS)}
+            except Exception:
+                return {"online": False, "installed": [], "recommended": list(self.RECOMMENDED_MODELS)}
+
+        def pull_model(self, model_name: str, stream: bool = False) -> Dict[str, Any]:
+            import urllib.request
+            try:
+                req = urllib.request.Request(
+                    f"{self.base_url}/api/pull",
+                    data=json.dumps({"name": model_name, "stream": stream}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+    return _FallbackLocalLLMClient(base_url=endpoint), cfg
+
+@app.get("/api/local-worker/status")
+def get_local_worker_status(project_id: Optional[str] = None):
+    client, cfg = _get_local_worker_client(project_id)
+    online = client.healthcheck()
+    return {
+        "status": "ok",
+        "online": online,
+        "provider": cfg.get("provider", "ollama"),
+        "endpoint": cfg.get("endpoint", "http://127.0.0.1:11434"),
+        "model": cfg.get("model", "qwen2.5-coder:7b-instruct-q4_k_m"),
+        "circuit_breaker_threshold": cfg.get("circuit_breaker_threshold", 2),
+        "consecutive_failures": cfg.get("consecutive_failures", {})
+    }
+
+@app.get("/api/local-worker/models")
+def get_local_worker_models(project_id: Optional[str] = None):
+    client, cfg = _get_local_worker_client(project_id)
+    models_info = client.list_models()
+    return {
+        "status": "ok",
+        "online": models_info.get("online", False),
+        "installed": models_info.get("installed", []),
+        "recommended": models_info.get("recommended", []),
+        "current_model": cfg.get("model", "qwen2.5-coder:7b-instruct-q4_k_m")
+    }
+
+class LocalWorkerSelectPayload(BaseModel):
+    model: str
+    project_id: Optional[str] = None
+
+@app.post("/api/local-worker/select")
+def post_local_worker_select(payload: LocalWorkerSelectPayload):
+    model_name = payload.model.strip()
+    if not model_name:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Nome do modelo não pode ser vazio.")
+
+    if hasattr(db, "set_local_worker_config"):
+        cfg = db.set_local_worker_config({"model": model_name}, project_id=payload.project_id)
+    else:
+        target_pid = db.resolve_project_id(payload.project_id)
+        with db.lock:
+            state = db.get_state(target_pid)
+            cfg = state.setdefault("local_worker", {
+                "provider": "ollama",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "circuit_breaker_threshold": 2,
+                "consecutive_failures": {}
+            })
+            cfg["model"] = model_name
+            db._save_state(state, target_pid)
+        db._notify("LOCAL_WORKER_CONFIG_UPDATED", cfg, target_pid)
+        db._notify("STATE_FULL", state, target_pid)
+
+    return {
+        "status": "ok",
+        "model": model_name,
+        "config": cfg
+    }
+
+class LocalWorkerPullPayload(BaseModel):
+    model: str
+    project_id: Optional[str] = None
+
+@app.post("/api/local-worker/pull")
+def post_local_worker_pull(payload: LocalWorkerPullPayload):
+    model_name = payload.model.strip()
+    if not model_name:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Nome do modelo não pode ser vazio.")
+
+    client, _ = _get_local_worker_client(payload.project_id)
+    res = client.pull_model(model_name, stream=False)
+    status_str = res.get("status", "ok") if isinstance(res, dict) else "ok"
+    return {
+        "status": status_str,
+        "model": model_name,
+        "details": res
+    }
+
 # Monta arquivos estáticos do dashboard visual
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 if os.path.exists(WEB_DIR):
