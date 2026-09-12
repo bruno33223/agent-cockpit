@@ -322,13 +322,18 @@ function renderHeaderAndKPIs() {
   // Human Gate Button
   if (btnHumanGate) {
     const isApproved = state.human_gates && state.human_gates.gate_ship_approved;
+    const gateLabel = btnHumanGate.querySelector('.gate-text') || btnHumanGate.querySelector('.tab-label');
+    
+    btnHumanGate.classList.toggle('approved', !!isApproved);
+    btnHumanGate.classList.toggle('pending', !isApproved);
+    
     if (isApproved) {
-      btnHumanGate.className = 'action-btn gate-btn approved';
-      btnHumanGate.textContent = 'Gate: Aprovado';
+      if (gateLabel) gateLabel.textContent = 'Gate: Aprovado';
+      btnHumanGate.setAttribute('data-tooltip', `Release aprovado por ${state.human_gates.approved_by || 'usuário'}`);
       btnHumanGate.title = `Release aprovado por ${state.human_gates.approved_by || 'usuário'}`;
     } else {
-      btnHumanGate.className = 'action-btn gate-btn pending';
-      btnHumanGate.textContent = 'Gate: Pendente (Aprovar)';
+      if (gateLabel) gateLabel.textContent = 'Gate: Pendente';
+      btnHumanGate.setAttribute('data-tooltip', 'Portão Humano: Pendente (Clique para Aprovar)');
       btnHumanGate.title = 'Clique para aprovar e autorizar o release da entrega';
     }
   }

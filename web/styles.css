@@ -271,6 +271,7 @@ body {
   width: 100%;
   white-space: nowrap;
   position: relative;
+  overflow: hidden;
 }
 
 .sidebar-action-btn:hover {
@@ -279,12 +280,61 @@ body {
   border-color: var(--border-strong);
 }
 
+.sidebar-action-btn .action-svg {
+  flex-shrink: 0;
+}
+
+/* Gate Button States */
+.sidebar-action-btn.gate-btn.pending {
+  color: var(--amber-bright);
+  background-color: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.sidebar-action-btn.gate-btn.pending:hover {
+  background-color: rgba(245, 158, 11, 0.16);
+  border-color: var(--amber-bright);
+}
+
+.sidebar-action-btn.gate-btn.approved {
+  color: var(--green-bright);
+  background-color: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.sidebar-action-btn.gate-btn.approved:hover {
+  background-color: rgba(34, 197, 94, 0.16);
+  border-color: var(--green-bright);
+}
+
+/* Autostart Button States */
+.sidebar-action-btn.autostart-btn.enabled {
+  color: var(--green-bright);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.sidebar-action-btn.autostart-btn.disabled {
+  color: var(--text-muted);
+}
+
+/* MODO COLAPSADO: MOSTRAR APENAS O ÍCONE SEM OVERFLOW */
 .app-sidebar.collapsed .sidebar-action-btn {
   justify-content: center;
-  padding: 8px 0;
+  padding: 0;
   width: 44px;
   height: 38px;
   margin: 0 auto;
+  overflow: hidden;
+}
+
+.app-sidebar.collapsed .sidebar-action-btn .tab-label,
+.app-sidebar.collapsed .sidebar-action-btn .gate-text,
+.app-sidebar.collapsed .sidebar-action-btn .autostart-text,
+.app-sidebar.collapsed .sidebar-action-btn .autostart-dot {
+  display: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  pointer-events: none;
 }
 
 .sidebar-meta {
