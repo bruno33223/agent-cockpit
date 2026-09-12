@@ -1,3 +1,33 @@
+// Base URLs unificadas (Suporte híbrido: Navegador local ou Tauri Desktop)
+const IS_HOSTED_SERVER = (window.location.port === '8765' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+const API_BASE = IS_HOSTED_SERVER ? '' : 'http://127.0.0.1:8765';
+const WS_BASE = IS_HOSTED_SERVER 
+  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
+  : 'ws://127.0.0.1:8765/ws';
+
+// Wrapper unificado para fetch direcionando dinamicamente para o backend
+function apiFetch(endpoint, options) {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  return fetch(url, options);
+}
+
+// Inicialização da Sidebar Retrátil (Hambúrguer)
+function initSidebar() {
+  const sidebar = document.getElementById('app-sidebar');
+  const toggleBtn = document.getElementById('btn-sidebar-toggle');
+  if (!sidebar || !toggleBtn) return;
+
+  const isCollapsed = localStorage.getItem('cockpit_sidebar_collapsed') === 'true';
+  if (isCollapsed) {
+    sidebar.classList.add('collapsed');
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    localStorage.setItem('cockpit_sidebar_collapsed', sidebar.classList.contains('collapsed'));
+  });
+}
+
 let state = {
   epic: {},
   nodes: [],
@@ -94,7 +124,7 @@ document.querySelectorAll('.nav-tab').forEach(btn => {
 async function loadProjects() {
   if (!projectSelect) return;
   try {
-    const res = await fetch('/api/projects');
+    const res = await apiFetch('/api/projects');
     if (res.ok) {
       const data = await res.json();
       knownProjects = data.projects || [];
@@ -148,7 +178,7 @@ async function switchProject(projectId) {
   }
 
   try {
-    const res = await fetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
+    const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
     if (res.ok) {
       state = await res.json();
       renderAll();
@@ -174,7 +204,7 @@ async function triggerScanProjects() {
     btnScanProjects.style.opacity = '0.5';
   }
   try {
-    const res = await fetch('/api/projects/scan', { method: 'POST' });
+    const res = await apiFetch('/api/projects/scan', { method: 'POST' });
     if (res.ok) {
       const data = await res.json();
       knownProjects = data.projects || [];
@@ -196,14 +226,17 @@ if (btnScanProjects) {
 
 // 2. WEBSOCKET
 function initWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws`;
-
   wsStatusText.textContent = 'WS Conectando...';
   const led = wsStatusPill.querySelector('.pulse-led');
   if (led) led.className = 'pulse-led offline';
 
-  socket = new WebSocket(wsUrl);
+  try {
+    socket = new WebSocket(WS_BASE);
+  } catch (err) {
+    console.error('[WebSocket] Erro ao instanciar:', err);
+    setTimeout(initWebSocket, 3000);
+    return;
+  }
 
   socket.onopen = () => {
     if (led) led.className = 'pulse-led online';
@@ -306,7 +339,7 @@ async function loadHandoff() {
   if (!handoffRenderedContent) return;
   handoffRenderedContent.textContent = 'Carregando handoff em disco...';
   try {
-    const res = await fetch(`/api/handoff?project_id=${encodeURIComponent(currentProjectId)}`);
+    const res = await apiFetch(`/api/handoff?project_id=${encodeURIComponent(currentProjectId)}`);
     const data = await res.json();
     if (data.status === 'NO_HANDOFF_FOUND') {
       if (handoffDirDisplay) handoffDirDisplay.textContent = 'Nenhum detectado';
@@ -343,7 +376,7 @@ if (btnHumanGate) {
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ action: 'APPROVE_GATE', gate: 'gate_ship_approved', project_id: currentProjectId }));
       } else {
-        fetch('/api/gates/approve', {
+        apiFetch('/api/gates/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ gate: 'gate_ship_approved', approved_by: 'user', project_id: currentProjectId })
@@ -597,7 +630,7 @@ chatForm.addEventListener('submit', (e) => {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ action: 'USER_STEERING', text, project_id: currentProjectId }));
   } else {
-    fetch('/api/steering', {
+    apiFetch('/api/steering', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, project_id: currentProjectId })
@@ -609,7 +642,7 @@ chatForm.addEventListener('submit', (e) => {
 // Fallback Polling a cada 2s (garante atualização automática sem F5 mesmo se o WebSocket falhar)
 setInterval(async () => {
   try {
-    const res = await fetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
+    const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
     if (res.ok) {
       const remoteState = await res.json();
       if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
@@ -643,7 +676,7 @@ function deselectGraphNode() {
 function initOrRefreshGraph(customRoot = null) {
   const targetRoot = (typeof customRoot === 'string' && customRoot.trim()) ? customRoot.trim() : getActiveProjectRoot();
   const url = targetRoot ? `/api/graph?root=${encodeURIComponent(targetRoot)}` : '/api/graph';
-  fetch(url)
+  apiFetch(url)
     .then(r => r.json())
     .then(data => {
       graphData = data;
@@ -1222,7 +1255,7 @@ function selectGraphNode(node) {
   document.getElementById('inspector-lines').textContent = node.lines;
 
   // Consulta raio de impacto
-  fetch(`/api/graph`)
+  apiFetch(`/api/graph`)
     .then(() => {
       const dependents = graphLinks.filter(l => l.target.id === node.id).map(l => l.source.id);
       const riskBadge = document.getElementById('inspector-risk');
@@ -1268,7 +1301,7 @@ function selectGraphNode(node) {
     const targetRoot = getActiveProjectRoot();
     const noteUrl = targetRoot ? `/api/vault/note?file=${encodeURIComponent(node.id)}&root=${encodeURIComponent(targetRoot)}` : `/api/vault/note?file=${encodeURIComponent(node.id)}`;
 
-    fetch(noteUrl)
+    apiFetch(noteUrl)
       .then(r => r.json())
       .then(data => {
         if (data.found) {
@@ -1301,7 +1334,7 @@ if (btnSaveNote) {
     btnSaveNote.disabled = true;
     btnSaveNote.textContent = 'Salvando...';
 
-    fetch('/api/vault/note', {
+    apiFetch('/api/vault/note', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1414,7 +1447,7 @@ btnReset.addEventListener('click', () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ action: 'RESET_STATE', project_id: currentProjectId }));
     } else {
-      fetch('/api/reset', {
+      apiFetch('/api/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: currentProjectId })
@@ -1430,7 +1463,7 @@ btnTestCycle.addEventListener('click', () => {
                      node.kanban_status === 'EXECUTING' ? 'CRITIQUING' :
                      node.kanban_status === 'CRITIQUING' ? 'APPROVED' : 'BACKLOG';
 
-  fetch('/api/steering', {
+  apiFetch('/api/steering', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: `Simulação de pulso: ${node.id} movido para ${nextStatus}`, project_id: currentProjectId })
@@ -1449,7 +1482,7 @@ let autostartEnabled = false;
 async function checkAutostartStatus() {
   if (!btnAutostart) return;
   try {
-    const res = await fetch('/api/autostart');
+    const res = await apiFetch('/api/autostart');
     if (res.ok) {
       const data = await res.json();
       updateAutostartUI(data.enabled);
@@ -1465,11 +1498,11 @@ function updateAutostartUI(enabled) {
   btnAutostart.classList.remove('loading');
   const label = btnAutostart.querySelector('.autostart-text');
   if (autostartEnabled) {
-    btnAutostart.className = 'action-btn autostart-btn enabled';
+    btnAutostart.className = 'sidebar-action-btn autostart-btn enabled';
     if (label) label.textContent = 'Autostart: Ativo';
     btnAutostart.title = 'Agent Cockpit inicia automaticamente com o sistema operacional. Clique para desativar.';
   } else {
-    btnAutostart.className = 'action-btn autostart-btn disabled';
+    btnAutostart.className = 'sidebar-action-btn autostart-btn disabled';
     if (label) label.textContent = 'Autostart: Desligado';
     btnAutostart.title = 'Inicialização com o sistema está desativada. Clique para ativar.';
   }
@@ -1480,7 +1513,7 @@ if (btnAutostart) {
     btnAutostart.classList.add('loading');
     const newState = !autostartEnabled;
     try {
-      const res = await fetch('/api/autostart', {
+      const res = await apiFetch('/api/autostart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: newState })
@@ -1499,6 +1532,7 @@ if (btnAutostart) {
 }
 
 // Inicializa
+initSidebar();
 loadProjects();
 initWebSocket();
 checkAutostartStatus();

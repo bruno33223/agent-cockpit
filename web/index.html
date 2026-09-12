@@ -10,65 +10,115 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <div class="topbar-brand">
-      <div class="brand-badge">COCKPIT</div>
-      <div class="brand-text">
-        <span class="brand-title">AGENT COCKPIT</span>
-        <span class="brand-sub">Telemetry & Governance v2.0</span>
+  <!-- APP LAYOUT -->
+  <div class="app-layout">
+    <!-- ASIDE: EXPANDABLE SIDEBAR -->
+    <aside class="app-sidebar" id="app-sidebar">
+      <div class="sidebar-header">
+        <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" title="Expandir / Recolher Menu (Hambúrguer)" aria-label="Alternar Menu">
+          <svg class="hamburger-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-badge">COCKPIT</span>
+          <span class="sidebar-brand-title">Agent Cockpit</span>
+        </div>
       </div>
-      <div class="conn-pill" id="ws-status">
-        <span class="pulse-led online"></span>
-        <span class="conn-text" id="ws-status-text">WS Conectado</span>
-      </div>
-    </div>
 
-    <!-- MAIN NAVIGATION TABS -->
-    <nav class="topbar-nav">
-      <button class="nav-tab active" data-view="view-overview">
-        <span class="tab-icon">📊</span>
-        <span>Visão Geral</span>
-      </button>
-      <button class="nav-tab" data-view="view-flow">
-        <span class="tab-icon">⚡</span>
-        <span>Fluxo & Kanban</span>
-      </button>
-      <button class="nav-tab" data-view="view-graph" id="nav-tab-graph">
-        <span class="tab-icon">🕸️</span>
-        <span>Code Graph</span>
-      </button>
-      <button class="nav-tab" data-view="view-gauntlet">
-        <span class="tab-icon">📜</span>
-        <span>Gauntlet Log</span>
-      </button>
-      <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff">
-        <span class="tab-icon">📋</span>
-        <span>Handoff</span>
-      </button>
-    </nav>
+      <!-- MAIN NAVIGATION TABS -->
+      <nav class="sidebar-nav">
+        <button class="nav-tab active" data-view="view-overview" data-tooltip="Visão Geral">
+          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9"></rect>
+            <rect x="14" y="3" width="7" height="5"></rect>
+            <rect x="14" y="12" width="7" height="9"></rect>
+            <rect x="3" y="16" width="7" height="5"></rect>
+          </svg>
+          <span class="tab-label">Visão Geral</span>
+        </button>
+        <button class="nav-tab" data-view="view-flow" data-tooltip="Fluxo & Kanban">
+          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span class="tab-label">Fluxo & Kanban</span>
+        </button>
+        <button class="nav-tab" data-view="view-graph" id="nav-tab-graph" data-tooltip="Code Graph">
+          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          <span class="tab-label">Code Graph</span>
+        </button>
+        <button class="nav-tab" data-view="view-gauntlet" data-tooltip="Gauntlet Log">
+          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          <span class="tab-label">Gauntlet Log</span>
+        </button>
+        <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff" data-tooltip="Handoff">
+          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          </svg>
+          <span class="tab-label">Handoff</span>
+        </button>
+      </nav>
 
-    <div class="topbar-actions">
-      <div class="project-selector-wrapper" title="Seletor de Workspace / Projeto Concorrente">
-        <span class="project-tag">📁 PROJETO</span>
-        <select id="project-select" class="project-dropdown" aria-label="Selecione o Projeto">
-          <option value="default">Carregando projetos...</option>
-        </select>
-        <button id="btn-scan-projects" class="project-scan-btn" title="Escanear e sincronizar projetos reais em ~/Projects">⟳</button>
+      <!-- SIDEBAR FOOTER -->
+      <div class="sidebar-footer">
+        <button class="sidebar-action-btn" id="btn-autostart" data-tooltip="Status do Autostart">
+          <span class="autostart-dot"></span>
+          <span class="tab-label autostart-text">Autostart: ...</span>
+        </button>
+        <button class="sidebar-action-btn gate-btn pending" id="btn-human-gate" data-tooltip="Portão Humano Obrigatório">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span class="tab-label">Gate: Pendente</span>
+        </button>
+        <div class="sidebar-meta">
+          <span class="meta-version tab-label">v2.1</span>
+          <div class="meta-actions">
+            <button class="meta-btn" id="btn-test-cycle" title="Simular Pulso" data-tooltip="Simular Pulso">⚡</button>
+            <button class="meta-btn danger" id="btn-reset" title="Resetar Estado" data-tooltip="Resetar">↺</button>
+          </div>
+        </div>
       </div>
-      <div class="epic-indicator" title="Épico atualmente sincronizado">
-        <span class="epic-tag">ÉPICO</span>
-        <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
-      </div>
-      <button class="action-btn autostart-btn" id="btn-autostart" title="Carregando status do Autostart...">
-        <span class="autostart-dot"></span>
-        <span class="autostart-text">Autostart: ...</span>
-      </button>
-      <button class="action-btn gate-btn pending" id="btn-human-gate" title="Portão Humano Obrigatório do Release">Gate: Pendente</button>
-      <button class="action-btn secondary" id="btn-test-cycle" title="Simular avanço de pulso da frota">Simular Pulso</button>
-      <button class="action-btn danger" id="btn-reset" title="Restaurar estado padrão">Resetar</button>
-    </div>
-  </header>
+    </aside>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="main-content">
+      <!-- TOPBAR MINIMALISTA -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="epic-indicator" title="Épico atualmente sincronizado">
+            <span class="epic-tag">ÉPICO</span>
+            <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="project-selector-wrapper" title="Seletor de Workspace / Projeto Concorrente">
+            <span class="project-tag">📁 PROJETO</span>
+            <select id="project-select" class="project-dropdown" aria-label="Selecione o Projeto">
+              <option value="default">Carregando projetos...</option>
+            </select>
+            <button id="btn-scan-projects" class="project-scan-btn" title="Escanear e sincronizar projetos reais em ~/Projects">⟳</button>
+          </div>
+
+          <div class="conn-pill" id="ws-status">
+            <span class="pulse-led online"></span>
+            <span class="conn-text" id="ws-status-text">WS Conectando...</span>
+          </div>
+        </div>
+      </header>
 
   <!-- WORKSPACE WRAPPER -->
   <div class="workspace-wrapper">
@@ -326,9 +376,11 @@
           <input type="text" id="chat-input" placeholder="Direcionar o orquestrador..." autocomplete="off">
           <button type="submit" class="steering-send-btn">Enviar</button>
         </form>
-      </div>
+      </div> <!-- /chat-block -->
     </aside>
-  </div>
+  </div> <!-- /workspace-wrapper -->
+</div> <!-- /main-content -->
+</div> <!-- /app-layout -->
 
   <!-- INSPECTOR DRAWER -->
   <div class="drawer-backdrop" id="drawer-backdrop">
