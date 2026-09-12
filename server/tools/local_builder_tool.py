@@ -95,15 +95,15 @@ def apply_surgical_patch(existing_content: str, patch_text: str) -> Tuple[str, i
         norm_replace = replace_block.replace("\r\n", "\n")
         norm_content = content.replace("\r\n", "\n")
 
+        # Se o arquivo estiver vazio, o replace_block é a criação inicial completa do arquivo
+        if not norm_content.strip():
+            content = norm_replace
+            total_added += len(norm_replace.splitlines())
+            hunks_applied += 1
+            continue
+
         if not norm_search:
-            # Bloco de inserção inicial em arquivo vazio
-            if not norm_content.strip():
-                content = norm_replace
-                total_added += len(norm_replace.splitlines())
-                hunks_applied += 1
-                continue
-            else:
-                raise ValueError("Bloco SEARCH vazio não permitido em arquivos não vazios.")
+            raise ValueError("Bloco SEARCH vazio não permitido em arquivos não vazios.")
 
         occurrences = norm_content.count(norm_search)
         if occurrences == 0:
@@ -163,7 +163,11 @@ def build_local_prompt(
     if context_content:
         prompt_parts.append(f"\nArquivos de Contexto (Apenas Leitura):\n{context_content}")
 
-    prompt_parts.append(f"\nConteúdo Atual de {target_file}:\n```\n{existing_content}\n```")
+    if not existing_content.strip():
+        prompt_parts.append("\nATENÇÃO: O arquivo alvo é NOVO e está VAZIO. Coloque todo o código do arquivo entre ======= e >>>>>>>:")
+        prompt_parts.append("<<<<<<< SEARCH\n=======\n[todo o código novo completo aqui]\n>>>>>>>")
+    else:
+        prompt_parts.append(f"\nConteúdo Atual de {target_file}:\n```\n{existing_content}\n```")
     prompt_parts.append("\nGere os blocos SEARCH/REPLACE:")
 
     return "\n".join(prompt_parts)
@@ -196,7 +200,8 @@ def call_local_llm(
         "stream": False,
         "options": {
             "temperature": 0.1,
-            "top_p": 0.95
+            "top_p": 0.95,
+            "num_predict": 4096
         }
     }
 

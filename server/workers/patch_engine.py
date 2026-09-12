@@ -125,12 +125,10 @@ class PatchEngine:
 
         # Processa todas as alterações em memória para garantir atomicidade
         for block_idx, block in enumerate(blocks):
-            if block.search == "":
+            if block.search == "" or current_content is None or not current_content.strip():
                 # Criação ou substituição de arquivo completo
                 current_content = block.replace
             else:
-                if current_content is None:
-                    raise ValueError(f"Arquivo alvo não encontrado para modificação: {file_path}")
 
                 occurrences = current_content.count(block.search)
                 matched_key = block.search
