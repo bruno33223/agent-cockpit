@@ -631,6 +631,7 @@ def _get_local_worker_client(project_id: Optional[str] = None):
 
     class _FallbackLocalLLMClient:
         RECOMMENDED_MODELS = [
+            "deepseek-coder-v2:16b",
             "qwen2.5-coder:7b",
             "qwen2.5-coder:1.5b",
             "deepseek-coder:6.7b",
