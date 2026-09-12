@@ -572,6 +572,8 @@ body {
 .flow-node-card.active-reviewing { border-left: 3px solid var(--amber-bright); }
 .flow-node-card.active-approved { border-left: 3px solid var(--green-bright); }
 .flow-node-card.active-rejected { border-left: 3px solid var(--red-bright); }
+.flow-node-card.active-blocked { border-left: 3px solid #ef4444; background: linear-gradient(90deg, rgba(239, 68, 68, 0.08) 0%, rgba(15, 23, 42, 0) 100%); }
+.flow-node-card.active-stalled { border-left: 3px solid #f97316; }
 
 .node-header {
   display: flex;
@@ -693,6 +695,15 @@ body {
 .kanban-task-card.rejected {
   border-color: var(--red-bright);
   background-color: var(--red-dim);
+}
+.kanban-task-card.blocked {
+  border-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+}
+.kanban-task-card.stalled {
+  border-color: #f97316;
+  background-color: rgba(249, 115, 22, 0.15);
 }
 
 .task-desc {

@@ -49,6 +49,8 @@ def _run_suite():
     assert "sync_blueprint" in tool_names, "sync_blueprint ausente"
     assert "update_agent_pulse" in tool_names, "update_agent_pulse ausente"
     assert "log_critique_verdict" in tool_names, "log_critique_verdict ausente"
+    assert "check_fleet_liveness" in tool_names, "check_fleet_liveness ausente"
+    assert "resume_orchestration" in tool_names, "resume_orchestration ausente"
     print(f" [OK] tools/list OK ({len(tool_names)} ferramentas registradas)")
 
     # Call sync_blueprint
@@ -321,6 +323,47 @@ def _run_suite():
     list_p_data = json.loads(list_p_res["result"]["content"][0]["text"])
     assert isinstance(list_p_data, list), "list_cockpit_projects deve retornar lista"
     print(f" [OK] Tool call list_cockpit_projects ({len(list_p_data)} projetos listados) OK")
+
+    # Call check_fleet_liveness (Simulando erro de quota de créditos no subagente)
+    liveness_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 181,
+        "method": "tools/call",
+        "params": {
+            "name": "check_fleet_liveness",
+            "arguments": {
+                "subagents_status": [
+                    {
+                        "conversationId": "subagent-failed-quota-123",
+                        "role": "Builder 1",
+                        "state": "errored",
+                        "stateDetail": "ResourceExhausted: 429 Quota exceeded for quota metric GenerateContent"
+                    }
+                ],
+                "slice_id": "slice-1"
+            }
+        }
+    })
+    liveness_data = json.loads(liveness_res["result"]["content"][0]["text"])
+    assert liveness_data["healthy"] == False
+    assert liveness_data["anomaly_type"] == "OUT_OF_CREDITS"
+    assert "checkpoint_path" in liveness_data
+    print(" [OK] Tool call check_fleet_liveness (Detecção de Falta de Créditos & Checkpoint) OK")
+
+    # Call resume_orchestration (Retomada cirúrgica pós-créditos)
+    resume_res = send_rpc({
+        "jsonrpc": "2.0",
+        "id": 182,
+        "method": "tools/call",
+        "params": {
+            "name": "resume_orchestration",
+            "arguments": {}
+        }
+    })
+    resume_data = json.loads(resume_res["result"]["content"][0]["text"])
+    assert resume_data["status"] == "RESUMED"
+    assert "slice-1" in resume_data["resumed_slices"]
+    print(" [OK] Tool call resume_orchestration (Descongelamento & Retomada) OK")
 
     # Call sync_blueprint para Projeto Alfa e Beta (Concorrência isolada)
     send_rpc({

@@ -362,7 +362,7 @@ function renderNodes() {
     card.className = `flow-node-card ${statusClass}`;
 
     const colBacklog = node.kanban_status === 'BACKLOG' ? renderTaskCard(node) : '';
-    const colExecuting = (node.kanban_status === 'EXECUTING' || node.kanban_status === 'WAITING_REVIEW' || node.kanban_status === 'REJECTED') ? renderTaskCard(node) : '';
+    const colExecuting = (node.kanban_status === 'EXECUTING' || node.kanban_status === 'WAITING_REVIEW' || node.kanban_status === 'REJECTED' || node.kanban_status === 'BLOCKED_NO_CREDIT' || node.kanban_status === 'STALLED') ? renderTaskCard(node) : '';
     const colReviewing = node.kanban_status === 'CRITIQUING' ? renderTaskCard(node) : '';
     const colApproved = node.kanban_status === 'APPROVED' ? renderTaskCard(node) : '';
 
@@ -396,6 +396,8 @@ function getNodeStatusClass(status) {
     case 'CRITIQUING': return 'active-reviewing';
     case 'APPROVED': return 'active-approved';
     case 'REJECTED': return 'active-rejected';
+    case 'BLOCKED_NO_CREDIT': return 'active-blocked';
+    case 'STALLED': return 'active-stalled';
     default: return '';
   }
 }
@@ -406,7 +408,15 @@ function renderTaskCard(node) {
   let tagText = 'Em Construção';
   let cardClass = 'active';
 
-  if (status === 'WAITING_REVIEW') {
+  if (status === 'BLOCKED_NO_CREDIT') {
+    tagColor = '#ef4444';
+    tagText = '💳 Sem Crédito / Bloqueado';
+    cardClass = 'blocked';
+  } else if (status === 'STALLED') {
+    tagColor = '#f97316';
+    tagText = '⚠️ Zumbi / Inativo';
+    cardClass = 'stalled';
+  } else if (status === 'WAITING_REVIEW') {
     tagColor = 'var(--amber-bright)';
     tagText = 'Entregue (Aguardando Revisor)';
     cardClass = 'waiting';

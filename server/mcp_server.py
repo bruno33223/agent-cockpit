@@ -280,6 +280,34 @@ TOOLS_DEFINITIONS = [
             },
             "required": ["project_id_or_path"]
         }
+    },
+    {
+        "name": "check_fleet_liveness",
+        "description": "Fleet Liveness & Quota Watchdog: Inspeciona subagentes ativos contra erros de esgotamento de crédito/cota (ResourceExhausted / Rate Limit) e valida Proof of Work no Git (proibindo falsos positivos de conclusão sem commits). Congela estado com segurança.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "subagents_status": {
+                    "type": "array",
+                    "description": "Lista de subagentes com 'state' e 'stateDetail' retornada por manage_subagents(Action='list').",
+                    "items": {"type": "object"}
+                },
+                "repo_root": {"type": "string", "description": "Caminho do repositório para validar Proof of Work de commits."},
+                "slice_id": {"type": "string", "description": "ID da fatia sendo avaliada para Proof of Work."},
+                "project_id": {"type": "string", "description": "ID do projeto opcional."}
+            }
+        }
+    },
+    {
+        "name": "resume_orchestration",
+        "description": "Descongela e retoma uma orquestração interrompida por falta de créditos a partir do último checkpoint seguro, preservando fatias já aprovadas sem retrabalho.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "description": "ID do projeto opcional."},
+                "project_root": {"type": "string", "description": "Caminho raiz do projeto opcional."}
+            }
+        }
     }
 ]
 
@@ -602,6 +630,25 @@ def handle_tool_call(name: str, args: dict) -> dict:
                 evidence["reason"] = "Os testes mais recentes falharam (Exit Code != 0). O portão de entrega permanece bloqueado."
         
         return {"content": [{"type": "text", "text": json.dumps(evidence, indent=2, ensure_ascii=False)}]}
+
+    elif name == "check_fleet_liveness":
+        subagents = args.get("subagents_status", [])
+        repo_root = args.get("repo_root")
+        slice_id = args.get("slice_id")
+        result = db.check_fleet_liveness(
+            subagents_status=subagents,
+            repo_root=repo_root,
+            slice_id=slice_id,
+            project_id=target_pid
+        )
+        return {"content": [{"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=False)}]}
+
+    elif name == "resume_orchestration":
+        result = db.resume_orchestration(
+            project_id=target_pid,
+            project_root=args.get("project_root")
+        )
+        return {"content": [{"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=False)}]}
 
     else:
         return {"isError": True, "content": [{"type": "text", "text": f"Ferramenta desconhecida: {name}"}]}

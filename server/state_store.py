@@ -715,6 +715,220 @@ class StateStore:
 
         return self.list_projects()
 
+    def _get_checkpoint_file(self, project_id: str) -> str:
+        safe_id = re.sub(r'[^a-zA-Z0-9_\-]', '-', project_id) or "default"
+        return os.path.join(self.states_dir, f"{safe_id}.checkpoint.json")
+
+    def freeze_checkpoint(self, project_id: Optional[str] = None) -> str:
+        """Salva um snapshot transacional atômico do projeto para retomada segura em caso de falha de cota/créditos."""
+        target_pid = project_id or self.get_current_project_id()
+        with self.lock:
+            state = self.get_state(target_pid)
+            cp_file = self._get_checkpoint_file(target_pid)
+            checkpoint_data = {
+                "checkpoint_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "project_id": target_pid,
+                "project_root": state.get("project_root"),
+                "epic": state.get("epic"),
+                "nodes": state.get("nodes"),
+                "pairs_3x3": state.get("pairs_3x3"),
+                "human_gates": state.get("human_gates")
+            }
+            with open(cp_file, 'w', encoding='utf-8') as f:
+                json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
+            return cp_file
+
+    def read_checkpoint(self, project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Lê o snapshot transacional de um projeto se existir."""
+        target_pid = project_id or self.get_current_project_id()
+        cp_file = self._get_checkpoint_file(target_pid)
+        if not os.path.exists(cp_file):
+            return None
+        try:
+            with open(cp_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: str = "master") -> Dict[str, Any]:
+        """Proof of Work (Git): Valida se a branch da fatia possui commits válidos à frente da branch base."""
+        import subprocess
+        root = os.path.abspath(os.path.expanduser(repo_root))
+        branch_name = f"cockpit/{slice_id}"
+        
+        # 1. Verifica se a branch da fatia existe no git
+        res_ref = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--verify", branch_name],
+            capture_output=True, text=True, check=False
+        )
+        if res_ref.returncode != 0:
+            return {
+                "valid_proof": False,
+                "reason": f"Branch '{branch_name}' não encontrada no repositório. O subagente não comitou nada.",
+                "commits_count": 0
+            }
+
+        branch_head = res_ref.stdout.strip()
+
+        # 2. Verifica hash da branch base
+        res_base = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--verify", base_branch],
+            capture_output=True, text=True, check=False
+        )
+        base_head = res_base.stdout.strip() if res_base.returncode == 0 else ""
+
+        if branch_head == base_head:
+            return {
+                "valid_proof": False,
+                "reason": f"A branch '{branch_name}' aponta exatamente para a '{base_branch}'. Nenhum commit de trabalho foi produzido.",
+                "commits_count": 0
+            }
+
+        # 3. Lista commits à frente
+        log_res = subprocess.run(
+            ["git", "-C", root, "log", f"{base_branch}..{branch_name}", "--oneline"],
+            capture_output=True, text=True, check=False
+        )
+        lines = [l.strip() for l in log_res.stdout.splitlines() if l.strip()]
+        return {
+            "valid_proof": len(lines) > 0,
+            "head_commit": branch_head,
+            "commits_count": len(lines),
+            "commits": lines,
+            "latest_commit_msg": lines[0] if lines else ""
+        }
+
+    def register_fleet_anomaly(self, slice_id: Optional[str], anomaly_type: str, details: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Registra falha crítica ou falta de créditos, congelando o estado do projeto e alertando a telemetria."""
+        target_pid = project_id or self.get_current_project_id()
+        with self.lock:
+            state = self.get_state(target_pid)
+            
+            # 1. Atualiza o nó no Kanban
+            target_slice = None
+            for n in state.get("nodes", []):
+                if (slice_id and n.get("id") == slice_id) or (not slice_id and n.get("kanban_status") in ["EXECUTING", "REVIEWING"]):
+                    n["kanban_status"] = "BLOCKED_NO_CREDIT" if anomaly_type == "OUT_OF_CREDITS" else "STALLED"
+                    n["latest_feedback"] = f"⚠️ ANOMALIA [{anomaly_type}]: {details}"
+                    target_slice = n.get("id")
+                    break
+
+            # 2. Atualiza pares 3x3 correspondentes
+            for p in state.get("pairs_3x3", []):
+                if not target_slice or p.get("current_slice_id") == target_slice:
+                    p["builder_status"] = "BLOCKED"
+                    p["critic_status"] = "IDLE"
+
+            # 3. Adiciona mensagem de emergência no steering
+            state.setdefault("steering_messages", []).append({
+                "id": f"msg-err-{int(time.time())}",
+                "sender": "ORCHESTRATOR",
+                "text": f"🚨 ALERTA DE SISTEMA [{anomaly_type}]: {details}. Estado congelado em checkpoint.",
+                "timestamp": time.strftime("%H:%M:%S"),
+                "consumed": False
+            })
+
+            # 4. Salva estado e snapshot de checkpoint
+            self._save_state(state, target_pid)
+            cp_path = self.freeze_checkpoint(target_pid)
+
+        self._notify("FLEET_ANOMALY", {"anomaly_type": anomaly_type, "slice_id": target_slice, "details": details}, target_pid)
+        self._notify("STATE_FULL", state, target_pid)
+
+        return {
+            "status": "ANOMALY_REGISTERED",
+            "anomaly_type": anomaly_type,
+            "affected_slice": target_slice,
+            "checkpoint_path": cp_path,
+            "details": details
+        }
+
+    def check_fleet_liveness(self, subagents_status: Optional[List[Dict[str, Any]]] = None,
+                             repo_root: Optional[str] = None, slice_id: Optional[str] = None,
+                             project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Inspeciona se a frota sofreu corte de créditos, rate limit ou silêncio por zumbi."""
+        target_pid = project_id or self.get_current_project_id()
+        state = self.get_state(target_pid)
+        root = repo_root or state.get("project_root")
+
+        # 1. Inspeciona erros nos subagentes (se passados via manage_subagents ou telemetry)
+        if subagents_status:
+            credit_keywords = ["resourceexhausted", "quota", "credit", "rate limit", "insufficient_quota", "billing", "exceeded"]
+            for sub in subagents_status:
+                s_state = str(sub.get("state", "")).lower()
+                s_detail = str(sub.get("stateDetail", "")).lower()
+                
+                # Checa erro de cota / crédito
+                if any(kw in s_detail for kw in credit_keywords) or (s_state == "errored" and "quota" in s_detail):
+                    anom = self.register_fleet_anomaly(
+                        slice_id=slice_id,
+                        anomaly_type="OUT_OF_CREDITS",
+                        details=f"Subagente '{sub.get('role', sub.get('conversationId'))}' falhou com esgotamento de créditos: {sub.get('stateDetail')}",
+                        project_id=target_pid
+                    )
+                    return {
+                        "healthy": False,
+                        "anomaly_type": "OUT_OF_CREDITS",
+                        "details": anom["details"],
+                        "checkpoint_path": anom["checkpoint_path"],
+                        "recovery_hint": "Aguarde a renovação da cota ou troque de conta/modelo e chame resume_orchestration."
+                    }
+
+        # 2. Se foi solicitada verificação de commit proof (Proof of Work)
+        if root and slice_id:
+            proof = self.verify_worktree_commit_proof(root, slice_id)
+            if not proof.get("valid_proof"):
+                # Subagente concluiu falsamente sem commits
+                anom = self.register_fleet_anomaly(
+                    slice_id=slice_id,
+                    anomaly_type="ZERO_COMMIT_DROPPED",
+                    details=f"Proof of Work falhou para '{slice_id}': {proof.get('reason')}",
+                    project_id=target_pid
+                )
+                return {
+                    "healthy": False,
+                    "anomaly_type": "ZERO_COMMIT_DROPPED",
+                    "details": proof.get("reason"),
+                    "checkpoint_path": anom["checkpoint_path"],
+                    "recovery_hint": "O subagente foi interrompido sem gravar commits. Re-despache o Builder para a worktree."
+                }
+
+        return {
+            "healthy": True,
+            "anomaly_type": None,
+            "message": "Frota íntegra. Nenhuma falha de cota ou ausência de commits detectada."
+        }
+
+    def resume_orchestration(self, project_id: Optional[str] = None, project_root: Optional[str] = None) -> Dict[str, Any]:
+        """Retoma a orquestração a partir do último checkpoint seguro, preservando o trabalho já aprovado."""
+        target_pid = self.resolve_project_id(project_id, project_root)
+        with self.lock:
+            state = self.get_state(target_pid)
+            cp = self.read_checkpoint(target_pid)
+            
+            # Identifica fatias prontas vs fatias bloqueadas
+            resumed_slices = []
+            for n in state.get("nodes", []):
+                if n.get("kanban_status") in ["BLOCKED_NO_CREDIT", "STALLED"]:
+                    n["kanban_status"] = "EXECUTING"
+                    n["latest_feedback"] = "Retomada autorizada após verificação de créditos/liveness."
+                    resumed_slices.append(n.get("id"))
+
+            for p in state.get("pairs_3x3", []):
+                if p.get("builder_status") == "BLOCKED":
+                    p["builder_status"] = "IDLE"
+
+            self._save_state(state, target_pid)
+
+        self._notify("STATE_FULL", state, target_pid)
+        return {
+            "status": "RESUMED",
+            "project_id": target_pid,
+            "resumed_slices": resumed_slices,
+            "approved_slices": [n.get("id") for n in state.get("nodes", []) if n.get("kanban_status") == "APPROVED"],
+            "pending_slices": [n.get("id") for n in state.get("nodes", []) if n.get("kanban_status") != "APPROVED"]
+        }
+
     @property
     def file_path(self) -> str:
         """Propriedade para manter compatibilidade com verificações existentes de file_path."""
