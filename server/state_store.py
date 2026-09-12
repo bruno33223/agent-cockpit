@@ -156,7 +156,7 @@ class StateStore:
                 else:
                     listener(event_type, payload)
             except Exception as e:
-                print(f"[StateStore] Erro notificando listener: {e}")
+                print(f"[StateStore] Erro notificando listener: {e}", file=sys.stderr)
 
     def _ensure_init(self):
         with self.lock:
@@ -183,7 +183,7 @@ class StateStore:
                     epic_name = legacy_data.get("epic", {}).get("name", "Default Project")
                     self._update_index_entry("default", epic_name, root_p, legacy_data)
                 except Exception as e:
-                    print(f"[StateStore] Falha ao migrar estado legado: {e}")
+                    print(f"[StateStore] Falha ao migrar estado legado: {e}", file=sys.stderr)
 
             # Garante que o projeto 'default' tenha arquivo
             if not os.path.exists(default_file):
@@ -678,7 +678,7 @@ class StateStore:
                         self._save_index(index_data)
                     return pid
         except Exception as e:
-            print(f"[StateStore] Falha ao sincronizar estado legado: {e}")
+            print(f"[StateStore] Falha ao sincronizar estado legado: {e}", file=sys.stderr)
         return None
 
     def scan_local_projects(self, base_dir: Optional[str] = None) -> List[Dict[str, Any]]:

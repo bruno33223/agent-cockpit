@@ -6,8 +6,13 @@ import warnings
 # Suprime warnings para proteger o pipe stdio JSON-RPC 2.0
 warnings.filterwarnings("ignore")
 
-# Garante path relativo para importar state_store
-sys.path.insert(0, os.path.dirname(__file__))
+# Garante path relativo para importar state_store e server packages
+_server_dir = os.path.dirname(os.path.abspath(__file__))
+_repo_root = os.path.dirname(_server_dir)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+if _server_dir not in sys.path:
+    sys.path.insert(0, _server_dir)
 from state_store import db
 
 TOOLS_DEFINITIONS = [

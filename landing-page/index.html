@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Cockpit - Orquestração Multiagente 3x3 & Gauntlet Loop</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Top Navigation Header -->
+    <header id="header" class="site-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="logo-icon">⚡</div>
+                <span class="logo-text">Agent Cockpit</span>
+                <span class="badge badge-version">v2.0 Beta</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#hero" class="nav-link">Início</a>
+                <a href="#architecture" class="nav-link">Arquitetura 3x3</a>
+                <a href="#features" class="nav-link">Recursos</a>
+                <a href="#simulator" class="nav-link">Simulador de Frota</a>
+                <a href="#local-worker" class="nav-link">Local Worker GPU</a>
+            </nav>
+            <div class="header-actions">
+                <a href="https://github.com/bruno33223/agent-cockpit" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">GitHub</a>
+                <a href="#simulator" class="btn btn-primary btn-sm">Ver Demo</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="hero" class="hero-section">
+            <div class="container hero-container">
+                <div class="hero-badge">
+                    <span class="pulse-dot"></span>
+                    <span>Spec-Driven Development + Gauntlet Loop Protocol</span>
+                </div>
+                <h1 class="hero-title">
+                    Governança e Orquestração Multiagente <span class="gradient-text">3x3 Simultânea</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Converta épicos em Master Blueprints pragmáticos com fatias verticais isoladas em Git Worktrees.
+                    3 Subagentes Builders emparelhados a 3 Harsh Critics auditando em tempo real com Local Worker Qwen acelerado por GPU.
+                </p>
+                <div class="hero-cta-group">
+                    <a href="#simulator" class="btn btn-primary btn-lg">
+                        <span>Lançar Simulador de Frota</span>
+                        <svg class="icon-arrow" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    <a href="https://github.com/bruno33223/agent-cockpit" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-lg">
+                        <svg class="icon-github" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
+                        <span>Explorar no GitHub</span>
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-card">
+                        <span class="stat-value">3x3</span>
+                        <span class="stat-label">Execução Paralela Pura</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">Zero Fluff</span>
+                        <span class="stat-label">Economia de ~85% Tokens</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value">100%</span>
+                        <span class="stat-label">Privacidade Local Worker GPU</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture Section -->
+        <section id="architecture" class="architecture-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <span class="badge badge-subtle">Engenharia de Elite</span>
+                    <h2 class="section-title">Arquitetura 3x3 com Banca Revisora Gauntlet Loop</h2>
+                    <p class="section-desc">
+                        Cada fatia vertical opera em sua própria Git Worktree isolada com Locks estritos de arquivos, ciclo de TDD compulsório e auditoria adversarial independente.
+                    </p>
+                </div>
+
+                <div class="architecture-flow">
+                    <!-- Pair 1 -->
+                    <div class="pair-card">
+                        <div class="pair-header">
+                            <span class="pair-tag">Par 1 • Fatia 1</span>
+                            <span class="status-indicator active"></span>
+                        </div>
+                        <div class="pair-body">
+                            <div class="agent-box builder-box">
+                                <span class="role-icon">🔨</span>
+                                <div class="agent-info">
+                                    <div class="agent-title">Local Builder 1</div>
+                                    <div class="agent-role">Contratos & Estrutura HTML5</div>
+                                </div>
+                            </div>
+                            <div class="sync-arrow">
+                                <span>TDD RED ➔ GREEN</span>
+                            </div>
+                            <div class="agent-box critic-box">
+                                <span class="role-icon">⚖️</span>
+                                <div class="agent-info">
+                                    <div class="agent-title">Harsh Critic 1</div>
+                                    <div class="agent-role">Auditor Gauntlet Loop</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pair-footer">
+                            <span class="lock-tag">🔒 landing-page/index.html</span>
+                        </div>
+                    </div>
+
+                    <!-- Pair 2 -->
+                    <div class="pair-card">
+                        <div class="pair-header">
+                            <span class="pair-tag">Par 2 • Fatia 2</span>
+                            <span class="status-indicator active"></span>
+                        </div>
+                        <div class="pair-body">
+                            <div class="agent-box builder-box">
+                                <span class="role-icon">🎨</span>
+                                <div class="agent-info">
+                                    <div class="agent-title">Local Builder 2</div>
+                                    <div class="agent-role">Estilos CSS & Design System</div>
+                                </div>
+                            </div>
+                            <div class="sync-arrow">
+                                <span>TDD RED ➔ GREEN</span>
+                            </div>
+                            <div class="agent-box critic-box">
+                                <span class="role-icon">⚖️</span>
+                                <div class="agent-info">
+                                    <div class="agent-title">Harsh Critic 2</div>
+                                    <div class="agent-role">Auditor Gauntlet Loop</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pair-footer">
+                            <span class="lock-tag">🔒 landing-page/styles.css</span>
+                        </div>
+                    </div>
+
+                    <!-- Pair 3 -->
+                    <div class="pair-card">
+                        <div class="pair-header">
+                            <span class="pair-tag">Par 3 • Fatia 3</span>
+                            <span class="status-indicator active"></span>
+                        </div>
+                        <div class="pair-body">
+                            <div class="agent-box builder-box">
+                                <span class="role-icon">⚙️</span>
+                                <div class="agent-info">
+                                    <div class="agent-title">Local Builder 3</div>
+                                    <div class="agent-role">Interatividade JS & Telemetria</div>
+                                </div>
+                            </div>
+                            <div class="sync-arrow">
+                                <span>TDD RED ➔ GREEN</span>
+                            </div>
+                            <div class="agent-box critic-box">
+                                <span class="role-icon">⚖️</span>
+                                <div class="agent-info">
+                                    <div class="agent-title">Harsh Critic 3</div>
+                                    <div class="agent-role">Auditor Gauntlet Loop</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pair-footer">
+                            <span class="lock-tag">🔒 landing-page/app.js</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <span class="badge badge-subtle">Pilares Tecnológicos</span>
+                    <h2 class="section-title">Feito para Engenharia Autônoma de Alto Impacto</h2>
+                    <p class="section-desc">Padrões consolidados do SDD Superpowers combinados com aceleração local de hardware.</p>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📐</div>
+                        <h3 class="feature-title">Spec-Driven Orchestration</h3>
+                        <p class="feature-text">Master Blueprint formal com fatias verticais, critérios de aceitação rígidos e barreira humana pré-merge.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3 class="feature-title">Git Worktree Isolation</h3>
+                        <p class="feature-text">Isolamento físico de código por branch (`.worktrees/slice-N`). Zero contaminação de workspace e conflitos de merge nulos.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🗜️</div>
+                        <h3 class="feature-title">Token Zero-Fluff Protocol</h3>
+                        <p class="feature-text">Comunicação ultra-resumida por ponteiros de arquivos e micro-JSONs. Elimina até 85% do desperdício de tokens de contexto.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3 class="feature-title">Ollama Local Integration</h3>
+                        <p class="feature-text">Inferência cirúrgica SEARCH/REPLACE via Qwen2.5-Coder em hardware local com garantia anti-arquivo vazio e fallback mock.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🚦</div>
+                        <h3 class="feature-title">Iron Law of TDD</h3>
+                        <p class="feature-text">Comprovação técnica da fase RED antes de qualquer linha de implementação. Validação automatizada green via MCP.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📋</div>
+                        <h3 class="feature-title">Local Worker Queue</h3>
+                        <p class="feature-text">Fila sequencial FIFO thread-safe com semáforos, monitoramento de VRAM da GPU e telemetria de tokens em tempo real.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Simulator Section -->
+        <section id="simulator" class="simulator-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <span class="badge badge-subtle">Experiência Interativa</span>
+                    <h2 class="section-title">Simulador da Frota 3x3 em Tempo Real</h2>
+                    <p class="section-desc">Visualize os pares [Builder ⟷ Critic] atuando em tempo real com telemetria visual.</p>
+                </div>
+
+                <div class="simulator-panel">
+                    <div class="simulator-controls">
+                        <button id="sim-start-btn" class="btn btn-primary btn-sm">Iniciar Simulação</button>
+                        <button id="sim-reset-btn" class="btn btn-secondary btn-sm">Resetar Frota</button>
+                        <span id="sim-status-label" class="sim-status-text">Status: Frota Pronta (Standby)</span>
+                    </div>
+                    <div id="sim-fleet-container" class="fleet-grid">
+                        <div class="sim-node" data-slice="slice-1">
+                            <div class="sim-node-header">
+                                <span class="node-id">Fatia 1: Contratos HTML</span>
+                                <span class="node-badge status-idle">IDLE</span>
+                            </div>
+                            <div class="sim-progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <div class="sim-node-detail">Aguardando gatilho de execução...</div>
+                        </div>
+                        <div class="sim-node" data-slice="slice-2">
+                            <div class="sim-node-header">
+                                <span class="node-id">Fatia 2: Design CSS</span>
+                                <span class="node-badge status-idle">IDLE</span>
+                            </div>
+                            <div class="sim-progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <div class="sim-node-detail">Aguardando gatilho de execução...</div>
+                        </div>
+                        <div class="sim-node" data-slice="slice-3">
+                            <div class="sim-node-header">
+                                <span class="node-id">Fatia 3: Lógica JS</span>
+                                <span class="node-badge status-idle">IDLE</span>
+                            </div>
+                            <div class="sim-progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
+                            <div class="sim-node-detail">Aguardando gatilho de execução...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Local Worker GPU Section -->
+        <section id="local-worker" class="local-worker-section">
+            <div class="container">
+                <div class="worker-card">
+                    <div class="worker-content">
+                        <span class="badge badge-accent">Aceleração de Hardware</span>
+                        <h2 class="worker-title">Local Worker GPU: Privacidade Total e Custo Zero de API</h2>
+                        <p class="worker-text">
+                            Desenvolvido para executar modelos de ponta como Qwen2.5-Coder diretamente na sua GPU local via Ollama.
+                            Suas regras de negócio e código-fonte jamais saem do seu ambiente local, com latência ultrabaixa e disponibilidade contínua sem rate limits.
+                        </p>
+                        <ul class="worker-specs">
+                            <li><strong>Engine Local:</strong> Ollama com suporte a Q4_K_M</li>
+                            <li><strong>Modo Cirúrgico:</strong> Diff blocks com validação semântica</li>
+                            <li><strong>Garantia de Entrega:</strong> Circuit breaker com inteligente fallback</li>
+                            <li><strong>Acesso FIFO:</strong> LocalWorkerQueue protegendo VRAM contra OOM</li>
+                        </ul>
+                    </div>
+                    <div class="worker-visual">
+                        <div class="terminal-mock">
+                            <div class="terminal-bar">
+                                <span class="circle red"></span>
+                                <span class="circle yellow"></span>
+                                <span class="circle green"></span>
+                                <span class="terminal-title">local-worker.log</span>
+                            </div>
+                            <pre class="terminal-body"><code>[GPU Engine] VRAM: 8192 MB | Alocação: 5240 MB
+[LocalWorkerQueue] Ticket #ticket-903fa330 adquirido
+[Ollama:Qwen2.5] Invocando qwen2.5-coder:7b
+[PatchEngine] 1 hunk cirúrgico aplicado com sucesso
+[TDD] python3 -m unittest verify_green ➔ PASS (10/10)
+[Cockpit] Telemetria sincronizada no WebSocket :44435</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer id="footer" class="site-footer">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <div class="logo-text">Agent Cockpit</div>
+                <p class="footer-tagline">Central de Comando e Orquestração Multiagente com Governança Rigorosa.</p>
+            </div>
+            <div class="footer-links">
+                <div class="links-group">
+                    <h4>Navegação</h4>
+                    <a href="#hero">Início</a>
+                    <a href="#architecture">Arquitetura</a>
+                    <a href="#features">Recursos</a>
+                    <a href="#simulator">Simulador</a>
+                    <a href="#local-worker">Local Worker</a>
+                </div>
+                <div class="links-group">
+                    <h4>Ecossistema</h4>
+                    <a href="https://github.com/bruno33223/agent-cockpit" target="_blank" rel="noopener noreferrer">Repositório GitHub</a>
+                    <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">Ollama Model Hub</a>
+                    <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer">Model Context Protocol</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom text-center">
+            <p>&copy; 2026 Agent Cockpit. Desenvolvido com padrão SDD Superpowers & Gauntlet Loop.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
