@@ -15,7 +15,7 @@ from state_store import db
 from workers.worker_queue import local_worker_queue
 
 SEARCH_REPLACE_REGEX = re.compile(
-    r'<{7}\s*SEARCH\r?\n(.*?)\r?\n?={7}\r?\n(.*?)\r?\n?>{7}',
+    r'<{5,9}\s*SEARCH\r?\n(.*?)\r?\n?={5,9}\r?\n(.*?)\r?\n?>{5,9}',
     re.DOTALL
 )
 
@@ -744,6 +744,7 @@ def execute_local_builder(
             hunks = max(hunks, 1)
             diff_summary = f"+{len(mock_code.splitlines())} lines (scaffold fallback)"
 
+        db.reset_local_worker_attempts(slice_id, project_id=project_id)
         return {
             "status": "DELIVERED",
             "slice_id": slice_id,

@@ -332,6 +332,8 @@ class StateStore:
                     "updated_at": time.strftime("%H:%M:%S")
                 })
             state["nodes"] = nodes
+            if "local_worker" in state and isinstance(state["local_worker"], dict):
+                state["local_worker"]["consecutive_failures"] = {}
             self._save_state(state, target_pid)
             
             index_data = self._read_index()
