@@ -132,11 +132,15 @@ class TestLocalWorkerAPI(unittest.TestCase):
 
     def test_post_local_worker_pull_broadcast(self):
         """Verifica se thread de background chama client.pull_model e faz broadcast_sync com model_pull_complete."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch, MagicMock, ANY
         with patch("web_server._get_local_worker_client") as mock_get_client, \
              patch("web_server.manager.broadcast_sync") as mock_broadcast:
             mock_client = MagicMock()
-            mock_client.pull_model.return_value = {"status": "success"}
+            def fake_pull(model, stream=True, progress_callback=None):
+                if progress_callback:
+                    progress_callback({"status": "downloading", "completed": 50, "total": 100})
+                return {"status": "success"}
+            mock_client.pull_model.side_effect = fake_pull
             mock_get_client.return_value = (mock_client, {})
 
             status_code, data = self._http_post("/api/local-worker/pull", {"model": "qwen2.5-coder:7b"})
@@ -145,8 +149,9 @@ class TestLocalWorkerAPI(unittest.TestCase):
 
             # Aguarda a thread terminar
             time.sleep(0.2)
-            mock_client.pull_model.assert_called_with("qwen2.5-coder:7b")
-            mock_broadcast.assert_called_with("model_pull_complete", {"model": "qwen2.5-coder:7b", "status": "success"})
+            mock_client.pull_model.assert_called_with("qwen2.5-coder:7b", stream=True, progress_callback=ANY)
+            mock_broadcast.assert_any_call("model_pull_progress", {"model": "qwen2.5-coder:7b", "progress": {"status": "downloading", "completed": 50, "total": 100}})
+            mock_broadcast.assert_any_call("model_pull_complete", {"model": "qwen2.5-coder:7b", "status": "success"})
 
     def test_post_local_worker_pull_validation(self):
         """Verifica se payload inválido em POST /api/local-worker/pull é rejeitado."""

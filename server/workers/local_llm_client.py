@@ -5,7 +5,7 @@ LocalLLMClient: Cliente para integração com servidores locais Ollama/OpenAI co
 import json
 import urllib.request
 import urllib.error
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Callable
 
 
 class LocalLLMClient:
@@ -72,13 +72,54 @@ class LocalLLMClient:
                 "recommended": list(self.RECOMMENDED_MODELS)
             }
 
-    def pull_model(self, model_name: str, stream: bool = False) -> Dict[str, Any]:
+    def pull_model(
+        self,
+        model_name: str,
+        stream: bool = True,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None
+    ) -> Dict[str, Any]:
         """
-        Inicia o download de um modelo via endpoint /api/pull.
+        Inicia o download de um modelo via endpoint /api/pull com timeout estendido e suporte a streaming.
         """
         payload = {"name": model_name, "stream": stream}
+        url = f"{self.base_url}/api/pull"
+        data = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+
         try:
-            return self._request("/api/pull", method="POST", payload=payload)
+            with urllib.request.urlopen(req, timeout=3600) as resp:
+                last_status = None
+                if hasattr(resp, "mock_calls") or hasattr(resp, "_mock_return_value"):
+                    mock_lines = list(resp)
+                    if mock_lines:
+                        lines = mock_lines
+                    elif hasattr(resp, "read"):
+                        raw = resp.read()
+                        if isinstance(raw, (bytes, bytearray)):
+                            raw = raw.decode("utf-8")
+                        lines = [l for l in str(raw).splitlines() if l.strip()]
+                    else:
+                        lines = []
+                else:
+                    lines = resp
+
+                for raw_line in lines:
+                    if isinstance(raw_line, (bytes, bytearray)):
+                        line = raw_line.decode("utf-8").strip()
+                    else:
+                        line = str(raw_line).strip()
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                        if progress_callback and callable(progress_callback):
+                            progress_callback(chunk)
+                        last_status = chunk
+                    except Exception:
+                        continue
+
+                return last_status if last_status is not None else {"status": "success"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
 

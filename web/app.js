@@ -274,6 +274,23 @@ function initWebSocket() {
         }
       } else if (data.event === 'ollama_log' || data.type === 'ollama_log' || data.event === 'OLLAMA_LOG') {
         renderOllamaLogLine(data.payload || data.line || data.message || data);
+      } else if (data.event === 'model_pull_progress') {
+        const payload = data.payload || {};
+        const chunk = payload.progress || {};
+        const model = payload.model || '';
+        if (pullFeedbackMsg) {
+          pullFeedbackMsg.style.display = 'block';
+          pullFeedbackMsg.className = 'pull-feedback-msg info';
+          if (chunk.completed !== undefined && chunk.total && chunk.total > 0) {
+            const percent = Math.round((chunk.completed * 100) / chunk.total);
+            const mbCompleted = (chunk.completed / (1024 * 1024)).toFixed(1);
+            const mbTotal = (chunk.total / (1024 * 1024)).toFixed(1);
+            const statusText = chunk.status ? ` - ${chunk.status}` : '';
+            pullFeedbackMsg.textContent = `Baixando ${model || 'modelo'}: ${percent}% (${mbCompleted} MB / ${mbTotal} MB)${statusText}`;
+          } else if (chunk.status) {
+            pullFeedbackMsg.textContent = `${model ? model + ': ' : ''}${chunk.status}`;
+          }
+        }
       } else if (data.event === 'model_pull_complete') {
         loadLocalWorkerModels();
         const payload = data.payload || {};
@@ -283,14 +300,14 @@ function initWebSocket() {
             pullFeedbackMsg.className = 'pull-feedback-msg success';
             pullFeedbackMsg.style.display = 'block';
           }
-          alert(`Download do modelo "${payload.model}" concluído com sucesso!`);
         } else {
           if (pullFeedbackMsg) {
             pullFeedbackMsg.textContent = `Erro ao baixar modelo "${payload.model}": ${payload.message || 'Falha no download'}`;
             pullFeedbackMsg.className = 'pull-feedback-msg error';
             pullFeedbackMsg.style.display = 'block';
+          } else {
+            alert(`Erro no download do modelo "${payload.model}": ${payload.message || 'Falha desconhecida'}`);
           }
-          alert(`Erro no download do modelo "${payload.model}": ${payload.message || 'Falha desconhecida'}`);
         }
       } else if (data.event === 'STEERING_RECEIVED' || data.event === 'ORCHESTRATOR_MESSAGE') {
         if (!data.project_id || data.project_id === currentProjectId) {

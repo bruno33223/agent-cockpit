@@ -58,7 +58,7 @@ Quando o usuário disser:
 | **1. Arquitetura** | `writing-plans`, `spec-orchestrator` | `query_symbol_impact`, `analyze_codebase_graph`, `sync_blueprint` | Mapeamento AST de baixo custo, fatiamento vertical e sincronização visual. |
 | **2. Isolamento** | `using-git-worktrees` | `create_slice_worktree` | Workspaces isolados em `.worktrees/slice-N` sem poluir a branch principal. |
 | **3. Context Briefing** | `subagent-driven-development`, `dispatching-parallel-agents` | `prepare_task_context`, `get_slice_spec` | Briefing cirúrgico isolado por fatia; despacho simultâneo da frota 3x3. |
-| **4. Construção TDD** | `test-driven-development` | `run_project_tests(tdd_mode='verify_red' / 'verify_green')`, `update_agent_pulse` | TDD Iron Law: teste falha antes de codar; passa após codar; telemetria em tempo real. |
+| **4. Construção TDD** | `test-driven-development` | `execute_local_builder`, `run_project_tests(tdd_mode='verify_red' / 'verify_green')`, `update_agent_pulse` | TDD Iron Law: delegação local via `execute_local_builder` com circuit breaker para o frontier; teste falha antes de codar; passa após codar; telemetria em tempo real. |
 | **4.5. Quota Watchdog & Git PoW** | `verification-before-completion` | `check_fleet_liveness` | Watchdog de créditos/quota e validação de Proof of Work Git; bloqueia falsos positivos se subagentes caírem silenciosamente por falta de crédito. |
 | **5. Auditoria Cega** | `requesting-code-review`, `receiving-code-review`, `gauntlet-loop` | `run_project_tests`, `log_critique_verdict` | Inspeção cega de `git diff` e métricas estruturadas (`critical`, `important`, `minor`). |
 | **6. Diagnóstico** | `systematic-debugging` | `get_slice_failure_report` | Causa-raiz obrigatória antes de propor correção; zero tokens no chat principal. |
@@ -97,11 +97,12 @@ Quando o usuário disser:
 1. Para cada fatia vertical a ser executada, chame `create_slice_worktree(slice_id="slice-N")` no MCP para isolar branches e arquivos em `.worktrees/slice-N`.
 
 ### Etapa 4: Construção e Auditoria Adversária (Skill: `gauntlet-loop` + SDD)
-1. **Despacho Concorrente dos Builders (Padrão SDD + TDD Iron Law):**
+1. **Despacho Concorrente dos Builders (Padrão SDD + TDD Iron Law + Local Worker):**
    - Dispare os 3 executores simultaneamente via `invoke_subagent` em lote único.
    - Cada Builder chama `prepare_task_context(slice_id="slice-N", role_type="implementer")` no MCP.
    - Aplica a Iron Law do `test-driven-development`: cria o teste que falha e valida com `run_project_tests(tdd_mode="verify_red")`.
-   - Implementa o código de produção mínimo e valida com `run_project_tests(tdd_mode="verify_green")`.
+   - **Delegação Local Obrigatória (LLM-as-a-Tool):** Cada Builder delega a escrita física de código chamando `execute_local_builder(slice_id="slice-N", instruction="...", target_file="...")`. Se o modelo local falhar 2 vezes seguidas, a tool aciona o Circuit Breaker retornando status `'ESCALATION_REQUIRED'`, momento em que o Builder de nuvem (frontier) assume a implementação física como fallback.
+   - Valida o código com `run_project_tests(tdd_mode="verify_green")`.
    - Atualiza a seção `<!-- COCKPIT_NOTES_START -->` no vault e retorna estritamente: `{"status": "DELIVERED", "slice_id": "slice-N", "files_count": <N>}`.
 2. **Despacho Concorrente dos Harsh Critics (Skill: `requesting-code-review` & `receiving-code-review`):**
    - Dispare os 3 revisores em contexto limpo via `invoke_subagent` em lote único.

@@ -755,10 +755,13 @@ def post_local_worker_pull(payload: LocalWorkerPullPayload):
     client, _ = _get_local_worker_client(payload.project_id)
 
     def _bg_pull():
+        def on_progress(chunk: dict):
+            manager.broadcast_sync("model_pull_progress", {"model": model_name, "progress": chunk})
+
         try:
-            res = client.pull_model(model_name)
-            if isinstance(res, dict) and res.get("status") == "error":
-                err_msg = res.get("message", "Falha ao baixar modelo")
+            res = client.pull_model(model_name, stream=True, progress_callback=on_progress)
+            if isinstance(res, dict) and (res.get("status") == "error" or "error" in res):
+                err_msg = res.get("message") or res.get("error") or "Falha ao baixar modelo"
                 manager.broadcast_sync("model_pull_complete", {"model": model_name, "status": "error", "message": err_msg})
             else:
                 manager.broadcast_sync("model_pull_complete", {"model": model_name, "status": "success"})

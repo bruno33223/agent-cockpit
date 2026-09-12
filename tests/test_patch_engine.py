@@ -249,6 +249,27 @@ class TestLocalLLMClient(unittest.TestCase):
         result = self.client.pull_model("qwen2.5-coder:7b")
         self.assertEqual(result.get("status"), "success")
 
+    @patch("urllib.request.urlopen")
+    def test_pull_model_streaming(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.__iter__.return_value = [
+            b'{"status": "pulling manifest"}\n',
+            b'{"status": "downloading", "completed": 500, "total": 1000}\n',
+            b'{"status": "success"}\n'
+        ]
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        progress_chunks = []
+        result = self.client.pull_model(
+            "qwen2.5-coder:7b",
+            stream=True,
+            progress_callback=progress_chunks.append
+        )
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(len(progress_chunks), 3)
+        self.assertEqual(progress_chunks[1].get("completed"), 500)
+
+
     def test_format_patch_prompt(self):
         prompt = self.client.format_patch_prompt(
             file_path="server/app.py",
