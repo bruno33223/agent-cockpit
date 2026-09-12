@@ -238,15 +238,30 @@ def call_local_llm(
     )
 
     url = f"{endpoint}/api/generate"
+    builder_options = {
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "num_predict": 4096,
+        "num_ctx": int(cfg.get("num_ctx", 2048)),
+    }
+    num_threads = cfg.get("num_thread")
+    if num_threads:
+        builder_options["num_thread"] = int(num_threads)
+    else:
+        try:
+            cpu_count = os.cpu_count() or 4
+            if cpu_count >= 16:
+                builder_options["num_thread"] = cpu_count // 2
+            elif cpu_count > 4:
+                builder_options["num_thread"] = cpu_count
+        except Exception:
+            pass
+
     body = {
         "model": model,
         "prompt": prompt,
         "stream": False,
-        "options": {
-            "temperature": 0.1,
-            "top_p": 0.95,
-            "num_predict": 4096
-        }
+        "options": builder_options
     }
 
     req = urllib.request.Request(
