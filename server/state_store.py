@@ -128,7 +128,8 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
             "endpoint": "http://127.0.0.1:11434",
             "model": "qwen2.5-coder:7b-instruct-q4_k_m",
             "circuit_breaker_threshold": 2,
-            "consecutive_failures": {}
+            "consecutive_failures": {},
+            "auto_start_ollama": True
         },
         "project_root": project_root
     }
@@ -945,8 +946,11 @@ class StateStore:
                 "endpoint": "http://127.0.0.1:11434",
                 "model": "qwen2.5-coder:7b-instruct-q4_k_m",
                 "circuit_breaker_threshold": 2,
-                "consecutive_failures": {}
+                "consecutive_failures": {},
+                "auto_start_ollama": True
             })
+            if "auto_start_ollama" not in cfg:
+                cfg["auto_start_ollama"] = True
             return dict(cfg)
 
     def set_local_worker_config(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
@@ -958,8 +962,11 @@ class StateStore:
                 "endpoint": "http://127.0.0.1:11434",
                 "model": "qwen2.5-coder:7b-instruct-q4_k_m",
                 "circuit_breaker_threshold": 2,
-                "consecutive_failures": {}
+                "consecutive_failures": {},
+                "auto_start_ollama": True
             })
+            if "auto_start_ollama" not in cfg:
+                cfg["auto_start_ollama"] = True
             cfg.update(updates)
             self._save_state(state, target_pid)
         self._notify("LOCAL_WORKER_CONFIG_UPDATED", cfg, target_pid)

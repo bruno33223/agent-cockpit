@@ -121,7 +121,11 @@ def main():
     parser.add_argument("--autostart-enable", action="store_true", help="Configura o Agent Cockpit para iniciar com o sistema operacional")
     parser.add_argument("--autostart-disable", action="store_true", help="Desativa a inicialização do Agent Cockpit com o sistema operacional")
     parser.add_argument("--autostart-status", action="store_true", help="Verifica se o Agent Cockpit está configurado para iniciar com o sistema")
+    parser.add_argument("--no-ollama", action="store_true", help="Desativa a inicialização automática do Ollama em segundo plano")
     args = parser.parse_args()
+
+    if args.no_ollama:
+        os.environ["COCKPIT_NO_OLLAMA"] = "1"
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "server"))
     if args.autostart_enable or args.autostart_disable or args.autostart_status:
