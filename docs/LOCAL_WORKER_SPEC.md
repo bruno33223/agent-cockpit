@@ -151,6 +151,23 @@ O retorno não envia o código-fonte gerado para a janela de contexto do harness
 - [ ] **Módulo `server/tools/local_builder_tool.py`:**
   - Integração da tool `execute_local_builder` ao servidor FastMCP.
   - Registro de telemetria no dashboard (`update_agent_pulse`).
-- [ ] **Testes de Regressão (`tests/test_local_builder.py`):**
+- [x] **Testes de Regressão (`tests/test_local_builder.py`):**
   - Testes unitários do `patch_engine` (match exato, múltiplos blocos, indentação preservada, erro de match).
   - Testes de integração com mock do endpoint Ollama.
+
+---
+
+## 7. Matriz de Especialização & Delimitação de Escopo (Local vs Frontier)
+
+Com base em benchmarks empíricos reais na GPU AMD Radeon RX 6600 (8 GB VRAM) com DeepSeek-Coder-V2 16B MoE Q3_K_M (~25 tks/s), a divisão de trabalho entre modelo local e modelo de nuvem é estritamente delimitada:
+
+| Camada / Tipo de Tarefa | Executor Designado | Justificativa Técnica |
+| :--- | :--- | :--- |
+| **Funções Auxiliares & Utilitários** (`utils/`, `helpers/`, `formatters/`, `validators/`) | **Local Worker (DeepSeek 16B)** | Tarefas atômicas (< 50 linhas), puras, sem estado complexo. Excelente taxa de acerto de primeira e custo $0.00. |
+| **Transformação de Dados, Parsing e Regex** | **Local Worker (DeepSeek 16B)** | Algoritmos isolados e mecânicos (ex: validação CPF/Email, parse JSON/CSV, slugify). |
+| **Scaffold de Tipos, DTOs e Schemas** | **Local Worker (DeepSeek 16B)** | Estruturas de dados, classes de contrato e interfaces bem definidas. |
+| **Testes Unitários de Funções Auxiliares** | **Local Worker (DeepSeek 16B)** | Testes simples de entrada/saída determinística com unittest/jest. |
+| **Design System & Estilização (CSS / SCSS / Tailwind)** | **Nuvem (Frontier)** | Requer sensibilidade estética, proporção áurea, glassmorphism e responsividade. Gerado em 2s pela nuvem (`delegate_styles_to_cloud: true`). |
+| **Arquitetura de Telas, HTML Semântico & Layouts** | **Nuvem (Frontier)** | Estruturas de alta interdependência visual e hierarquia de componentes. |
+| **Orquestração, Domain Core & Resolução de Falhas** | **Nuvem (Frontier)** | Raciocínio profundo, governança multiagente e auditoria adversária. |
+

@@ -126,14 +126,14 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
         "local_worker": {
             "provider": "ollama",
             "endpoint": "http://127.0.0.1:11434",
-            "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+            "model": "deepseek-coder-v2:16b-q3_k_m",
             "circuit_breaker_threshold": 2,
             "consecutive_failures": {},
             "auto_start_ollama": True,
-            "delegate_styles_to_cloud": False
+            "delegate_styles_to_cloud": True
         },
         "settings": {
-            "delegate_styles_to_cloud": False
+            "delegate_styles_to_cloud": True
         },
         "project_root": project_root
     }
@@ -968,16 +968,16 @@ class StateStore:
             cfg = state.setdefault("local_worker", {
                 "provider": "ollama",
                 "endpoint": "http://127.0.0.1:11434",
-                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "model": "deepseek-coder-v2:16b-q3_k_m",
                 "circuit_breaker_threshold": 2,
                 "consecutive_failures": {},
                 "auto_start_ollama": True,
-                "delegate_styles_to_cloud": False
+                "delegate_styles_to_cloud": True
             })
             if "auto_start_ollama" not in cfg:
                 cfg["auto_start_ollama"] = True
             if "delegate_styles_to_cloud" not in cfg:
-                cfg["delegate_styles_to_cloud"] = False
+                cfg["delegate_styles_to_cloud"] = True
             cfg.update(updates)
             if "delegate_styles_to_cloud" in updates:
                 st = state.setdefault("settings", {})
