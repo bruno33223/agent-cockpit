@@ -1,72 +1,87 @@
-# Arquitetura de Implementação: Local Worker Delegation via MCP (Agent Cockpit)
+# Implementation Architecture: Local Worker Delegation via MCP (Agent Cockpit)
 
-## 1. Visão Geral & Objetivo
+## 1. Overview & Objective
 
-Implementar no servidor MCP `agent-cockpit` o padrão **Local Worker / Frontier Critic** (ou *LLM-as-a-Tool*).
-O objetivo é delegar a digitação mecânica de código para um modelo de linguagem local (ex: **Qwen 2.5 Coder 7B Instruct** rodando na GPU local via Ollama ou llama.cpp) através de uma ferramenta MCP nativa, reservando o harness da nuvem (modelo frontier de alta capacidade) exclusivamente para:
-1. **Arquitetura e decomposição de fatias verticais** (`spec-orchestrator`);
-2. **Especificação cirúrgica de tarefas** (`MASTER_BLUEPRINT.md`);
-3. **Auditoria rigorosa e portões de qualidade** (`gauntlet-loop` / *Harsh Critic*).
+Implement the **Local Worker / Frontier Critic** pattern (or *LLM-as-a-Tool*) within the `agent-cockpit` MCP server.
+The primary goal is delegating deterministic, mechanical code generation to a local language model (e.g., **DeepSeek-Coder-V2 16B MoE** or **Qwen 2.5 Coder 7B/14B** running on consumer hardware via Ollama or llama.cpp) via a native MCP tool, while reserving the cloud frontier harness (e.g., Claude 3.7 Sonnet, Gemini 2.5 Pro, GPT-4o) exclusively for:
+1. **High-level architecture and vertical slice decomposition** (`spec-orchestrator`);
+2. **Surgical blueprint specification** (`MASTER_BLUEPRINT.md`);
+3. **Adversarial auditing, test verification, and quality gates** (`gauntlet-loop` / *Harsh Critic*).
+
+> [!IMPORTANT]
+> **Status: Experimental (Disabled by Default)**
+> Extensive empirical benchmarks demonstrate that local models on 8GB VRAM consumer GPUs excel at focused auxiliary functions, schema scaffolding, and atomic unit tests, but struggle when tasked with full layout generation, CSS design systems, or cross-component state.
+> Consequently, **Local AI is disabled by default** (`enable_local_ai: false`). When disabled, all tasks delegate directly to cloud frontier models with zero friction. Enable only when offloading auxiliary mechanical routines.
 
 ---
 
-## 2. Diagrama de Fluxo Operacional
+## 2. Operational Sequence Diagram
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Harness as Orquestrador / Harness (Frontier)
+    participant Harness as Orchestrator / Harness (Frontier Cloud)
     participant MCP as MCP Server (agent-cockpit)
-    participant LocalLLM as LLM Local (Qwen 2.5 Coder 7B)
-    participant Disk as Worktree Isolada (.worktrees/slice-N)
-    participant Critic as Harsh Critic & Testes
+    participant Queue as Worker Queue (FIFO Single-Worker)
+    participant LocalLLM as Local LLM (DeepSeek 16B / Qwen 7B)
+    participant Disk as Isolated Worktree (.worktrees/slice-N)
+    participant Critic as Harsh Critic & Test Runner
 
     Harness->>MCP: execute_local_builder(slice_id, instruction, target_file)
-    MCP->>LocalLLM: Prompt cirúrgico + código atual do arquivo
-    LocalLLM-->>MCP: Blocos SEARCH / REPLACE
-    MCP->>MCP: Validação sintática do patch
-    MCP->>Disk: Aplicação atômica do patch no arquivo
-    MCP-->>Harness: Telemetria enxuta JSON (diff summary, status)
-    Harness->>Critic: run_project_tests() + auditoria do git diff
-    alt Aprovado no Gauntlet
-        Critic-->>Harness: VERDICT: APPROVED
-        Harness->>Harness: Avança para o Anti-Slop Gate
-    else Reprovado no Gauntlet
-        Critic-->>Harness: VERDICT: REJECTED (log_critique_verdict)
-        Harness->>MCP: execute_local_builder com error_feedback (Retry)
+    alt Local AI Disabled (Default)
+        MCP-->>Harness: STATUS: DELEGATED_TO_CLOUD (instant delegation)
+    else Local AI Enabled (Experimental)
+        MCP->>Queue: enqueue(slice_id, target_file)
+        Queue->>LocalLLM: Prompt + current file content
+        LocalLLM-->>Queue: SEARCH / REPLACE blocks
+        Queue->>MCP: Syntactic patch validation
+        MCP->>Disk: Atomic patch application
+        MCP-->>Harness: Lean JSON telemetry (diff summary, tokens, latency)
+        Harness->>Critic: run_project_tests() + git diff review
+        alt Approved by Gauntlet
+            Critic-->>Harness: VERDICT: APPROVED
+            Harness->>Harness: Proceed to Anti-Slop & Merge Gate
+        else Rejected by Gauntlet
+            Critic-->>Harness: VERDICT: REJECTED (log_critique_verdict)
+            Harness->>MCP: execute_local_builder with error_feedback (Retry)
+        end
     end
 ```
 
 ---
 
-## 3. Diretrizes de Engenharia (Sem Gambiarras)
+## 3. Engineering Guidelines (Zero-Workarounds Principle)
 
-### 3.1. Provedor de Inferência Local
-- **Runtime Padrão:** Ollama ou `llama-server` (compatível com a API OpenAI em `http://127.0.0.1:11434/v1`).
-- **Modelo Recomendado:** `qwen2.5-coder:7b-instruct-q4_k_m` (ocupa ~5.2 GB de VRAM, deixando >2 GB livres para KV Cache na GPU de 8GB).
-- **Hiperparâmetros:** `temperature: 0.1`, `top_p: 0.95`, `stream: false`.
+### 3.1. Local Inference Runtime
+- **Default Runtime:** Ollama or `llama-server` (compatible with the OpenAI-compatible API at `http://127.0.0.1:11434/v1`).
+- **Recommended Models:**
+  - `deepseek-coder-v2:16b-q3_k_m` (quantized MoE, ~8.1 GB VRAM/RAM footprint, achieves ~25-27 tks/s with CPU offload tuning).
+  - `qwen2.5-coder:7b-instruct-q4_k_m` (pure GPU footprint ~5.2 GB VRAM, ultra-fast latency).
+- **Hyperparameters:** `temperature: 0.1`, `top_p: 0.95`, `stream: false`.
 
-### 3.2. Mecanismo de Patching Cirúrgico (Search/Replace Blocks)
-Para evitar que modelos locais de 7B alucinem tentando reescrever arquivos completos de centenas de linhas, o MCP obriga o modelo a responder estritamente no padrão de blocos `SEARCH/REPLACE` (estilo *Aider*):
+### 3.2. Surgical Patching Engine (Search/Replace Blocks)
+To prevent smaller local models from hallucinating when rewriting whole files, the MCP server enforces strict Aider-style `SEARCH/REPLACE` blocks:
 
 ```text
 <<<<<<< SEARCH
-código original a ser substituído
+original code to be replaced
 =======
-novo código implementado
+new code implemented
 >>>>>>>
 ```
 
-#### Regras de Validação do Patch Engine:
-1. **Exatidão de Match:** O conteúdo dentro de `SEARCH` deve existir exatamente uma vez no arquivo de destino.
-2. **Atomicidade:** Se houver múltiplos blocos no mesmo arquivo e um falhar, nenhuma alteração é persistida no disco.
-3. **Isolamento de Caminho:** O `target_file` é validado para garantir que está restrito à pasta `.worktrees/{slice_id}/`, impedindo vulnerabilidades de *Directory Traversal*.
+#### Patch Engine Validation Rules:
+1. **Exact Matching:** Content inside `SEARCH` must match uniquely within the target file.
+2. **Atomicity:** If multiple blocks are defined in a file and any block fails to match, zero changes are persisted to disk.
+3. **Path Traversal Protection:** Every `target_file` is strictly validated against `.worktrees/{slice_id}/`, preventing any directory traversal vulnerability.
+4. **Anti-Empty File Guarantee:** If the local model returns an invalid, empty, or unparseable response, a robust syntactically valid scaffold fallback is applied so files never remain empty.
 
 ---
 
-## 4. Assinatura da Nova Ferramenta MCP
+## 4. MCP Tool Interface & Contracts
 
-Adicionar ao servidor `agent-cockpit` (em `server/mcp_server.py` ou módulo correspondente) a seguinte tool:
+### 4.1. `execute_local_builder`
+Delegates code implementation to the local LLM within the isolated slice worktree:
 
 ```python
 @mcp.tool()
@@ -78,96 +93,79 @@ def execute_local_builder(
     error_feedback: str | None = None
 ) -> dict:
     """
-    Delega a implementação física de código para o LLM local dentro da worktree isolada da fatia.
+    Delegates physical code implementation to the local LLM within the isolated slice worktree.
     
     Args:
-        slice_id: Identificador da fatia (ex: 'slice-1'), mapeada em .worktrees/slice-1.
-        instruction: Descrição direta da alteração requerida.
-        target_file: Caminho relativo do arquivo que sofrerá alteração dentro da worktree.
-        context_files: Lista opcional de arquivos adicionais para o modelo ler como contexto (somente leitura).
-        error_feedback: Opcional. Mensagem de erro de testes ou apontamentos do Harsh Critic para ciclo de correção.
+        slice_id: Identifier of the slice (e.g., 'slice-1'), mapped to .worktrees/slice-1.
+        instruction: Functional description of the required modification (keep concise, no code dictation).
+        target_file: Relative path of the target file inside the slice worktree.
+        context_files: Optional list of read-only reference files for context.
+        error_feedback: Optional test failure output or Harsh Critic critique notes for retry loops.
     
     Returns:
-        JSON com status da execução, resumo do diff e telemetria de consumo.
+        JSON telemetry with execution status, diff summary, and token metrics.
     """
 ```
 
-### Contrato de Retorno (Zero-Fluff JSON)
-O retorno não envia o código-fonte gerado para a janela de contexto do harness, preservando tokens:
+### 4.2. Return Contract (Zero-Fluff JSON)
+Source code is written directly to disk and never echoed back to the cloud harness context window:
 
 ```json
 {
   "status": "DELIVERED",
   "slice_id": "slice-1",
-  "target_file": "src/components/Button.tsx",
+  "target_file": "src/utils/slugify.ts",
   "hunks_applied": 1,
   "diff_summary": "+15 -3 lines",
-  "execution_time_ms": 2840,
+  "execution_time_ms": 1840,
   "local_tokens_generated": 142
+}
+```
+
+When local execution is disabled or delegated:
+```json
+{
+  "status": "DELEGATED_TO_CLOUD",
+  "slice_id": "slice-1",
+  "target_file": "src/styles.css",
+  "message": "Local AI is disabled by default (Experimental). Task delegated directly to frontier cloud."
 }
 ```
 
 ---
 
-## 5. Integração com o Gauntlet Loop do Cockpit
+## 5. Gauntlet Loop Integration & Circuit Breaker
 
-### 5.1. Ciclo de Execução TDD (Etapa 4 do Cockpit)
-1. **Fase Red (TDD Iron Law):**
-   - O Orquestrador chama `execute_local_builder` para criar/modificar o arquivo de teste unitário conforme o contrato da Blueprint.
-   - O Orquestrador executa `run_project_tests(tdd_mode="verify_red")` para certificar que o teste falhou pelo motivo certo.
-2. **Fase Green (Implementação):**
-   - O Orquestrador chama `execute_local_builder` passando a instrução de implementação e o arquivo de produção.
-   - O Orquestrador executa `run_project_tests(tdd_mode="verify_green")`.
-3. **Auditoria Cega (Gauntlet Critic):**
-   - O subagente revisor inspeciona o `git diff` real e o resultado dos testes.
-   - Registra o veredito via `log_critique_verdict`.
+### 5.1. TDD Iron Law Cycle
+1. **Red Phase:** The Orchestrator generates/updates unit tests and verifies failure via `run_project_tests(tdd_mode="verify_red")`.
+2. **Green Phase:** The implementation is generated, followed by `run_project_tests(tdd_mode="verify_green")`.
+3. **Blind Audit:** A reviewer subagent inspects the raw `git diff` and registers the verdict via `log_critique_verdict`.
 
-### 5.2. Protocolo de Fallback & Circuit Breaker
-- Limite de tentativas locais por fatia: **2 iterações**.
-- Se após 2 tentativas o modelo local continuar gerando código rejeitado pelo Gauntlet ou quebrando os testes:
-  1. O MCP retorna:
-     ```json
-     {
-       "status": "ESCALATION_REQUIRED",
-       "slice_id": "slice-1",
-       "reason": "local_worker_threshold_exceeded",
-       "last_error": "AssertionError: expected status 200, got 500"
-     }
-     ```
-  2. O Orquestrador do Harness detecta o escalonamento e despacha um subagente de nuvem (`invoke_subagent`) com o modelo frontier para resolver o caso complexo.
+### 5.2. Fallback & Circuit Breaker Protocol
+- **Consecutive failure limit per slice:** `2 iterations`.
+- If the local model fails two consecutive attempts, the MCP tool returns `ESCALATION_REQUIRED`:
+  ```json
+  {
+    "status": "ESCALATION_REQUIRED",
+    "slice_id": "slice-1",
+    "reason": "local_worker_threshold_exceeded",
+    "last_error": "AssertionError: expected status 200, got 500"
+  }
+  ```
+- The Harness detects the escalation and automatically falls back to a cloud frontier subagent (`invoke_subagent`).
 
 ---
 
-## 6. Checklist de Implementação para o Agente Executor
+## 6. Specialization Matrix & Scope Delimitation (Local vs Frontier)
 
-- [ ] **Módulo `server/workers/local_llm_client.py`:**
-  - Cliente HTTP usando `httpx` para chamada assíncrona ao Ollama (`/v1/chat/completions`).
-  - Healthcheck para checar se o Ollama está online antes de processar.
-  - Formatação do System Prompt estrito com exemplos de blocos `SEARCH/REPLACE`.
-- [ ] **Módulo `server/workers/patch_engine.py`:**
-  - Parser de blocos de substituição.
-  - Verificação de caminhos seguros contra *Path Traversal*.
-  - Aplicação atômica e rollback em caso de falha de match.
-- [ ] **Módulo `server/tools/local_builder_tool.py`:**
-  - Integração da tool `execute_local_builder` ao servidor FastMCP.
-  - Registro de telemetria no dashboard (`update_agent_pulse`).
-- [x] **Testes de Regressão (`tests/test_local_builder.py`):**
-  - Testes unitários do `patch_engine` (match exato, múltiplos blocos, indentação preservada, erro de match).
-  - Testes de integração com mock do endpoint Ollama.
+Empirical benchmarks on an AMD Radeon RX 6600 (8 GB VRAM) with DeepSeek-Coder-V2 16B MoE establish clear boundaries:
 
----
-
-## 7. Matriz de Especialização & Delimitação de Escopo (Local vs Frontier)
-
-Com base em benchmarks empíricos reais na GPU AMD Radeon RX 6600 (8 GB VRAM) com DeepSeek-Coder-V2 16B MoE Q3_K_M (~25 tks/s), a divisão de trabalho entre modelo local e modelo de nuvem é estritamente delimitada:
-
-| Camada / Tipo de Tarefa | Executor Designado | Justificativa Técnica |
+| Layer / Task Classification | Designated Worker | Technical Rationale |
 | :--- | :--- | :--- |
-| **Funções Auxiliares & Utilitários** (`utils/`, `helpers/`, `formatters/`, `validators/`) | **Local Worker (DeepSeek 16B)** | Tarefas atômicas (< 50 linhas), puras, sem estado complexo. Excelente taxa de acerto de primeira e custo $0.00. |
-| **Transformação de Dados, Parsing e Regex** | **Local Worker (DeepSeek 16B)** | Algoritmos isolados e mecânicos (ex: validação CPF/Email, parse JSON/CSV, slugify). |
-| **Scaffold de Tipos, DTOs e Schemas** | **Local Worker (DeepSeek 16B)** | Estruturas de dados, classes de contrato e interfaces bem definidas. |
-| **Testes Unitários de Funções Auxiliares** | **Local Worker (DeepSeek 16B)** | Testes simples de entrada/saída determinística com unittest/jest. |
-| **Design System & Estilização (CSS / SCSS / Tailwind)** | **Nuvem (Frontier)** | Requer sensibilidade estética, proporção áurea, glassmorphism e responsividade. Gerado em 2s pela nuvem (`delegate_styles_to_cloud: true`). |
-| **Arquitetura de Telas, HTML Semântico & Layouts** | **Nuvem (Frontier)** | Estruturas de alta interdependência visual e hierarquia de componentes. |
-| **Orquestração, Domain Core & Resolução de Falhas** | **Nuvem (Frontier)** | Raciocínio profundo, governança multiagente e auditoria adversária. |
-
+| **Auxiliary & Utility Functions** (`utils/`, `helpers/`, `formatters/`, `validators/`) | **Local Worker (DeepSeek 16B)** | Atomic tasks (< 50 lines), pure logic, zero state complexity. High first-pass success rate at bash.00 cost. |
+| **Data Transformation, Parsing & Regular Expressions** | **Local Worker (DeepSeek 16B)** | Isolated mechanical algorithms (e.g., CSV/JSON parsers, string tokenizers, slug generators). |
+| **Type Definitions, DTOs & Schemas** | **Local Worker (DeepSeek 16B)** | Well-specified contracts, interfaces, and serialization dataclasses. |
+| **Atomic Unit Tests for Utilities** | **Local Worker (DeepSeek 16B)** | Deterministic input/output tests using standard unittest/jest. |
+| **Design Systems & Styling (CSS / SCSS / Tailwind)** | **Cloud Frontier** | Requires aesthetic judgment, golden ratio proportions, modern glassmorphism, and responsive fluidity (`delegate_styles_to_cloud: true`). |
+| **Screen Architecture, Semantic HTML & Layouts** | **Cloud Frontier** | Complex structural hierarchies with strong visual interdependencies. |
+| **Orchestration, Domain Core & Architectural Bug Fixing** | **Cloud Frontier** | Deep multi-step reasoning, cross-module synchronization, and adversarial critique. |

@@ -64,6 +64,7 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
     def setUp(self):
         # Garante estado padrão limpo antes de cada teste
         db.update_settings({
+            "enable_local_ai": True,
             "delegate_styles_to_cloud": False,
             "circuit_breaker_threshold": 2
         })
@@ -76,6 +77,7 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
 
     def tearDown(self):
         db.update_settings({
+            "enable_local_ai": False,
             "delegate_styles_to_cloud": False
         })
         db.reset_local_worker_attempts("slice-test")
@@ -195,5 +197,41 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
         self.assertIn(res.get("status"), ["DELIVERED", "ESCALATION_REQUIRED"])
 
 
+    def test_execute_local_builder_disabled_by_default(self):
+        """
+        Verifica que quando enable_local_ai está desativado (padrão),
+        execute_local_builder retorna imediatamente DELEGATED_TO_CLOUD para qualquer arquivo
+        com aviso de Experimental.
+        """
+        db.update_settings({"enable_local_ai": False})
+
+        res = execute_local_builder(
+            slice_id="slice-test",
+            instruction="Crie um utilitário simples",
+            target_file="src/utils.py",
+            repo_root=BASE_DIR
+        )
+
+        self.assertEqual(res.get("status"), "DELEGATED_TO_CLOUD")
+        self.assertEqual(res.get("target_file"), "src/utils.py")
+        self.assertIn("Experimental", res.get("message", ""))
+
+    def test_api_settings_enable_local_ai_roundtrip(self):
+        """Verifica se POST /api/settings com enable_local_ai é persistido e refletido no GET."""
+        post_code, post_data = self._http_post("/api/settings", {"enable_local_ai": True})
+        self.assertEqual(post_code, 200)
+        self.assertTrue(post_data["enable_local_ai"])
+
+        get_code, get_data = self._http_get("/api/settings")
+        self.assertEqual(get_code, 200)
+        self.assertTrue(get_data["enable_local_ai"])
+
+        # Desativa
+        post_code2, post_data2 = self._http_post("/api/settings", {"enable_local_ai": False})
+        self.assertEqual(post_code2, 200)
+        self.assertFalse(post_data2["enable_local_ai"])
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -704,7 +704,53 @@
             </div>
           </div>
 
-          <!-- CARD PRINCIPAL: DELEGAÇÃO DE ESTILOS (DEIXAR ESTILOS COM A NUVEM) -->
+          <!-- CARD PRINCIPAL: ATIVAÇÃO DA IA LOCAL (EXPERIMENTAL) -->
+          <div class="settings-card highlight-card experimental-card" id="local-ai-card">
+            <div class="settings-card-header">
+              <div class="settings-card-title-group">
+                <span class="settings-icon">🤖</span>
+                <div>
+                  <div class="settings-card-title">
+                    HABILITAR WORKER LOCAL (GPU / OLLAMA)
+                    <span class="badge-experimental" title="Recurso Experimental: Mantenha desativado por padrão para geração sem gargalos">EXPERIMENTAL</span>
+                  </div>
+                  <div class="settings-card-subtitle">Execução local de código na GPU — Recomendado prioritariamente para funções auxiliares</div>
+                </div>
+              </div>
+              <div class="settings-toggle-wrapper">
+                <label class="switch-control" for="toggle-enable-local-ai" title="Ativar ou desativar o Local Worker (Experimental)">
+                  <input type="checkbox" id="toggle-enable-local-ai">
+                  <span class="switch-slider"></span>
+                </label>
+                <div class="switch-status-group">
+                  <span class="badge-experimental-tag">⚠️ Experimental</span>
+                  <span class="switch-label" id="enable-local-ai-status-label">Desativado por Padrão (100% Nuvem Frontier)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="settings-explainer-box warning-explainer">
+                <div class="explainer-header">
+                  <span class="explainer-icon">⚠️</span>
+                  <strong>Aviso Importante & Delimitação de Escopo (Local vs Frontier):</strong>
+                </div>
+                <div class="explainer-content">
+                  <p>
+                    <strong>Por que vem desativado por padrão?</strong> Em GPUs de 8GB de VRAM, modelos locais (7B a 16B) sofrem em tarefas de escopo aberto (layouts completos, arquivos extensos, múltiplos componentes interligados), gerando ciclos repetitivos de refatoração no Gauntlet.
+                  </p>
+                  <p>
+                    <strong>Escopo Adequado para o Worker Local:</strong> Quando ativado, utilize o modelo local estritamente para <em>tarefas mecânicas e determinísticas</em>: funções auxiliares (< 50 linhas), parsers, regex, schemas/DTOs e testes unitários de funções isoladas.
+                  </p>
+                  <p>
+                    <strong>Geração Frontier Direta (Recomendado):</strong> Mantendo desativado, o Cockpit delega a criação diretamente aos modelos de fronteira na nuvem (Claude 3.7 Sonnet / Gemini 2.5 Pro / GPT-4o), garantindo entrega de primeira linha, alto padrão estético e zero retrabalho.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD: DELEGAÇÃO DE ESTILOS (DEIXAR ESTILOS COM A NUVEM) -->
           <div class="settings-card highlight-card">
             <div class="settings-card-header">
               <div class="settings-card-title-group">

@@ -124,15 +124,17 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
         },
         "last_handoff": None,
         "local_worker": {
+            "enabled": False,
             "provider": "ollama",
             "endpoint": "http://127.0.0.1:11434",
             "model": "deepseek-coder-v2:16b-q3_k_m",
             "circuit_breaker_threshold": 2,
             "consecutive_failures": {},
-            "auto_start_ollama": True,
+            "auto_start_ollama": False,
             "delegate_styles_to_cloud": True
         },
         "settings": {
+            "enable_local_ai": False,
             "delegate_styles_to_cloud": True
         },
         "project_root": project_root
@@ -948,17 +950,21 @@ class StateStore:
         with self.lock:
             state = self.get_state(target_pid)
             cfg = state.setdefault("local_worker", {
+                "enabled": False,
                 "provider": "ollama",
                 "endpoint": "http://127.0.0.1:11434",
-                "model": "qwen2.5-coder:7b-instruct-q4_k_m",
+                "model": "deepseek-coder-v2:16b-q3_k_m",
                 "circuit_breaker_threshold": 2,
                 "consecutive_failures": {},
-                "auto_start_ollama": True
+                "auto_start_ollama": False,
+                "delegate_styles_to_cloud": True
             })
+            if "enabled" not in cfg:
+                cfg["enabled"] = False
             if "auto_start_ollama" not in cfg:
-                cfg["auto_start_ollama"] = True
+                cfg["auto_start_ollama"] = False
             if "delegate_styles_to_cloud" not in cfg:
-                cfg["delegate_styles_to_cloud"] = state.get("settings", {}).get("delegate_styles_to_cloud", False)
+                cfg["delegate_styles_to_cloud"] = state.get("settings", {}).get("delegate_styles_to_cloud", True)
             return dict(cfg)
 
     def set_local_worker_config(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
@@ -966,19 +972,25 @@ class StateStore:
         with self.lock:
             state = self.get_state(target_pid)
             cfg = state.setdefault("local_worker", {
+                "enabled": False,
                 "provider": "ollama",
                 "endpoint": "http://127.0.0.1:11434",
                 "model": "deepseek-coder-v2:16b-q3_k_m",
                 "circuit_breaker_threshold": 2,
                 "consecutive_failures": {},
-                "auto_start_ollama": True,
+                "auto_start_ollama": False,
                 "delegate_styles_to_cloud": True
             })
+            if "enabled" not in cfg:
+                cfg["enabled"] = False
             if "auto_start_ollama" not in cfg:
-                cfg["auto_start_ollama"] = True
+                cfg["auto_start_ollama"] = False
             if "delegate_styles_to_cloud" not in cfg:
                 cfg["delegate_styles_to_cloud"] = True
             cfg.update(updates)
+            if "enabled" in updates:
+                st = state.setdefault("settings", {})
+                st["enable_local_ai"] = bool(updates["enabled"])
             if "delegate_styles_to_cloud" in updates:
                 st = state.setdefault("settings", {})
                 st["delegate_styles_to_cloud"] = bool(updates["delegate_styles_to_cloud"])
@@ -991,18 +1003,20 @@ class StateStore:
         return self.set_local_worker_config(updates, project_id=project_id)
 
     def get_settings(self, project_id: Optional[str] = None) -> Dict[str, Any]:
-        """Retorna configurações gerais do Cockpit, incluindo delegação de estilos para a nuvem."""
+        """Retorna configurações gerais do Cockpit, incluindo delegação de estilos para a nuvem e Local AI."""
         target_pid = self.resolve_project_id(project_id)
         with self.lock:
             state = self.get_state(target_pid)
             cfg = state.setdefault("local_worker", {})
             st = state.setdefault("settings", {})
-            delegate_styles = st.get("delegate_styles_to_cloud", cfg.get("delegate_styles_to_cloud", False))
+            delegate_styles = st.get("delegate_styles_to_cloud", cfg.get("delegate_styles_to_cloud", True))
+            enable_local_ai = st.get("enable_local_ai", cfg.get("enabled", False))
             return {
+                "enable_local_ai": bool(enable_local_ai),
                 "delegate_styles_to_cloud": bool(delegate_styles),
-                "model": cfg.get("model", "qwen2.5-coder:7b-instruct-q4_k_m"),
+                "model": cfg.get("model", "deepseek-coder-v2:16b-q3_k_m"),
                 "endpoint": cfg.get("endpoint", "http://127.0.0.1:11434"),
-                "auto_start_ollama": cfg.get("auto_start_ollama", True),
+                "auto_start_ollama": cfg.get("auto_start_ollama", False),
                 "circuit_breaker_threshold": cfg.get("circuit_breaker_threshold", 2),
                 "project_root": state.get("project_root")
             }
@@ -1014,6 +1028,11 @@ class StateStore:
             state = self.get_state(target_pid)
             cfg = state.setdefault("local_worker", {})
             st = state.setdefault("settings", {})
+
+            if "enable_local_ai" in updates:
+                val = bool(updates["enable_local_ai"])
+                st["enable_local_ai"] = val
+                cfg["enabled"] = val
 
             if "delegate_styles_to_cloud" in updates:
                 val = bool(updates["delegate_styles_to_cloud"])

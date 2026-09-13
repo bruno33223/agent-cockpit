@@ -277,6 +277,10 @@ function initWebSocket() {
             const p = data.payload;
             if (p.running !== undefined) localWorkerStatus.running = !!p.running;
             if (p.pid !== undefined) localWorkerStatus.pid = p.pid || null;
+            if (p.enabled !== undefined) {
+              currentSettings.enable_local_ai = !!p.enabled;
+              applySettingsToUI(currentSettings);
+            }
             if (p.delegate_styles_to_cloud !== undefined) {
               currentSettings.delegate_styles_to_cloud = !!p.delegate_styles_to_cloud;
               applySettingsToUI(currentSettings);
@@ -2386,10 +2390,11 @@ function initLocalWorkerEvents() {
 // ==========================================================================
 
 let currentSettings = {
-  delegate_styles_to_cloud: false,
-  model: 'qwen2.5-coder:7b-instruct-q4_k_m',
+  enable_local_ai: false,
+  delegate_styles_to_cloud: true,
+  model: 'deepseek-coder-v2:16b-q3_k_m',
   endpoint: 'http://127.0.0.1:11434',
-  auto_start_ollama: true,
+  auto_start_ollama: false,
   circuit_breaker_threshold: 2,
   project_root: ''
 };
@@ -2415,9 +2420,31 @@ async function loadSettings() {
 function applySettingsToUI(settings) {
   if (!settings) return;
 
+  const toggleLocalAi = document.getElementById('toggle-enable-local-ai');
+  const localAiLabel = document.getElementById('enable-local-ai-status-label');
+  const localAiCard = document.getElementById('local-ai-card');
+
+  if (toggleLocalAi) {
+    toggleLocalAi.checked = !!settings.enable_local_ai;
+  }
+
+  if (localAiLabel) {
+    if (settings.enable_local_ai) {
+      localAiLabel.textContent = 'Ativado (Atenção: Uso Experimental)';
+      localAiLabel.classList.add('active');
+    } else {
+      localAiLabel.textContent = 'Desativado por Padrão (100% Nuvem Frontier)';
+      localAiLabel.classList.remove('active');
+    }
+  }
+
+  if (localAiCard) {
+    localAiCard.classList.toggle('active', !!settings.enable_local_ai);
+  }
+
   const toggleStyles = document.getElementById('toggle-delegate-styles');
   const stylesLabel = document.getElementById('delegate-styles-status-label');
-  const highlightCard = document.querySelector('.settings-card.highlight-card');
+  const highlightCard = document.querySelector('.settings-card.highlight-card:not(.experimental-card)');
 
   if (toggleStyles) {
     toggleStyles.checked = !!settings.delegate_styles_to_cloud;
@@ -2511,6 +2538,17 @@ async function saveSettingUpdate(updates, successNotice = 'Configuração salva 
 }
 
 function initSettingsEvents() {
+  const toggleLocalAi = document.getElementById('toggle-enable-local-ai');
+  if (toggleLocalAi) {
+    toggleLocalAi.addEventListener('change', () => {
+      const isChecked = toggleLocalAi.checked;
+      saveSettingUpdate(
+        { enable_local_ai: isChecked },
+        isChecked ? 'Worker Local ativado (Experimental)! Recomendado apenas para funções mecânicas/auxiliares.' : 'Worker Local desativado. Geração 100% direta via Nuvem Frontier.'
+      );
+    });
+  }
+
   const toggleStyles = document.getElementById('toggle-delegate-styles');
   if (toggleStyles) {
     toggleStyles.addEventListener('change', () => {

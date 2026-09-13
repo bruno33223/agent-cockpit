@@ -693,9 +693,19 @@ def execute_local_builder(
     cfg = db.get_local_worker_config(project_id=project_id)
     threshold = cfg.get("circuit_breaker_threshold", 2)
     attempts = db.get_local_worker_attempts(slice_id, project_id=project_id)
+    st = db.get_settings(project_id=project_id) if hasattr(db, "get_settings") else {}
+
+    # 0. Verifica se o Local AI está ativado (desativado por padrão / Experimental)
+    is_local_ai_enabled = bool(cfg.get("enabled", False) or (st.get("enable_local_ai", False) if st else False))
+    if not is_local_ai_enabled:
+        return {
+            "status": "DELEGATED_TO_CLOUD",
+            "slice_id": slice_id,
+            "target_file": target_file,
+            "message": "Local AI is disabled by default (Experimental). Task delegated directly to frontier cloud."
+        }
 
     # 1. Verifica se a opção 'DEIXAR ESTILOS COM A NUVEM' está ativa para arquivos CSS/UI
-    st = db.get_settings(project_id=project_id) if hasattr(db, "get_settings") else {}
     delegate_styles = bool(st.get("delegate_styles_to_cloud", cfg.get("delegate_styles_to_cloud", False)))
     ext = os.path.splitext(target_file)[1].lower()
     is_style_file = ext in [".css", ".scss", ".sass", ".less", ".style"]

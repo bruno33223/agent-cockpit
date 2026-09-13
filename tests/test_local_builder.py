@@ -26,8 +26,8 @@ class TestLocalBuilder(unittest.TestCase):
         # Configura worktree falso para testes de isolamento
         self.worktree_dir = os.path.join(self.test_dir, ".worktrees", self.slice_id)
         os.makedirs(self.worktree_dir, exist_ok=True)
-        # Reseta contador de tentativas e garante delegate_styles_to_cloud desativado nos testes base
-        db.set_local_worker_config({"delegate_styles_to_cloud": False})
+        # Reseta contador de tentativas e garante local_worker ativado e delegate_styles_to_cloud desativado nos testes base
+        db.set_local_worker_config({"enabled": True, "delegate_styles_to_cloud": False})
         if hasattr(db, "reset_local_worker_attempts"):
             db.reset_local_worker_attempts(self.slice_id)
 
@@ -281,9 +281,20 @@ class TestLocalBuilder(unittest.TestCase):
         q_status = get_worker_queue_status(slice_id="slice-test")
         self.assertIn("is_busy", q_status)
         self.assertIn("queue_length", q_status)
-        self.assertIn("message", q_status)
+    def test_execute_local_builder_delegates_when_disabled(self):
+        """Verifica que quando o worker local está desativado (enabled: False), execute_local_builder delega para a nuvem."""
+        db.set_local_worker_config({"enabled": False})
+        res = execute_local_builder(
+            slice_id=self.slice_id,
+            instruction="Implemente função de validação",
+            target_file="src/validator.py",
+            repo_root=self.test_dir
+        )
+        self.assertEqual(res.get("status"), "DELEGATED_TO_CLOUD")
+        self.assertIn("Experimental", res.get("message", ""))
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

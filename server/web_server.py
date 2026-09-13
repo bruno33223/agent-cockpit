@@ -274,7 +274,9 @@ async def auto_start_ollama_task():
     """Inicialização automática do Ollama em segundo plano se configurado e porta fechada."""
     try:
         cfg = db.get_local_worker_config() if hasattr(db, "get_local_worker_config") else {}
-        auto_start = cfg.get("auto_start_ollama", True)
+        settings = db.get_settings() if hasattr(db, "get_settings") else {}
+        is_local_ai_enabled = bool(cfg.get("enabled", False) or settings.get("enable_local_ai", False))
+        auto_start = cfg.get("auto_start_ollama", False) if is_local_ai_enabled else False
         if os.getenv("COCKPIT_NO_OLLAMA") == "1":
             auto_start = False
 
@@ -584,6 +586,7 @@ def post_autostart_toggle(payload: AutostartPayload):
 
 # ROTAS DE CONFIGURAÇÕES GERAIS
 class SettingsPayload(BaseModel):
+    enable_local_ai: Optional[bool] = None
     delegate_styles_to_cloud: Optional[bool] = None
     model: Optional[str] = None
     auto_start_ollama: Optional[bool] = None
