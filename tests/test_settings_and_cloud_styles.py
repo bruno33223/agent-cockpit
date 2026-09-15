@@ -234,6 +234,28 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
         self.assertEqual(post_code2, 200)
         self.assertFalse(post_data2["enable_local_ai"])
 
+    def test_omniroute_connectors_container_in_index_html(self):
+        """Verifica se web/index.html possui container para listagem visual de conectores OmniRoute no modal de configurações."""
+        html_path = os.path.join(BASE_DIR, "web", "index.html")
+        self.assertTrue(os.path.exists(html_path), "index.html não encontrado")
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # O container deve estar no modal de configurações (ag-panel-models)
+        self.assertIn('id="ag-omniroute-connectors-list"', content)
+        self.assertIn('ag-omniroute-connectors-section', content)
+
+    def test_omniroute_connectors_logic_in_settings_js(self):
+        """Verifica se web/js/settings.js possui as funções para carregar, renderizar conectores e auto-preencher OpenCode."""
+        js_path = os.path.join(BASE_DIR, "web", "js", "settings.js")
+        self.assertTrue(os.path.exists(js_path), "settings.js não encontrado")
+        with open(js_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("loadOmniRouteConnectors", content)
+        self.assertIn("renderOmniRouteConnectors", content)
+        self.assertIn("autofillOpenCodeCredentials", content)
+
 
 if __name__ == "__main__":
     unittest.main()
