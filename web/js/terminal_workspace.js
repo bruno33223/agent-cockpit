@@ -68,6 +68,112 @@ export class TerminalWorkspaceManager {
     }
   }
 
+  getTerminalTheme(themeName) {
+    const currentTheme = themeName || (typeof document !== 'undefined' && document.documentElement ? document.documentElement.getAttribute('data-theme') : null) || 'dark';
+    switch (currentTheme) {
+      case 'light':
+        return {
+          background: '#ffffff',
+          foreground: '#0f172a',
+          cursor: '#0f172a',
+          cursorAccent: '#ffffff',
+          selectionBackground: 'rgba(15, 23, 42, 0.15)',
+          selectionForeground: '#0f172a',
+          black: '#0f172a',
+          red: '#b91c1c',
+          green: '#15803d',
+          yellow: '#a16207',
+          blue: '#1d4ed8',
+          magenta: '#7e22ce',
+          cyan: '#0e7490',
+          white: '#475569',
+          brightBlack: '#64748b',
+          brightRed: '#dc2626',
+          brightGreen: '#16a34a',
+          brightYellow: '#c2410c',
+          brightBlue: '#2563eb',
+          brightMagenta: '#9333ea',
+          brightCyan: '#0891b2',
+          brightWhite: '#0f172a'
+        };
+      case 'classic':
+        return {
+          background: '#181818',
+          foreground: '#d4d4d4',
+          cursor: '#00ff66',
+          cursorAccent: '#181818',
+          selectionBackground: 'rgba(0, 255, 102, 0.25)',
+          selectionForeground: '#ffffff',
+          black: '#000000',
+          red: '#cd3131',
+          green: '#0dbc79',
+          yellow: '#e5e510',
+          blue: '#2472c8',
+          magenta: '#bc3fbc',
+          cyan: '#11a8cd',
+          white: '#e5e5e5',
+          brightBlack: '#666666',
+          brightRed: '#f14c4c',
+          brightGreen: '#23d18b',
+          brightYellow: '#f5f543',
+          brightBlue: '#3b8eea',
+          brightMagenta: '#d670d6',
+          brightCyan: '#29b8db',
+          brightWhite: '#ffffff'
+        };
+      case 'sepia':
+        return {
+          background: '#faf4e8',
+          foreground: '#291e12',
+          cursor: '#5a4123',
+          cursorAccent: '#faf4e8',
+          selectionBackground: 'rgba(90, 65, 35, 0.2)',
+          selectionForeground: '#291e12',
+          black: '#291e12',
+          red: '#991b1b',
+          green: '#166534',
+          yellow: '#92400e',
+          blue: '#1e40af',
+          magenta: '#6b21a8',
+          cyan: '#155e75',
+          white: '#5c4731',
+          brightBlack: '#78654c',
+          brightRed: '#b91c1c',
+          brightGreen: '#15803d',
+          brightYellow: '#b45309',
+          brightBlue: '#1d4ed8',
+          brightMagenta: '#7e22ce',
+          brightCyan: '#0369a1',
+          brightWhite: '#1c140c'
+        };
+      case 'dark':
+      default:
+        return {
+          background: '#09090b',
+          foreground: '#f4f4f5',
+          cursor: '#f4f4f5',
+          cursorAccent: '#09090b',
+          selectionBackground: 'rgba(255, 255, 255, 0.18)',
+          black: '#18181b',
+          red: '#f43f5e',
+          green: '#10b981',
+          yellow: '#f59e0b',
+          blue: '#3b82f6',
+          magenta: '#a855f7',
+          cyan: '#38bdf8',
+          white: '#f4f4f5',
+          brightBlack: '#71717a',
+          brightRed: '#fb7185',
+          brightGreen: '#34d399',
+          brightYellow: '#fbbf24',
+          brightBlue: '#60a5fa',
+          brightMagenta: '#c084fc',
+          brightCyan: '#7dd3fc',
+          brightWhite: '#ffffff'
+        };
+    }
+  }
+
   setRoleFilter(filter) {
     this.roleFilter = filter || 'all';
     this.sessions.forEach(s => {
@@ -360,6 +466,32 @@ export class TerminalWorkspaceManager {
     if (typeof window !== 'undefined' && typeof window.checkOmniRouteStatus === 'function') {
       window.checkOmniRouteStatus();
     }
+
+    // Observador reativo de temas para instâncias do Xterm.js
+    const updateAllTerminalThemes = () => {
+      const themeObj = this.getTerminalTheme();
+      this.sessions.forEach(session => {
+        if (session && session.term && session.term.options) {
+          session.term.options.theme = themeObj;
+          session.term.options.minimumContrastRatio = 4.5;
+        }
+      });
+    };
+
+    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined' && document.documentElement) {
+      const themeObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+            updateAllTerminalThemes();
+            break;
+          }
+        }
+      });
+      themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('theme-changed', () => updateAllTerminalThemes());
+    }
   }
 
   getActiveProjectRoot() {
@@ -451,28 +583,8 @@ export class TerminalWorkspaceManager {
       fontFamily: "'JetBrains Mono', monospace",
       fontSize: 13,
       lineHeight: 1.25,
-      theme: {
-        background: '#09090b',
-        foreground: '#f4f4f5',
-        cursor: '#f4f4f5',
-        selectionBackground: 'rgba(255, 255, 255, 0.18)',
-        black: '#18181b',
-        red: '#f43f5e',
-        green: '#10b981',
-        yellow: '#f59e0b',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#38bdf8',
-        white: '#f4f4f5',
-        brightBlack: '#71717a',
-        brightRed: '#fb7185',
-        brightGreen: '#34d399',
-        brightYellow: '#fbbf24',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#c084fc',
-        brightCyan: '#7dd3fc',
-        brightWhite: '#ffffff'
-      }
+      minimumContrastRatio: 4.5,
+      theme: this.getTerminalTheme()
     });
 
     let fitAddon = null;

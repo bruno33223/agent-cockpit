@@ -574,6 +574,7 @@ export function initThemeAndFontSettings() {
       const selected = themeSelect.value;
       document.documentElement.setAttribute('data-theme', selected);
       localStorage.setItem('ag_theme', selected);
+      window.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: selected } }));
     });
   }
 
