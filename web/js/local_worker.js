@@ -5,9 +5,69 @@
  */
 
 import { escapeHtml } from './ui_utils.js';
-import { apiFetch } from './state.js';
+import { apiFetch, currentProjectId } from './state.js';
 
-async export function loadLocalWorker() {
+export let isOllamaAutoScrollEnabled = true;
+
+export let localWorkerStatus = {
+  online: false,
+  running: false,
+  pid: null,
+  model: '',
+  endpoint: 'http://127.0.0.1:11434',
+  installed: [],
+  recommended: []
+};
+
+// Elementos DOM do Local Worker & Ollama
+let lwPillLed = null;
+let lwTopbarSelect = null;
+let btnTopbarPullModal = null;
+let lwStatusBadge = null;
+let lwSidebarSelect = null;
+let lwEndpointDisplay = null;
+let btnOpenPullModal = null;
+let modalModelDownload = null;
+let btnCloseModelModal = null;
+let formCustomPull = null;
+let inputCustomModel = null;
+let btnStartPull = null;
+let pullStatusBox = null;
+let pullStatusMessage = null;
+let pullFeedbackMsg = null;
+let lwProcessStatus = null;
+let lwProcessPid = null;
+let terminalProcessStatus = null;
+let terminalLogCounter = null;
+let modalOllamaConsole = null;
+let ollamaTerminalLogs = null;
+
+export function resolveLocalWorkerElements() {
+  if (typeof document === 'undefined') return;
+  lwPillLed = document.getElementById('lw-pill-led');
+  lwTopbarSelect = document.getElementById('lw-topbar-select');
+  btnTopbarPullModal = document.getElementById('btn-topbar-pull-modal');
+  lwStatusBadge = document.getElementById('lw-status-badge');
+  lwSidebarSelect = document.getElementById('lw-sidebar-select');
+  lwEndpointDisplay = document.getElementById('lw-endpoint-display');
+  btnOpenPullModal = document.getElementById('btn-open-pull-modal');
+  modalModelDownload = document.getElementById('modal-model-download');
+  btnCloseModelModal = document.getElementById('btn-close-model-modal');
+  formCustomPull = document.getElementById('form-custom-pull');
+  inputCustomModel = document.getElementById('input-custom-model');
+  btnStartPull = document.getElementById('btn-start-pull');
+  pullStatusBox = document.getElementById('pull-status-box');
+  pullStatusMessage = document.getElementById('pull-status-message');
+  pullFeedbackMsg = document.getElementById('pull-feedback-msg');
+  lwProcessStatus = document.getElementById('lw-process-status');
+  lwProcessPid = document.getElementById('lw-process-pid');
+  terminalProcessStatus = document.getElementById('terminal-process-status');
+  terminalLogCounter = document.getElementById('terminal-log-counter');
+  modalOllamaConsole = document.getElementById('modal-ollama-console');
+  ollamaTerminalLogs = document.getElementById('ollama-terminal-logs');
+}
+
+export async function loadLocalWorker() {
   try {
     const statusPromise = apiFetch(`/api/local-worker/status?project_id=${encodeURIComponent(currentProjectId)}`);
     const modelsPromise = apiFetch(`/api/local-worker/models?project_id=${encodeURIComponent(currentProjectId)}`);
@@ -52,7 +112,7 @@ async export function loadLocalWorker() {
   }
 }
 
-async export function loadWorkerQueue() {
+export async function loadWorkerQueue() {
   try {
     const res = await apiFetch('/api/local-worker/queue');
     if (res.ok) {
@@ -164,11 +224,12 @@ export function renderWorkerQueue(queueData) {
   }
 }
 
-async export export function loadLocalWorkerModels() {
+export async function loadLocalWorkerModels() {
   await loadLocalWorker();
 }
 
 export function renderLocalWorkerUI() {
+  if (!lwStatusBadge) resolveLocalWorkerElements();
   // 1. Atualiza LEDs e Badges de Conexão e Processo
   const isOnline = localWorkerStatus.online;
   const isRunning = !!(localWorkerStatus.running || localWorkerStatus.online);
@@ -315,7 +376,7 @@ export function renderLocalWorkerUI() {
   }
 }
 
-async export function selectLocalModel(modelName) {
+export async function selectLocalModel(modelName) {
   if (!modelName) return;
   try {
     const res = await apiFetch('/api/local-worker/select', {
@@ -336,7 +397,7 @@ async export function selectLocalModel(modelName) {
   }
 }
 
-async export function pullLocalModel(modelName) {
+export async function pullLocalModel(modelName) {
   const target = (modelName || '').trim();
   if (!target) return;
 
@@ -402,6 +463,7 @@ async export function pullLocalModel(modelName) {
 }
 
 export function openModelModal() {
+  if (!modalModelDownload) resolveLocalWorkerElements();
   if (modalModelDownload) {
     modalModelDownload.style.display = 'flex';
     if (pullFeedbackMsg) pullFeedbackMsg.style.display = 'none';
@@ -410,12 +472,13 @@ export function openModelModal() {
 }
 
 export function closeModelModal() {
+  if (!modalModelDownload) resolveLocalWorkerElements();
   if (modalModelDownload) {
     modalModelDownload.style.display = 'none';
   }
 }
 
-async export function startOllamaServer() {
+export async function startOllamaServer() {
   const btnStart = document.getElementById('btn-start-ollama');
   if (btnStart) {
     btnStart.disabled = true;
@@ -436,7 +499,7 @@ async export function startOllamaServer() {
   }
 }
 
-async export function stopOllamaServer() {
+export async function stopOllamaServer() {
   const btnStop = document.getElementById('btn-stop-ollama');
   if (btnStop) {
     btnStop.disabled = true;
@@ -460,6 +523,7 @@ async export function stopOllamaServer() {
 let ollamaLogsPollingInterval = null;
 
 export function openOllamaConsole() {
+  if (!modalOllamaConsole) resolveLocalWorkerElements();
   if (modalOllamaConsole) {
     modalOllamaConsole.style.display = 'flex';
     fetchOllamaLogs();
@@ -470,6 +534,7 @@ export function openOllamaConsole() {
 }
 
 export function closeOllamaConsole() {
+  if (!modalOllamaConsole) resolveLocalWorkerElements();
   if (modalOllamaConsole) {
     modalOllamaConsole.style.display = 'none';
   }
@@ -479,7 +544,7 @@ export function closeOllamaConsole() {
   }
 }
 
-async export function fetchOllamaLogs() {
+export async function fetchOllamaLogs() {
   try {
     const res = await apiFetch('/api/local-worker/server-logs?limit=80');
     if (res.ok) {
@@ -566,6 +631,15 @@ export function renderOllamaLogLine(line) {
 }
 
 export function initLocalWorkerEvents() {
+  resolveLocalWorkerElements();
+
+  const btnStartOllama = document.getElementById('btn-start-ollama');
+  const btnStopOllama = document.getElementById('btn-stop-ollama');
+  const btnOpenOllamaConsole = document.getElementById('btn-open-ollama-console');
+  const btnCloseOllamaConsole = document.getElementById('btn-close-ollama-console');
+  const btnClearOllamaLogs = document.getElementById('btn-clear-ollama-logs');
+  const btnToggleAutoscroll = document.getElementById('btn-toggle-autoscroll');
+
   if (lwTopbarSelect) {
     lwTopbarSelect.addEventListener('change', (e) => selectLocalModel(e.target.value));
   }
@@ -699,18 +773,4 @@ export function initLocalWorkerEvents() {
     });
   });
 }
-
-// ==========================================================================
-// 8. CONFIGURAÇÕES & DELEGAÇÃO DE ESTILOS PARA NUVEM
-// ==========================================================================
-
-let currentSettings = {
-  enable_local_ai: false,
-  delegate_styles_to_cloud: true,
-  model: 'deepseek-coder-v2:16b-q3_k_m',
-  endpoint: 'http://127.0.0.1:11434',
-  auto_start_ollama: false,
-  circuit_breaker_threshold: 2,
-  project_root: ''
-};
 

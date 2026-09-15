@@ -4,7 +4,7 @@
  */
 
 import { escapeHtml } from './ui_utils.js';
-import { apiFetch, currentProjectId, knownProjects } from './state.js';
+import { apiFetch, currentProjectId, knownProjects, state } from './state.js';
 import { sendTerminalCommand } from './terminal_workspace.js';
 
 export class FileExplorerManager {

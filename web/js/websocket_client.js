@@ -3,16 +3,47 @@
  * Gerencia ciclo de vida da conexão bidirecional, reconexão com backoff e despacho de eventos.
  */
 
-import { WS_BASE, currentProjectId, state, setState, setKnownProjects, setCurrentProjectId, renderProjectSelectOptions } from './state.js';
-import { renderAll, updateDrawerContent } from './slices_chat.js';
+import {
+  WS_BASE,
+  currentProjectId,
+  state,
+  setState,
+  knownProjects,
+  setKnownProjects,
+  setCurrentProjectId,
+  renderProjectSelectOptions
+} from './state.js';
+import {
+  renderAll,
+  updateDrawerContent,
+  renderChatMessages,
+  loadHandoff
+} from './slices_chat.js';
 import { renderWorktreeSidebar } from './sidebar.js';
-import { renderOllamaLogLine } from './local_worker.js';
+import {
+  renderOllamaLogLine,
+  localWorkerStatus,
+  renderLocalWorkerUI,
+  renderWorkerQueue,
+  loadLocalWorker,
+  loadLocalWorkerModels
+} from './local_worker.js';
+import {
+  currentSettings,
+  applySettingsToUI
+} from './settings.js';
 import { fileExplorerManager } from './file_explorer.js';
 import { terminalWorkspace } from './terminal_workspace.js';
 
 export let socket = null;
 
+const getWsStatusText = () => document.getElementById('ws-status-text');
+const getWsStatusPill = () => document.getElementById('ws-status');
+const getPullFeedbackMsg = () => document.getElementById('pull-feedback-msg');
+
 export function initWebSocket() {
+  const wsStatusText = getWsStatusText();
+  const wsStatusPill = getWsStatusPill();
   if (wsStatusText) wsStatusText.textContent = 'WS Conectando...';
   const led = wsStatusPill ? wsStatusPill.querySelector('.pulse-led') : null;
   if (led) led.className = 'pulse-led offline';
@@ -26,6 +57,9 @@ export function initWebSocket() {
   }
 
   socket.onopen = () => {
+    const wsStatusText = getWsStatusText();
+    const wsStatusPill = getWsStatusPill();
+    const led = wsStatusPill ? wsStatusPill.querySelector('.pulse-led') : null;
     if (led) led.className = 'pulse-led online';
     if (wsStatusText) wsStatusText.textContent = 'WS Online';
     
@@ -40,29 +74,30 @@ export function initWebSocket() {
     try {
       const data = JSON.parse(event.data);
       if (data.event === 'PROJECTS_UPDATED') {
-        knownProjects = data.payload || [];
+        setKnownProjects(data.payload || []);
         renderProjectSelectOptions();
         renderWorktreeSidebar();
       } else if (data.event === 'STATE_FULL') {
         const incomingPid = data.project_id || (data.payload && (data.payload.active_project_id || data.payload.project_id));
         if (!incomingPid || incomingPid === currentProjectId) {
-          state = data.payload || {};
-          state.active_project_id = currentProjectId;
+          const incomingState = data.payload || {};
+          incomingState.active_project_id = currentProjectId;
+          setState(incomingState);
           renderAll();
           loadLocalWorker();
-          if (typeof fileExplorerManager !== 'undefined') {
+          if (typeof fileExplorerManager !== 'undefined' && fileExplorerManager) {
             fileExplorerManager.updateProjectHeader();
           }
         }
       } else if (data.event === 'PROJECT_ROOT_UPDATED' || data.event === 'PROJECT_SWITCHED') {
         if (!data.project_id || data.project_id === currentProjectId) {
-          if (typeof fileExplorerManager !== 'undefined') {
+          if (typeof fileExplorerManager !== 'undefined' && fileExplorerManager) {
             fileExplorerManager.loadFileTree(currentProjectId, true);
           }
         }
       } else if (data.event === 'SETTINGS_UPDATED') {
         if (!data.project_id || data.project_id === currentProjectId) {
-          currentSettings = Object.assign(currentSettings, data.payload || {});
+          Object.assign(currentSettings, data.payload || {});
           applySettingsToUI(currentSettings);
         }
       } else if (data.event === 'LOCAL_WORKER_CONFIG_UPDATED' || data.event === 'LOCAL_WORKER_STATUS_CHANGED' || data.event === 'ollama_status' || data.type === 'ollama_status') {
@@ -99,6 +134,7 @@ export function initWebSocket() {
         const workerPullPercent = document.getElementById('worker-pull-percent');
         const workerPullBar = document.getElementById('worker-pull-bar');
         const workerPullDetails = document.getElementById('worker-pull-details');
+        const pullFeedbackMsg = getPullFeedbackMsg();
 
         let percent = 0;
         let detailsText = chunk.status || 'Processando...';
@@ -127,6 +163,7 @@ export function initWebSocket() {
       } else if (data.event === 'model_pull_complete') {
         loadLocalWorkerModels();
         const payload = data.payload || {};
+        const pullFeedbackMsg = getPullFeedbackMsg();
 
         const workerBanner = document.getElementById('worker-pull-progress-banner');
         const workerPullTitle = document.getElementById('worker-pull-title');
@@ -180,12 +217,15 @@ export function initWebSocket() {
   };
 
   socket.onclose = () => {
+    const wsStatusText = getWsStatusText();
+    const wsStatusPill = getWsStatusPill();
+    const led = wsStatusPill ? wsStatusPill.querySelector('.pulse-led') : null;
     if (led) led.className = 'pulse-led offline';
     if (wsStatusText) wsStatusText.textContent = 'WS Desconectado';
     setTimeout(initWebSocket, 2000);
   };
 
-  socket.onerror = () => socket.close();
+  socket.onerror = () => {
+    if (socket) socket.close();
+  };
 }
-
-// 3. RENDER ALL

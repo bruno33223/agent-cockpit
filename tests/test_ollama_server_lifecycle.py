@@ -142,14 +142,14 @@ class TestOllamaServerLifecycle(unittest.TestCase):
 
         # Testa auto-start com auto_start_ollama = True
         with patch.object(web_server, "ollama_process_manager", mock_mgr):
-            with patch.object(db, "get_local_worker_config", return_value={"auto_start_ollama": True}):
+            with patch.object(db, "get_local_worker_config", return_value={"auto_start_ollama": True, "enabled": True}):
                 asyncio.run(web_server.auto_start_ollama_task())
                 self.assertTrue(mock_mgr.start.called, "start() deveria ser chamado quando auto_start_ollama=True e porta fechada")
 
         # Testa que NÃO inicia quando auto_start_ollama = False
         mock_mgr.reset_mock()
         with patch.object(web_server, "ollama_process_manager", mock_mgr):
-            with patch.object(db, "get_local_worker_config", return_value={"auto_start_ollama": False}):
+            with patch.object(db, "get_local_worker_config", return_value={"auto_start_ollama": False, "enabled": True}):
                 asyncio.run(web_server.auto_start_ollama_task())
                 self.assertFalse(mock_mgr.start.called, "start() não deveria ser chamado quando auto_start_ollama=False")
 
@@ -157,7 +157,7 @@ class TestOllamaServerLifecycle(unittest.TestCase):
         mock_mgr.reset_mock()
         mock_mgr.is_port_open.return_value = True
         with patch.object(web_server, "ollama_process_manager", mock_mgr):
-            with patch.object(db, "get_local_worker_config", return_value={"auto_start_ollama": True}):
+            with patch.object(db, "get_local_worker_config", return_value={"auto_start_ollama": True, "enabled": True}):
                 asyncio.run(web_server.auto_start_ollama_task())
                 self.assertFalse(mock_mgr.start.called, "start() não deveria ser chamado se a porta já estiver aberta")
 

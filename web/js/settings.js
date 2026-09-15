@@ -4,14 +4,18 @@
  * do serviço de autostart com o sistema operacional.
  */
 
-import { apiFetch } from './state.js';
+import { apiFetch, currentProjectId } from './state.js';
 import { escapeHtml } from './ui_utils.js';
 
 // AUTOSTART LOGIC
-const btnAutostart = document.getElementById('btn-autostart');
 let autostartEnabled = false;
 
-async export function checkAutostartStatus() {
+function getBtnAutostart() {
+  return document.getElementById('btn-autostart');
+}
+
+export async function checkAutostartStatus() {
+  const btnAutostart = getBtnAutostart();
   if (!btnAutostart) return;
   try {
     const res = await apiFetch('/api/autostart');
@@ -26,6 +30,7 @@ async export function checkAutostartStatus() {
 
 export function updateAutostartUI(enabled) {
   autostartEnabled = !!enabled;
+  const btnAutostart = getBtnAutostart();
   if (!btnAutostart) return;
   btnAutostart.classList.remove('loading');
   const label = btnAutostart.querySelector('.autostart-text');
@@ -40,77 +45,21 @@ export function updateAutostartUI(enabled) {
   }
 }
 
-if (btnAutostart) {
-  btnAutostart.addEventListener('click', async () => {
-    btnAutostart.classList.add('loading');
-    const newState = !autostartEnabled;
-    try {
-      const res = await apiFetch('/api/autostart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: newState })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        updateAutostartUI(data.enabled);
-      } else {
-        updateAutostartUI(autostartEnabled);
-      }
-    } catch (err) {
-      console.error('[Autostart] Erro ao alternar autostart:', err);
-      updateAutostartUI(autostartEnabled);
-    }
-  });
-}
-
 // ==========================================================================
-// LOCAL WORKER (OLLAMA) INTEGRATION (Fatia 3)
+// 8. CONFIGURAÇÕES GERAIS & HARNESS DE IA LOCAL
 // ==========================================================================
-const lwPillLed = document.getElementById('lw-pill-led');
-const lwTopbarSelect = document.getElementById('lw-topbar-select');
-const btnTopbarPullModal = document.getElementById('btn-topbar-pull-modal');
 
-const lwStatusBadge = document.getElementById('lw-status-badge');
-const lwSidebarSelect = document.getElementById('lw-sidebar-select');
-const lwEndpointDisplay = document.getElementById('lw-endpoint-display');
-const btnOpenPullModal = document.getElementById('btn-open-pull-modal');
-
-const modalModelDownload = document.getElementById('modal-model-download');
-const btnCloseModelModal = document.getElementById('btn-close-model-modal');
-const formCustomPull = document.getElementById('form-custom-pull');
-const inputCustomModel = document.getElementById('input-custom-model');
-const btnStartPull = document.getElementById('btn-start-pull');
-const pullStatusBox = document.getElementById('pull-status-box');
-const pullStatusMessage = document.getElementById('pull-status-message');
-const pullFeedbackMsg = document.getElementById('pull-feedback-msg');
-
-// Elementos de Controle e Terminal do Ollama (Local Worker)
-const btnStartOllama = document.getElementById('btn-start-ollama');
-const btnStopOllama = document.getElementById('btn-stop-ollama');
-const btnOpenOllamaConsole = document.getElementById('btn-open-ollama-console');
-const btnCloseOllamaConsole = document.getElementById('btn-close-ollama-console');
-const modalOllamaConsole = document.getElementById('modal-ollama-console');
-const ollamaTerminalLogs = document.getElementById('ollama-terminal-logs');
-const btnClearOllamaLogs = document.getElementById('btn-clear-ollama-logs');
-const btnToggleAutoscroll = document.getElementById('btn-toggle-autoscroll');
-const terminalProcessStatus = document.getElementById('terminal-process-status');
-const terminalLogCounter = document.getElementById('terminal-log-counter');
-const lwProcessStatus = document.getElementById('lw-process-status');
-const lwProcessPid = document.getElementById('lw-process-pid');
-let isOllamaAutoScrollEnabled = true;
-
-let localWorkerStatus = {
-  online: false,
-  running: false,
-  pid: null,
-  model: '',
+export let currentSettings = {
+  enable_local_ai: false,
+  delegate_styles_to_cloud: true,
+  model: 'deepseek-coder-v2:16b-q3_k_m',
   endpoint: 'http://127.0.0.1:11434',
-  installed: [],
-  recommended: []
+  auto_start_ollama: false,
+  circuit_breaker_threshold: 2,
+  project_root: ''
 };
 
-
-async export function loadSettings() {
+export async function loadSettings() {
   try {
     const res = await apiFetch(`/api/settings?project_id=${encodeURIComponent(currentProjectId)}`);
     if (res.ok) {
@@ -229,7 +178,7 @@ export function populateSettingsModelSelect(installedModels, currentModel) {
   }
 }
 
-async export function saveSettingUpdate(updates, successNotice = 'Configuração salva com sucesso!') {
+export async function saveSettingUpdate(updates, successNotice = 'Configuração salva com sucesso!') {
   try {
     const payload = Object.assign({ project_id: currentProjectId }, updates);
     const res = await apiFetch('/api/settings', {
@@ -318,12 +267,36 @@ export function initSettingsEvents() {
       }
     });
   }
+
+  const btnAutostart = getBtnAutostart();
+  if (btnAutostart) {
+    btnAutostart.addEventListener('click', async () => {
+      btnAutostart.classList.add('loading');
+      const newState = !autostartEnabled;
+      try {
+        const res = await apiFetch('/api/autostart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: newState })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          updateAutostartUI(data.enabled);
+        } else {
+          updateAutostartUI(autostartEnabled);
+        }
+      } catch (err) {
+        console.error('[Autostart] Erro ao alternar autostart:', err);
+        updateAutostartUI(autostartEnabled);
+      }
+    });
+  }
 }
 
 // =========================================================================
 // TERMINAL PTY & OPENCODE / OMNIROUTE RUNNER (ORCA WORKBENCH)
 
-async export function checkOmniRouteStatus() {
+export async function checkOmniRouteStatus() {
   const indicator = document.getElementById('terminal-omni-indicator');
   const pill = document.getElementById('omniroute-status-pill');
   try {
@@ -355,7 +328,7 @@ async export function checkOmniRouteStatus() {
   }
 }
 
-async export function loadOmniRouteSettings() {
+export async function loadOmniRouteSettings() {
   const urlInput = document.getElementById('omniroute-url-input');
   const keyInput = document.getElementById('omniroute-key-input');
   const modelInput = document.getElementById('omniroute-model-input');

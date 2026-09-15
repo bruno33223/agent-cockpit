@@ -12,6 +12,23 @@ let selectedGraphNode = null;
 let hoveredGraphNode = null;
 let graphAnimationId = null;
 
+let graphCanvas = null;
+let canvasViewport = null;
+let inspectorEmpty = null;
+let inspectorContent = null;
+let btnRefreshGraph = null;
+let graphSearchInput = null;
+
+export function resolveGraphElements() {
+  if (typeof document === 'undefined') return;
+  graphCanvas = document.getElementById('graph-canvas');
+  canvasViewport = document.getElementById('canvas-viewport');
+  inspectorEmpty = document.getElementById('inspector-empty');
+  inspectorContent = document.getElementById('inspector-content');
+  btnRefreshGraph = document.getElementById('btn-refresh-graph');
+  graphSearchInput = document.getElementById('graph-search');
+}
+
 export function getActiveProjectRoot() {
   if (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) {
     const activeProj = knownProjects.find(p => p.id === currentProjectId);
@@ -24,6 +41,7 @@ export function getActiveProjectRoot() {
 }
 
 export function deselectGraphNode() {
+  if (!inspectorEmpty) resolveGraphElements();
   selectedGraphNode = null;
   drawGraph();
 
@@ -471,154 +489,23 @@ function drawGraph() {
   });
 }
 
-// Interação com Mouse (Pan, Zoom, Drag & Click)
-if (graphCanvas) {
-  graphCanvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    const rect = graphCanvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    graphPanX = mouseX - (mouseX - graphPanX) * zoomFactor;
-    graphPanY = mouseY - (mouseY - graphPanY) * zoomFactor;
-    graphZoom = Math.max(0.15, Math.min(graphZoom * zoomFactor, 6.0));
-    drawGraph();
-  }, { passive: false });
-
-  let mouseDownScreenX = 0;
-  let mouseDownScreenY = 0;
-  let hasDraggedMouse = false;
-
-  graphCanvas.addEventListener('mousedown', (e) => {
-    const rect = graphCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - graphPanX) / graphZoom;
-    const y = (e.clientY - rect.top - graphPanY) / graphZoom;
-
-    mouseDownScreenX = e.clientX;
-    mouseDownScreenY = e.clientY;
-    hasDraggedMouse = false;
-
-    const clicked = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 5);
-    if (clicked) {
-      draggedGraphNode = clicked;
-      // Toggle de foco: se clicar no mesmo nó que já estava selecionado, DESFOCA / DESSELECIONA!
-      if (selectedGraphNode && selectedGraphNode.id === clicked.id) {
-        deselectGraphNode();
-      } else {
-        selectGraphNode(clicked);
-      }
-    } else {
-      isGraphPanning = true;
-      startPanX = e.clientX - graphPanX;
-      startPanY = e.clientY - graphPanY;
-    }
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (Math.hypot(e.clientX - mouseDownScreenX, e.clientY - mouseDownScreenY) > 4) {
-      hasDraggedMouse = true;
-    }
-
-    if (isGraphPanning) {
-      graphPanX = e.clientX - startPanX;
-      graphPanY = e.clientY - startPanY;
-      drawGraph();
-      return;
-    }
-    if (draggedGraphNode && graphCanvas) {
-      const rect = graphCanvas.getBoundingClientRect();
-      draggedGraphNode.x = (e.clientX - rect.left - graphPanX) / graphZoom;
-      draggedGraphNode.y = (e.clientY - rect.top - graphPanY) / graphZoom;
-      drawGraph();
-      return;
-    }
-    if (graphCanvas && graphCanvas.offsetParent !== null) {
-      const rect = graphCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left - graphPanX) / graphZoom;
-      const y = (e.clientY - rect.top - graphPanY) / graphZoom;
-      const prevHover = hoveredGraphNode;
-      hoveredGraphNode = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 5);
-
-      if (hoveredGraphNode !== prevHover) {
-        graphCanvas.style.cursor = hoveredGraphNode ? 'pointer' : 'grab';
-        drawGraph();
-      }
-    }
-  });
-
-  window.addEventListener('mouseup', () => {
-    // Se clicou no fundo vazio do canvas e NÃO arrastou: DESFOCA / DESSELECIONA!
-    if (isGraphPanning && !hasDraggedMouse) {
-      deselectGraphNode();
-    }
-    isGraphPanning = false;
-    draggedGraphNode = null;
-    if (graphCanvas) graphCanvas.style.cursor = 'grab';
-  });
-
-  graphCanvas.addEventListener('dblclick', () => {
-    fitGraphToViewport();
-  });
-
-  window.addEventListener('resize', () => {
-    if (graphCanvas && canvasViewport && document.getElementById('view-graph')?.classList.contains('active')) {
-      const rect = canvasViewport.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        graphCanvas.width = rect.width;
-        graphCanvas.height = rect.height;
-        drawGraph();
-      }
-    }
-  });
-}
-
-// Botões Flutuantes de Controle do Canvas
-const btnZoomIn = document.getElementById('btn-zoom-in');
-const btnZoomOut = document.getElementById('btn-zoom-out');
-const btnZoomFit = document.getElementById('btn-zoom-fit');
-
-if (btnZoomIn) {
-  btnZoomIn.addEventListener('click', () => {
-    const rect = graphCanvas.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    const factor = 1.3;
-    graphPanX = cx - (cx - graphPanX) * factor;
-    graphPanY = cy - (cy - graphPanY) * factor;
-    graphZoom = Math.min(graphZoom * factor, 6.0);
-    drawGraph();
-  });
-}
-
-if (btnZoomOut) {
-  btnZoomOut.addEventListener('click', () => {
-    const rect = graphCanvas.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    const factor = 0.77;
-    graphPanX = cx - (cx - graphPanX) * factor;
-    graphPanY = cy - (cy - graphPanY) * factor;
-    graphZoom = Math.max(graphZoom * factor, 0.15);
-    drawGraph();
-  });
-}
-
-if (btnZoomFit) {
-  btnZoomFit.addEventListener('click', () => fitGraphToViewport());
-}
-
+// Interação com Nós (Seleção e Inspeção)
 export function selectGraphNode(node) {
+  if (!inspectorEmpty) resolveGraphElements();
   selectedGraphNode = node;
   drawGraph();
 
-  inspectorEmpty.style.display = 'none';
-  inspectorContent.style.display = 'block';
+  if (inspectorEmpty) inspectorEmpty.style.display = 'none';
+  if (inspectorContent) inspectorContent.style.display = 'block';
 
-  document.getElementById('inspector-type').textContent = (node.type || 'FILE').toUpperCase();
-  document.getElementById('inspector-filename').textContent = node.label;
-  document.getElementById('inspector-path').textContent = node.id;
-  document.getElementById('inspector-lines').textContent = node.lines;
+  const elType = document.getElementById('inspector-type');
+  if (elType) elType.textContent = (node.type || 'FILE').toUpperCase();
+  const elFilename = document.getElementById('inspector-filename');
+  if (elFilename) elFilename.textContent = node.label;
+  const elPath = document.getElementById('inspector-path');
+  if (elPath) elPath.textContent = node.id;
+  const elLines = document.getElementById('inspector-lines');
+  if (elLines) elLines.textContent = node.lines;
 
   // Consulta raio de impacto
   apiFetch(`/api/graph`)
@@ -627,33 +514,39 @@ export function selectGraphNode(node) {
       const riskBadge = document.getElementById('inspector-risk');
       const risk = dependents.length <= 1 ? 'LOW' : (dependents.length <= 3 ? 'MEDIUM' : 'HIGH');
 
-      riskBadge.textContent = risk;
-      riskBadge.className = `risk-badge ${risk.toLowerCase()}`;
+      if (riskBadge) {
+        riskBadge.textContent = risk;
+        riskBadge.className = `risk-badge ${risk.toLowerCase()}`;
+      }
 
       // Símbolos
       const symbolsList = document.getElementById('inspector-symbols');
-      symbolsList.innerHTML = '';
-      if (node.symbols && node.symbols.length) {
-        node.symbols.forEach(s => {
-          const li = document.createElement('li');
-          li.textContent = s;
-          symbolsList.appendChild(li);
-        });
-      } else {
-        symbolsList.innerHTML = '<li style="color: var(--text-muted)">Nenhum símbolo exportado</li>';
+      if (symbolsList) {
+        symbolsList.innerHTML = '';
+        if (node.symbols && node.symbols.length) {
+          node.symbols.forEach(s => {
+            const li = document.createElement('li');
+            li.textContent = s;
+            symbolsList.appendChild(li);
+          });
+        } else {
+          symbolsList.innerHTML = '<li style="color: var(--text-muted)">Nenhum símbolo exportado</li>';
+        }
       }
 
       // Dependentes
       const depList = document.getElementById('inspector-dependents');
-      depList.innerHTML = '';
-      if (dependents.length) {
-        dependents.forEach(d => {
-          const li = document.createElement('li');
-          li.textContent = d;
-          depList.appendChild(li);
-        });
-      } else {
-        depList.innerHTML = '<li style="color: var(--text-muted)">Nenhum arquivo dependente direto</li>';
+      if (depList) {
+        depList.innerHTML = '';
+        if (dependents.length) {
+          dependents.forEach(d => {
+            const li = document.createElement('li');
+            li.textContent = d;
+            depList.appendChild(li);
+          });
+        } else {
+          depList.innerHTML = '<li style="color: var(--text-muted)">Nenhum arquivo dependente direto</li>';
+        }
       }
     });
 
@@ -685,74 +578,215 @@ export function selectGraphNode(node) {
   }
 }
 
-// Botão Salvar Nota do Vault
-const btnSaveNote = document.getElementById('btn-save-note');
-if (btnSaveNote) {
-  btnSaveNote.addEventListener('click', () => {
-    if (!selectedGraphNode) return;
-    const noteEditor = document.getElementById('inspector-note-editor');
-    const noteStatus = document.getElementById('note-save-status');
-    if (!noteEditor) return;
+// Inicialização de Eventos do Grafo (Mouse, Canvas, Zoom e Busca)
+export function initCodebaseGraphEvents() {
+  resolveGraphElements();
 
-    const content = noteEditor.value.trim();
-    const targetRoot = getActiveProjectRoot();
+  if (graphCanvas) {
+    graphCanvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      const rect = graphCanvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-    btnSaveNote.disabled = true;
-    btnSaveNote.textContent = 'Salvando...';
+      graphPanX = mouseX - (mouseX - graphPanX) * zoomFactor;
+      graphPanY = mouseY - (mouseY - graphPanY) * zoomFactor;
+      graphZoom = Math.max(0.15, Math.min(graphZoom * zoomFactor, 6.0));
+      drawGraph();
+    }, { passive: false });
 
-    apiFetch('/api/vault/note', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        file: selectedGraphNode.id,
-        content: content,
-        root: targetRoot
-      })
-    })
-    .then(r => r.json())
-    .then(res => {
-      btnSaveNote.disabled = false;
-      btnSaveNote.textContent = 'Salvar Nota';
-      if (res.status === 'ok') {
-        if (noteStatus) {
-          noteStatus.textContent = '✓ Salvo em cockpit-agent/vault!';
-          setTimeout(() => { if (noteStatus) noteStatus.textContent = ''; }, 3500);
+    let mouseDownScreenX = 0;
+    let mouseDownScreenY = 0;
+    let hasDraggedMouse = false;
+
+    graphCanvas.addEventListener('mousedown', (e) => {
+      const rect = graphCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left - graphPanX) / graphZoom;
+      const y = (e.clientY - rect.top - graphPanY) / graphZoom;
+
+      mouseDownScreenX = e.clientX;
+      mouseDownScreenY = e.clientY;
+      hasDraggedMouse = false;
+
+      const clicked = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 5);
+      if (clicked) {
+        draggedGraphNode = clicked;
+        if (selectedGraphNode && selectedGraphNode.id === clicked.id) {
+          deselectGraphNode();
+        } else {
+          selectGraphNode(clicked);
         }
       } else {
-        alert(res.message || 'Erro ao salvar nota.');
+        isGraphPanning = true;
+        startPanX = e.clientX - graphPanX;
+        startPanY = e.clientY - graphPanY;
       }
-    })
-    .catch(err => {
-      btnSaveNote.disabled = false;
-      btnSaveNote.textContent = 'Salvar Nota';
-      alert('Erro na requisição: ' + err);
     });
-  });
-}
 
-if (btnRefreshGraph) {
-  btnRefreshGraph.addEventListener('click', () => initOrRefreshGraph());
-}
-
-if (graphSearchInput) {
-  graphSearchInput.addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase().trim();
-    if (!term) {
-      selectedGraphNode = null;
-      drawGraph();
-      return;
-    }
-    const match = graphNodes.find(n => n.label.toLowerCase().includes(term) || n.id.toLowerCase().includes(term) || (n.symbols && n.symbols.some(s => s.toLowerCase().includes(term))));
-    if (match) {
-      selectGraphNode(match);
-      if (graphCanvas) {
-        const rect = graphCanvas.getBoundingClientRect();
-        graphPanX = rect.width / 2 - match.x * graphZoom;
-        graphPanY = rect.height / 2 - match.y * graphZoom;
-        drawGraph();
+    window.addEventListener('mousemove', (e) => {
+      if (Math.hypot(e.clientX - mouseDownScreenX, e.clientY - mouseDownScreenY) > 4) {
+        hasDraggedMouse = true;
       }
-    }
-  });
-}
 
-// 6. DRAWER
+      if (isGraphPanning) {
+        graphPanX = e.clientX - startPanX;
+        graphPanY = e.clientY - startPanY;
+        drawGraph();
+        return;
+      }
+      if (draggedGraphNode && graphCanvas) {
+        const rect = graphCanvas.getBoundingClientRect();
+        draggedGraphNode.x = (e.clientX - rect.left - graphPanX) / graphZoom;
+        draggedGraphNode.y = (e.clientY - rect.top - graphPanY) / graphZoom;
+        drawGraph();
+        return;
+      }
+      if (graphCanvas && graphCanvas.offsetParent !== null) {
+        const rect = graphCanvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - graphPanX) / graphZoom;
+        const y = (e.clientY - rect.top - graphPanY) / graphZoom;
+        const prevHover = hoveredGraphNode;
+        hoveredGraphNode = graphNodes.find(n => Math.hypot(n.x - x, n.y - y) <= n.radius + 5);
+
+        if (hoveredGraphNode !== prevHover) {
+          graphCanvas.style.cursor = hoveredGraphNode ? 'pointer' : 'grab';
+          drawGraph();
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isGraphPanning && !hasDraggedMouse) {
+        deselectGraphNode();
+      }
+      isGraphPanning = false;
+      draggedGraphNode = null;
+      if (graphCanvas) graphCanvas.style.cursor = 'grab';
+    });
+
+    graphCanvas.addEventListener('dblclick', () => {
+      fitGraphToViewport();
+    });
+
+    window.addEventListener('resize', () => {
+      if (graphCanvas && canvasViewport && document.getElementById('view-graph')?.classList.contains('active')) {
+        const rect = canvasViewport.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          graphCanvas.width = rect.width;
+          graphCanvas.height = rect.height;
+          drawGraph();
+        }
+      }
+    });
+  }
+
+  // Botões Flutuantes de Controle do Canvas
+  const btnZoomIn = document.getElementById('btn-zoom-in');
+  const btnZoomOut = document.getElementById('btn-zoom-out');
+  const btnZoomFit = document.getElementById('btn-zoom-fit');
+
+  if (btnZoomIn) {
+    btnZoomIn.addEventListener('click', () => {
+      if (!graphCanvas) resolveGraphElements();
+      if (!graphCanvas) return;
+      const rect = graphCanvas.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const factor = 1.3;
+      graphPanX = cx - (cx - graphPanX) * factor;
+      graphPanY = cy - (cy - graphPanY) * factor;
+      graphZoom = Math.min(graphZoom * factor, 6.0);
+      drawGraph();
+    });
+  }
+
+  if (btnZoomOut) {
+    btnZoomOut.addEventListener('click', () => {
+      if (!graphCanvas) resolveGraphElements();
+      if (!graphCanvas) return;
+      const rect = graphCanvas.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const factor = 0.77;
+      graphPanX = cx - (cx - graphPanX) * factor;
+      graphPanY = cy - (cy - graphPanY) * factor;
+      graphZoom = Math.max(graphZoom * factor, 0.15);
+      drawGraph();
+    });
+  }
+
+  if (btnZoomFit) {
+    btnZoomFit.addEventListener('click', () => fitGraphToViewport());
+  }
+
+  // Botão Salvar Nota do Vault
+  const btnSaveNote = document.getElementById('btn-save-note');
+  if (btnSaveNote) {
+    btnSaveNote.addEventListener('click', () => {
+      if (!selectedGraphNode) return;
+      const noteEditor = document.getElementById('inspector-note-editor');
+      const noteStatus = document.getElementById('note-save-status');
+      if (!noteEditor) return;
+
+      const content = noteEditor.value.trim();
+      const targetRoot = getActiveProjectRoot();
+
+      btnSaveNote.disabled = true;
+      btnSaveNote.textContent = 'Salvando...';
+
+      apiFetch('/api/vault/note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file: selectedGraphNode.id,
+          content: content,
+          root: targetRoot
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        btnSaveNote.disabled = false;
+        btnSaveNote.textContent = 'Salvar Nota';
+        if (res.status === 'ok') {
+          if (noteStatus) {
+            noteStatus.textContent = '✓ Salvo em cockpit-agent/vault!';
+            setTimeout(() => { if (noteStatus) noteStatus.textContent = ''; }, 3500);
+          }
+        } else {
+          alert(res.message || 'Erro ao salvar nota.');
+        }
+      })
+      .catch(err => {
+        btnSaveNote.disabled = false;
+        btnSaveNote.textContent = 'Salvar Nota';
+        alert('Erro na requisição: ' + err);
+      });
+    });
+  }
+
+  if (btnRefreshGraph) {
+    btnRefreshGraph.addEventListener('click', () => initOrRefreshGraph());
+  }
+
+  if (graphSearchInput) {
+    graphSearchInput.addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase().trim();
+      if (!term) {
+        selectedGraphNode = null;
+        drawGraph();
+        return;
+      }
+      const match = graphNodes.find(n => n.label.toLowerCase().includes(term) || n.id.toLowerCase().includes(term) || (n.symbols && n.symbols.some(s => s.toLowerCase().includes(term))));
+      if (match) {
+        selectGraphNode(match);
+        if (graphCanvas) {
+          const rect = graphCanvas.getBoundingClientRect();
+          graphPanX = rect.width / 2 - match.x * graphZoom;
+          graphPanY = rect.height / 2 - match.y * graphZoom;
+          drawGraph();
+        }
+      }
+    });
+  }
+}

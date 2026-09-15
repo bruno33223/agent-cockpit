@@ -195,7 +195,9 @@ export class TerminalWorkspaceManager {
     const initialContext = currentProjectId ? `project:${currentProjectId}` : 'global';
     this.switchContext(initialContext, this.getActiveProjectRoot(), true);
 
-    checkOmniRouteStatus();
+    if (typeof window !== 'undefined' && typeof window.checkOmniRouteStatus === 'function') {
+      window.checkOmniRouteStatus();
+    }
   }
 
   getActiveProjectRoot() {
@@ -908,16 +910,6 @@ export class TerminalWorkspaceManager {
     this.switchContext(`slice:${projId}:${sliceId}`, cwd, true);
   }
 }
-
-const terminalWorkspace = new TerminalWorkspaceManager();
-
-function initOrFitTerminal() {
-  terminalWorkspace.init();
-  terminalWorkspace.fitAll();
-}
-
-function sendTerminalCommand(cmd) {
-  terminalWorkspace.sendToActive(cmd);
 
 export const terminalWorkspace = new TerminalWorkspaceManager();
 

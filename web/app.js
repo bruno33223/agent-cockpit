@@ -7,9 +7,13 @@
 import { escapeHtml, formatRelativeCwd, formatBytes, showToast } from './js/ui_utils.js';
 import {
   state,
+  setState,
   currentProjectId,
+  setCurrentProjectId,
   activeSliceId,
+  setActiveSliceId,
   knownProjects,
+  setKnownProjects,
   apiFetch,
   loadProjects,
   switchProject,
@@ -55,14 +59,16 @@ import {
   renderFinalGate,
   renderChatMessages,
   renderGauntletFull,
-  updateDrawerContent
+  updateDrawerContent,
+  initSlicesChatEvents
 } from './js/slices_chat.js';
 import {
   initOrRefreshGraph,
   getActiveProjectRoot,
   selectGraphNode,
   deselectGraphNode,
-  fitGraphToViewport
+  fitGraphToViewport,
+  initCodebaseGraphEvents
 } from './js/codebase_graph.js';
 import {
   loadLocalWorker,
@@ -95,6 +101,33 @@ import {
 } from './js/websocket_client.js';
 
 // 2. Exportação para Escopo Global (window) para Retrocompatibilidade com DOM e Testes
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'state', {
+    get: () => state,
+    set: (v) => { if (v !== state) setState(v); },
+    configurable: true,
+    enumerable: true
+  });
+  Object.defineProperty(window, 'currentProjectId', {
+    get: () => currentProjectId,
+    set: (v) => { if (v !== currentProjectId) setCurrentProjectId(v); },
+    configurable: true,
+    enumerable: true
+  });
+  Object.defineProperty(window, 'activeSliceId', {
+    get: () => activeSliceId,
+    set: (v) => { if (v !== activeSliceId) setActiveSliceId(v); },
+    configurable: true,
+    enumerable: true
+  });
+  Object.defineProperty(window, 'knownProjects', {
+    get: () => knownProjects,
+    set: (v) => { if (v !== knownProjects) setKnownProjects(v); },
+    configurable: true,
+    enumerable: true
+  });
+}
+
 Object.assign(window, {
   // Utils
   escapeHtml,
@@ -102,11 +135,11 @@ Object.assign(window, {
   formatBytes,
   showToast,
 
-  // State & Multi-Workspace
-  state,
-  currentProjectId,
-  activeSliceId,
-  knownProjects,
+  // State & Multi-Workspace Setters
+  setState,
+  setCurrentProjectId,
+  setActiveSliceId,
+  setKnownProjects,
   apiFetch,
   loadProjects,
   switchProject,
@@ -153,6 +186,7 @@ Object.assign(window, {
   renderChatMessages,
   renderGauntletFull,
   updateDrawerContent,
+  initSlicesChatEvents,
 
   // Codebase Graph
   initOrRefreshGraph,
@@ -160,6 +194,7 @@ Object.assign(window, {
   selectGraphNode,
   deselectGraphNode,
   fitGraphToViewport,
+  initCodebaseGraphEvents,
 
   // Local AI Worker
   loadLocalWorker,
@@ -192,33 +227,51 @@ Object.assign(window, {
 });
 
 // 3. Inicialização e Bootstrapping da Aplicação
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[Agent Cockpit] Inicializando módulos desacoplados...');
+async function bootstrapCockpit() {
+  console.log('[Agent Cockpit] Inicializando orquestrador modular...');
 
-  // 1. Inicializa navegação, sidebar e atalhos
+  // 1. Inicializa subsistemas visuais e eventos
   initSidebar();
+  initSlicesChatEvents();
+  initCodebaseGraphEvents();
+  initLocalWorkerEvents();
+  initSettingsEvents();
+  initTerminalAndOmniEvents();
 
-  // 2. Inicializa workspace de terminais e explorador de arquivos
+  // 2. Inicializa terminais virtuais e explorador de arquivos
   terminalWorkspace.init();
   fileExplorerManager.init();
 
   // 3. Inicializa conexão WebSocket em tempo real
   initWebSocket();
 
-  // 4. Carrega estado de projetos e subsistemas
-  await loadProjects();
+  // 4. Carrega projetos e sincroniza estado dos subsistemas
+  try {
+    await loadProjects();
+    renderWorktreeSidebar();
+  } catch (err) {
+    console.warn('[Agent Cockpit] Erro ao carregar projetos iniciais:', err);
+  }
+
   checkAutostartStatus();
   loadLocalWorker();
   loadSettings();
   loadOmniRouteSettings();
 
-  // 5. Inicializa listeners de eventos de configurações e local worker
-  initLocalWorkerEvents();
-  initSettingsEvents();
-  initTerminalAndOmniEvents();
+  if (typeof fileExplorerManager !== 'undefined' && fileExplorerManager) {
+    fileExplorerManager.loadFileTree(currentProjectId);
+  }
 
-  console.log('[Agent Cockpit] Inicialização concluída com sucesso.');
-});
+  console.log('[Agent Cockpit] Inicialização modular concluída com sucesso.');
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrapCockpit);
+  } else {
+    bootstrapCockpit();
+  }
+}
 
 // Exportações do entrypoint
 export {

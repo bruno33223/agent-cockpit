@@ -14,7 +14,8 @@ import {
   switchProject,
   setActiveSliceId,
   getProjectDotClass,
-  getProjectDotTitle
+  getProjectDotTitle,
+  subscribe
 } from './state.js';
 
 let isProjectsExpanded = false;
@@ -44,6 +45,13 @@ export function initSidebar() {
   });
 
   initOrcaNavigationAndModals();
+
+  // Reatividade a mudanças no State Store
+  subscribe('projects', () => renderWorktreeSidebar());
+  subscribe('project', () => renderWorktreeSidebar());
+
+  // Render inicial imediato
+  renderWorktreeSidebar();
 }
 
 // Alternador de Abas Principais (Views)

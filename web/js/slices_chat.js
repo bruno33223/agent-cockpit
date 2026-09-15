@@ -5,10 +5,80 @@
  */
 
 import { escapeHtml } from './ui_utils.js';
-import { apiFetch, state, currentProjectId, activeSliceId, setActiveSliceId } from './state.js';
+import { apiFetch, state, setState, currentProjectId, activeSliceId, setActiveSliceId } from './state.js';
 import { renderWorktreeSidebar } from './sidebar.js';
 
+// Variáveis e referências defensivas aos elementos de DOM
+let epicTitle = null;
+let overviewEpicGoal = null;
+let nodesCanvas = null;
+let pairsContainer = null;
+let overviewFleetRow = null;
+let approvedSlicesCount = null;
+let globalProgressFill = null;
+let gateStatus = null;
+let chatMessages = null;
+let chatForm = null;
+let chatInput = null;
+let btnReset = null;
+let btnTestCycle = null;
+let kpiTokens = null;
+let kpiFirstPass = null;
+let kpiCompletedSlices = null;
+let kpiVerdictsCount = null;
+let gauntletFullList = null;
+let btnHumanGate = null;
+let btnRefreshHandoff = null;
+let handoffDirDisplay = null;
+let handoffPathDisplay = null;
+let handoffStatusBadge = null;
+let handoffRenderedContent = null;
+let drawerBackdrop = null;
+let drawerClose = null;
+let drawerSliceId = null;
+let drawerTitle = null;
+let drawerSpecContent = null;
+let drawerCriteriaContent = null;
+let drawerGauntletContent = null;
+let drawerTabs = null;
+
+function resolveSlicesElements() {
+  epicTitle = document.getElementById('epic-title');
+  overviewEpicGoal = document.getElementById('overview-epic-goal');
+  nodesCanvas = document.getElementById('nodes-canvas');
+  pairsContainer = document.getElementById('pairs-container');
+  overviewFleetRow = document.getElementById('overview-fleet-row');
+  approvedSlicesCount = document.getElementById('approved-slices-count');
+  globalProgressFill = document.getElementById('global-progress-fill');
+  gateStatus = document.getElementById('gate-status');
+  chatMessages = document.getElementById('chat-messages');
+  chatForm = document.getElementById('chat-form');
+  chatInput = document.getElementById('chat-input');
+  btnReset = document.getElementById('btn-reset');
+  btnTestCycle = document.getElementById('btn-test-cycle');
+  kpiTokens = document.getElementById('kpi-tokens');
+  kpiFirstPass = document.getElementById('kpi-first-pass');
+  kpiCompletedSlices = document.getElementById('kpi-completed-slices');
+  kpiVerdictsCount = document.getElementById('kpi-verdicts-count');
+  gauntletFullList = document.getElementById('gauntlet-full-list');
+  btnHumanGate = document.getElementById('btn-human-gate');
+  btnRefreshHandoff = document.getElementById('btn-refresh-handoff');
+  handoffDirDisplay = document.getElementById('handoff-dir-display');
+  handoffPathDisplay = document.getElementById('handoff-path-display');
+  handoffStatusBadge = document.getElementById('handoff-status-badge');
+  handoffRenderedContent = document.getElementById('handoff-rendered-content');
+  drawerBackdrop = document.getElementById('drawer-backdrop');
+  drawerClose = document.getElementById('drawer-close');
+  drawerSliceId = document.getElementById('drawer-slice-id');
+  drawerTitle = document.getElementById('drawer-title');
+  drawerSpecContent = document.getElementById('drawer-spec-content');
+  drawerCriteriaContent = document.getElementById('drawer-criteria-content');
+  drawerGauntletContent = document.getElementById('drawer-gauntlet-content');
+  drawerTabs = document.querySelectorAll('.drawer-tab');
+}
+
 export function renderAll() {
+  resolveSlicesElements();
   renderHeaderAndKPIs();
   renderNodes();
   renderPairs();
@@ -17,15 +87,18 @@ export function renderAll() {
   renderGauntletFull();
   renderWorktreeSidebar();
   if (activeSliceId) updateDrawerContent();
-  if (typeof fileExplorerManager !== 'undefined') fileExplorerManager.updateProjectHeader();
+  if (typeof window.fileExplorerManager !== 'undefined' && window.fileExplorerManager) {
+    window.fileExplorerManager.updateProjectHeader();
+  }
 }
 
 export function renderHeaderAndKPIs() {
+  if (!epicTitle) resolveSlicesElements();
   const epicName = state.epic && state.epic.name ? state.epic.name : 'Nenhum Épico Sincronizado';
   const epicGoal = state.epic && state.epic.goal ? state.epic.goal : 'Conecte o Antigravity via MCP para sincronizar.';
 
-  epicTitle.textContent = epicName;
-  overviewEpicGoal.textContent = epicGoal;
+  if (epicTitle) epicTitle.textContent = epicName;
+  if (overviewEpicGoal) overviewEpicGoal.textContent = epicGoal;
 
   const nodes = state.nodes || [];
   const approved = nodes.filter(n => n.kanban_status === 'APPROVED').length;
@@ -39,10 +112,10 @@ export function renderHeaderAndKPIs() {
   // Estimativa de tokens economizados
   const tokensSaved = (totalAttempts * 3500) + (logs.length * 1800) + 14200;
 
-  kpiTokens.textContent = tokensSaved.toLocaleString('pt-BR');
-  kpiFirstPass.textContent = `${firstPassRate}%`;
-  kpiCompletedSlices.textContent = `${approved} / ${total}`;
-  kpiVerdictsCount.textContent = `${logs.length}`;
+  if (kpiTokens) kpiTokens.textContent = tokensSaved.toLocaleString('pt-BR');
+  if (kpiFirstPass) kpiFirstPass.textContent = `${firstPassRate}%`;
+  if (kpiCompletedSlices) kpiCompletedSlices.textContent = `${approved} / ${total}`;
+  if (kpiVerdictsCount) kpiVerdictsCount.textContent = `${logs.length}`;
 
   // Human Gate Button
   if (btnHumanGate) {
@@ -65,7 +138,8 @@ export function renderHeaderAndKPIs() {
 }
 
 // HANDOFF LOADER
-async export function loadHandoff() {
+export async function loadHandoff() {
+  if (!handoffRenderedContent) resolveSlicesElements();
   if (!handoffRenderedContent) return;
   handoffRenderedContent.textContent = 'Carregando handoff em disco...';
   try {
@@ -95,28 +169,9 @@ async export function loadHandoff() {
   }
 }
 
-if (btnRefreshHandoff) {
-  btnRefreshHandoff.addEventListener('click', loadHandoff);
-}
-
-if (btnHumanGate) {
-  btnHumanGate.addEventListener('click', () => {
-    const isApproved = state.human_gates && state.human_gates.gate_ship_approved;
-    if (!isApproved) {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ action: 'APPROVE_GATE', gate: 'gate_ship_approved', project_id: currentProjectId }));
-      } else {
-        apiFetch('/api/gates/approve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gate: 'gate_ship_approved', approved_by: 'user', project_id: currentProjectId })
-        }).then(r => r.json()).then(() => renderAll());
-      }
-    }
-  });
-}
-
 export function renderNodes() {
+  if (!nodesCanvas) resolveSlicesElements();
+  if (!nodesCanvas) return;
   nodesCanvas.innerHTML = '';
 
   (state.nodes || []).forEach(node => {
@@ -198,44 +253,50 @@ export function renderTaskCard(node) {
   }
 
   const tddBadge = node.tdd_stage === 'GREEN_CONFIRMED' 
-    ? '<span style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); margin-left: 6px;">TDD: GREEN</span>'
-    : (node.tdd_stage === 'RED_CONFIRMED'
-      ? '<span style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); margin-left: 6px;">TDD: RED</span>'
-      : '');
-
-  const metrics = node.review_metrics || { critical: 0, important: 0, minor: 0 };
-  const hasFindings = (metrics.critical || 0) + (metrics.important || 0) + (metrics.minor || 0) > 0;
-  const metricsBadges = hasFindings ? `
-    <div style="display: flex; gap: 4px; margin-top: 4px;">
-      ${metrics.critical > 0 ? `<span style="font-size: 8px; padding: 1px 3px; border-radius: 2px; background: #dc2626; color: #fff;">CRIT: ${metrics.critical}</span>` : ''}
-      ${metrics.important > 0 ? `<span style="font-size: 8px; padding: 1px 3px; border-radius: 2px; background: #ea580c; color: #fff;">IMP: ${metrics.important}</span>` : ''}
-      ${metrics.minor > 0 ? `<span style="font-size: 8px; padding: 1px 3px; border-radius: 2px; background: #0284c7; color: #fff;">MIN: ${metrics.minor}</span>` : ''}
-    </div>
-  ` : '';
+    ? '<span class="tdd-badge tdd-green">TDD GREEN ✓</span>'
+    : (node.tdd_stage === 'RED_CONFIRMED' 
+      ? '<span class="tdd-badge tdd-red">TDD RED ✕</span>' 
+      : '<span class="tdd-badge tdd-idle">TDD INIT</span>');
 
   return `
     <div class="kanban-task-card ${cardClass}">
-      <div style="font-weight: 600; font-size: 10px; color: ${tagColor}; display: flex; align-items: center; justify-content: space-between;">
-        <span>${tagText}</span>
+      <div class="task-card-title">${escapeHtml(node.title)}</div>
+      <div class="task-card-meta">
         ${tddBadge}
+        <span class="status-pill-subtle" style="color: ${tagColor}; border-color: ${tagColor}">${tagText}</span>
       </div>
-      <div class="task-desc">${escapeHtml(node.latest_feedback || 'Em processamento')}</div>
-      ${metricsBadges}
-      <div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; font-family: var(--font-mono)">${node.updated_at || ''}</div>
+      <div class="task-card-desc">${escapeHtml(node.spec_md ? node.spec_md.slice(0, 80) + '...' : 'Sem descrição')}</div>
     </div>
   `;
 }
 
 export function renderPairs() {
+  if (!pairsContainer) resolveSlicesElements();
+  if (!pairsContainer) return;
   pairsContainer.innerHTML = '';
-  overviewFleetRow.innerHTML = '';
+  if (overviewFleetRow) overviewFleetRow.innerHTML = '';
 
-  (state.pairs_3x3 || []).forEach(pair => {
+  const pairs = state.pairs_3x3 || [];
+  pairs.forEach(pair => {
+    // Renderiza nos cards detalhados
     const card = createPairCard(pair);
     pairsContainer.appendChild(card);
 
-    const overviewCard = createPairCard(pair);
-    overviewFleetRow.appendChild(overviewCard);
+    // Renderiza na linha da visão geral
+    if (overviewFleetRow) {
+      const bClass = getAgentStatusClass(pair.builder_status);
+      const cClass = getAgentStatusClass(pair.critic_status);
+      const mini = document.createElement('div');
+      mini.className = 'fleet-pair-item';
+      mini.innerHTML = `
+        <div class="fleet-pair-title">${escapeHtml(pair.name)}</div>
+        <div class="fleet-pair-agents">
+          <div class="mini-agent-dot ${bClass}" title="Executor: ${pair.builder_status}"></div>
+          <div class="mini-agent-dot ${cClass}" title="Revisor: ${pair.critic_status}"></div>
+        </div>
+      `;
+      overviewFleetRow.appendChild(mini);
+    }
   });
 }
 
@@ -277,24 +338,29 @@ export function getAgentStatusClass(status) {
 }
 
 export function renderFinalGate() {
+  if (!approvedSlicesCount) resolveSlicesElements();
   const nodes = state.nodes || [];
   const approved = nodes.filter(n => n.kanban_status === 'APPROVED').length;
   const total = nodes.length || 3;
   const pct = Math.round((approved / total) * 100);
 
-  approvedSlicesCount.textContent = `${approved} / ${total}`;
-  globalProgressFill.style.width = `${pct}%`;
+  if (approvedSlicesCount) approvedSlicesCount.textContent = `${approved} / ${total}`;
+  if (globalProgressFill) globalProgressFill.style.width = `${pct}%`;
 
-  if (approved === total && total > 0) {
-    gateStatus.className = 'gatekeeper-badge approved';
-    gateStatus.textContent = 'COESÃO GLOBAL APROVADA';
-  } else {
-    gateStatus.className = 'gatekeeper-badge pending';
-    gateStatus.textContent = `EM ANDAMENTO (${approved}/${total})`;
+  if (gateStatus) {
+    if (approved === total && total > 0) {
+      gateStatus.className = 'gatekeeper-badge approved';
+      gateStatus.textContent = 'COESÃO GLOBAL APROVADA';
+    } else {
+      gateStatus.className = 'gatekeeper-badge pending';
+      gateStatus.textContent = `EM ANDAMENTO (${approved}/${total})`;
+    }
   }
 }
 
 export function renderChatMessages() {
+  if (!chatMessages) resolveSlicesElements();
+  if (!chatMessages) return;
   chatMessages.innerHTML = '';
   const messages = state.steering_messages || [];
 
@@ -317,6 +383,8 @@ export function renderChatMessages() {
 }
 
 export function renderGauntletFull() {
+  if (!gauntletFullList) resolveSlicesElements();
+  if (!gauntletFullList) return;
   gauntletFullList.innerHTML = '';
   const logs = state.gauntlet_log || [];
 
@@ -351,120 +419,158 @@ export function renderGauntletFull() {
   });
 }
 
-// 4. CHAT STEERING
-chatForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const text = chatInput.value.trim();
-  if (!text) return;
-
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ action: 'USER_STEERING', text, project_id: currentProjectId }));
-  } else {
-    apiFetch('/api/steering', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, project_id: currentProjectId })
-    });
-  }
-  chatInput.value = '';
-});
-
-// Fallback Polling a cada 2s (garante atualização automática sem F5 mesmo se o WebSocket falhar)
-setInterval(async () => {
-  try {
-    const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
-    if (res.ok) {
-      const remoteState = await res.json();
-      remoteState.active_project_id = currentProjectId;
-      if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
-        state = remoteState;
-        renderAll();
-      }
-    }
-  } catch (e) {
-    // Silencioso
-  }
-}, 2000);
-
-// 5. INTERACTIVE CODE GRAPH (CANVAS 2D)
-
-window.openDrawer = function(sliceId) {
-  activeSliceId = sliceId;
-  updateDrawerContent();
-  drawerBackdrop.classList.add('open');
-};
-
 export function updateDrawerContent() {
+  if (!drawerSliceId) resolveSlicesElements();
   const node = (state.nodes || []).find(n => n.id === activeSliceId);
   if (!node) return;
 
-  drawerSliceId.textContent = node.id.toUpperCase();
-  drawerTitle.textContent = node.title;
-  drawerSpecContent.textContent = node.spec_md || 'Nenhuma especificação gravada.';
-  drawerCriteriaContent.textContent = node.acceptance_criteria || 'Nenhum critério registrado.';
+  if (drawerSliceId) drawerSliceId.textContent = node.id.toUpperCase();
+  if (drawerTitle) drawerTitle.textContent = node.title;
+  if (drawerSpecContent) drawerSpecContent.textContent = node.spec_md || 'Nenhuma especificação gravada.';
+  if (drawerCriteriaContent) drawerCriteriaContent.textContent = node.acceptance_criteria || 'Nenhum critério registrado.';
 
-  drawerGauntletContent.innerHTML = '';
-  const nodeLogs = (state.gauntlet_log || []).filter(l => l.slice_id === node.id);
+  if (drawerGauntletContent) {
+    drawerGauntletContent.innerHTML = '';
+    const nodeLogs = (state.gauntlet_log || []).filter(l => l.slice_id === node.id);
 
-  if (nodeLogs.length === 0) {
-    drawerGauntletContent.innerHTML = '<div style="color: var(--text-muted); font-size: 11px; font-family: var(--font-mono)">Nenhuma tentativa registrada no Gauntlet Log para esta fatia.</div>';
-  } else {
-    nodeLogs.forEach(log => {
-      const isApproved = log.verdict === 'APROVADO';
-      const item = document.createElement('div');
-      item.className = `timeline-item ${isApproved ? 'aprovado' : 'rejeitado'}`;
-      item.innerHTML = `
-        <div class="timeline-header">
-          <span class="timeline-verdict ${isApproved ? 'aprovado' : 'rejeitado'}">${log.verdict} (Tentativa ${log.attempt})</span>
-          <span style="color: var(--text-muted)">${log.timestamp || ''}</span>
-        </div>
-        <div class="timeline-reason">${escapeHtml(log.reason || '')}</div>
-      `;
-      drawerGauntletContent.appendChild(item);
-    });
-  }
-}
-
-drawerClose.addEventListener('click', () => drawerBackdrop.classList.remove('open'));
-drawerBackdrop.addEventListener('click', (e) => {
-  if (e.target === drawerBackdrop) drawerBackdrop.classList.remove('open');
-});
-
-drawerTabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    drawerTabs.forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.drawer-tab-content').forEach(c => c.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(tab.getAttribute('data-tab')).classList.add('active');
-  });
-});
-
-// TOPBAR ACTIONS
-btnReset.addEventListener('click', () => {
-  if (confirm(`Restaurar o estado do projeto ativo (${currentProjectId}) para os valores iniciais?`)) {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ action: 'RESET_STATE', project_id: currentProjectId }));
+    if (nodeLogs.length === 0) {
+      drawerGauntletContent.innerHTML = '<div style="color: var(--text-muted); font-size: 11px; font-family: var(--font-mono)">Nenhuma tentativa registrada no Gauntlet Log para esta fatia.</div>';
     } else {
-      apiFetch('/api/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: currentProjectId })
+      nodeLogs.forEach(log => {
+        const isApproved = log.verdict === 'APROVADO';
+        const item = document.createElement('div');
+        item.className = `timeline-item ${isApproved ? 'aprovado' : 'rejeitado'}`;
+        item.innerHTML = `
+          <div class="timeline-header">
+            <span class="timeline-verdict ${isApproved ? 'aprovado' : 'rejeitado'}">${log.verdict} (Tentativa ${log.attempt})</span>
+            <span style="color: var(--text-muted)">${log.timestamp || ''}</span>
+          </div>
+          <div class="timeline-reason">${escapeHtml(log.reason || '')}</div>
+        `;
+        drawerGauntletContent.appendChild(item);
       });
     }
   }
-});
+}
 
-btnTestCycle.addEventListener('click', () => {
-  const node = state.nodes && state.nodes[0];
-  if (!node) return;
-  const nextStatus = node.kanban_status === 'BACKLOG' ? 'EXECUTING' :
-                     node.kanban_status === 'EXECUTING' ? 'CRITIQUING' :
-                     node.kanban_status === 'CRITIQUING' ? 'APPROVED' : 'BACKLOG';
+export function initSlicesChatEvents() {
+  resolveSlicesElements();
 
-  apiFetch('/api/steering', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: `Simulação de pulso: ${node.id} movido para ${nextStatus}`, project_id: currentProjectId })
-  });
-});
+  if (btnRefreshHandoff) {
+    btnRefreshHandoff.addEventListener('click', loadHandoff);
+  }
 
+  if (btnHumanGate) {
+    btnHumanGate.addEventListener('click', () => {
+      const isApproved = state.human_gates && state.human_gates.gate_ship_approved;
+      if (!isApproved) {
+        if (window.cockpitSocket && window.cockpitSocket.readyState === WebSocket.OPEN) {
+          window.cockpitSocket.send(JSON.stringify({ action: 'APPROVE_GATE', gate: 'gate_ship_approved', project_id: currentProjectId }));
+        } else {
+          apiFetch('/api/gates/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gate: 'gate_ship_approved', approved_by: 'user', project_id: currentProjectId })
+          }).then(r => r.json()).then(() => renderAll());
+        }
+      }
+    });
+  }
+
+  if (chatForm) {
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = chatInput ? chatInput.value.trim() : '';
+      if (!text) return;
+
+      if (window.cockpitSocket && window.cockpitSocket.readyState === WebSocket.OPEN) {
+        window.cockpitSocket.send(JSON.stringify({ action: 'USER_STEERING', text, project_id: currentProjectId }));
+      } else {
+        apiFetch('/api/steering', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, project_id: currentProjectId })
+        });
+      }
+      if (chatInput) chatInput.value = '';
+    });
+  }
+
+  if (drawerClose && drawerBackdrop) {
+    drawerClose.addEventListener('click', () => drawerBackdrop.classList.remove('open'));
+    drawerBackdrop.addEventListener('click', (e) => {
+      if (e.target === drawerBackdrop) drawerBackdrop.classList.remove('open');
+    });
+  }
+
+  if (drawerTabs) {
+    drawerTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        drawerTabs.forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.drawer-tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        const target = document.getElementById(tab.getAttribute('data-tab'));
+        if (target) target.classList.add('active');
+      });
+    });
+  }
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      if (confirm(`Restaurar o estado do projeto ativo (${currentProjectId}) para os valores iniciais?`)) {
+        if (window.cockpitSocket && window.cockpitSocket.readyState === WebSocket.OPEN) {
+          window.cockpitSocket.send(JSON.stringify({ action: 'RESET_STATE', project_id: currentProjectId }));
+        } else {
+          apiFetch('/api/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_id: currentProjectId })
+          });
+        }
+      }
+    });
+  }
+
+  if (btnTestCycle) {
+    btnTestCycle.addEventListener('click', () => {
+      const node = state.nodes && state.nodes[0];
+      if (!node) return;
+      const nextStatus = node.kanban_status === 'BACKLOG' ? 'EXECUTING' :
+                         node.kanban_status === 'EXECUTING' ? 'CRITIQUING' :
+                         node.kanban_status === 'CRITIQUING' ? 'APPROVED' : 'BACKLOG';
+
+      apiFetch('/api/steering', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: `Simulação de pulso: ${node.id} movido para ${nextStatus}`, project_id: currentProjectId })
+      });
+    });
+  }
+
+  window.openDrawer = function(sliceId) {
+    setActiveSliceId(sliceId);
+    updateDrawerContent();
+    if (drawerBackdrop) drawerBackdrop.classList.add('open');
+  };
+
+  window.closeDrawer = function() {
+    if (drawerBackdrop) drawerBackdrop.classList.remove('open');
+  };
+
+  // Fallback Polling a cada 2s (garante atualização automática sem F5)
+  setInterval(async () => {
+    try {
+      const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
+      if (res.ok) {
+        const remoteState = await res.json();
+        remoteState.active_project_id = currentProjectId;
+        if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
+          setState(remoteState);
+          renderAll();
+        }
+      }
+    } catch (e) {
+      // Silencioso
+    }
+  }, 2000);
+}
