@@ -24,20 +24,46 @@ let isProjectsExpanded = false;
 export function initSidebar() {
   const sidebar = document.getElementById('app-sidebar');
   const toggleBtn = document.getElementById('btn-sidebar-toggle');
-  if (!sidebar || !toggleBtn) return;
+  const topbarToggleBtn = document.getElementById('btn-topbar-sidebar-toggle');
+  const reopenBtn = document.getElementById('btn-reopen-left-sidebar');
+  if (!sidebar) return;
 
-  const isCollapsed = localStorage.getItem('cockpit_sidebar_collapsed') === 'true';
-  if (isCollapsed) {
-    sidebar.classList.add('collapsed');
-    sidebar.classList.add('sidebar-pinned-hidden');
-    document.body.classList.add('sidebar-pinned-hidden');
+  function setSidebarCollapsed(collapsed) {
+    sidebar.classList.toggle('collapsed', collapsed);
+    sidebar.classList.toggle('sidebar-pinned-hidden', collapsed);
+    document.body.classList.toggle('sidebar-pinned-hidden', collapsed);
+    localStorage.setItem('cockpit_sidebar_collapsed', collapsed ? 'true' : 'false');
   }
 
-  toggleBtn.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-    const isHidden = sidebar.classList.toggle('sidebar-pinned-hidden');
-    document.body.classList.toggle('sidebar-pinned-hidden', isHidden);
-    localStorage.setItem('cockpit_sidebar_collapsed', isHidden);
+  function toggleSidebar() {
+    const isCurrentlyHidden = document.body.classList.contains('sidebar-pinned-hidden');
+    setSidebarCollapsed(!isCurrentlyHidden);
+  }
+
+  // Padrão: SEMPRE ABERTO por padrão (redefine legado uma única vez para garantir experiência do usuário)
+  if (localStorage.getItem('cockpit_sidebar_reset_v3') !== 'done') {
+    localStorage.removeItem('cockpit_sidebar_collapsed');
+    localStorage.setItem('cockpit_sidebar_reset_v3', 'done');
+  }
+  const isCollapsed = localStorage.getItem('cockpit_sidebar_collapsed') === 'true';
+  setSidebarCollapsed(isCollapsed);
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', toggleSidebar);
+  }
+  if (topbarToggleBtn) {
+    topbarToggleBtn.addEventListener('click', toggleSidebar);
+  }
+  if (reopenBtn) {
+    reopenBtn.addEventListener('click', () => setSidebarCollapsed(false));
+  }
+
+  // Atalho global de teclado Ctrl+B / Cmd+B para alternar menu lateral
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toggleSidebar();
+    }
   });
 
   // Vincula tabs da navegação principal
@@ -340,6 +366,7 @@ export function initOrcaNavigationAndModals() {
       openQuickSearch();
     } else if (e.key === 'Escape') {
       closeQuickSearch();
+      closeAboutModal();
     }
   });
 

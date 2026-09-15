@@ -53,18 +53,26 @@ class TestIssue10TerminalWorkspaceUX(unittest.TestCase):
         self.assertIn("btn-orchestrator-subagents", self.term_js)
 
     def test_about_modal_structure(self):
-        """Valida a existência do modal Sobre o ZEUS AGENT com ícone expandido, versão e criador Bruno."""
+        """Valida o modal Sobre o ZEUS AGENT fiel ao protótipo (ícone expandido, status bar, terminal preview, v0.3.0 e criador Bruno)."""
         self.assertIn("modal-about-zeus", self.html)
         self.assertIn("zeus-brand", self.html)
         self.assertIn("Bruno", self.html)
+        self.assertIn("0.3.0", self.html)
+        self.assertIn("DIVINE_REASONING_ACTIVE", self.html)
+        self.assertIn("Terminal Execution Preview", self.html)
+        self.assertIn("https://github.com/bruno33223/agent-cockpit", self.html)
         self.assertIn("openAboutModal", self.sidebar_js)
 
-    def test_sidebar_toggle_and_right_sidebar_reopen(self):
-        """Valida que o hambúrguer oculta a left sidebar e a right sidebar tem botão de reexibição persistente."""
-        # Right sidebar deve ter botão de reabertura sempre acessível
+    def test_sidebar_toggle_and_reopen_buttons(self):
+        """Valida que tanto a left sidebar quanto a right sidebar possuem botões de alternância e reabertura persistentes."""
+        # Right sidebar deve ter botão de reabertura
         self.assertIn("btn-reopen-right-sidebar", self.html)
         self.assertIn("btn-reopen-right-sidebar", self.explorer_js)
-        # Left sidebar deve ter classe para ocultação completa
+        # Left sidebar deve ter botão de reabertura e botão na topbar
+        self.assertIn("btn-reopen-left-sidebar", self.html)
+        self.assertIn("btn-topbar-sidebar-toggle", self.html)
+        self.assertIn("btn-reopen-left-sidebar", self.sidebar_js)
+        self.assertIn("btn-topbar-sidebar-toggle", self.sidebar_js)
         self.assertIn("sidebar-pinned-hidden", self.css)
 
 if __name__ == "__main__":

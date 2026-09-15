@@ -19,6 +19,15 @@
   <!-- 1. TITLEBAR SUPERIOR ZEUS AGENT (.orca-titlebar / .titlebar) -->
   <header class="orca-titlebar titlebar" id="orca-titlebar">
     <div class="orca-titlebar-left titlebar-left">
+      <!-- Botão Hambúrguer Topbar para Alternar Menu Lateral -->
+      <button class="btn-topbar-sidebar-toggle" id="btn-topbar-sidebar-toggle" title="Alternar Menu Lateral (Ctrl+B)" aria-label="Alternar Menu Lateral">
+        <svg class="hamburger-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+
       <!-- Marca do app: ZEUS AGENT com Ícone do Deus Olímpico Zeus -->
       <div class="orca-brand" id="zeus-brand" title="ZEUS AGENT">
         <span class="orca-brand-logo zeus-brand-logo" id="zeus-brand-logo">
@@ -93,6 +102,15 @@
 
   <!-- APP LAYOUT -->
   <div class="app-layout">
+    <!-- Botão Flutuante Persistente para Reabertura da Barra Lateral Esquerda quando Recolhida -->
+    <button class="btn-reopen-left-sidebar" id="btn-reopen-left-sidebar" title="Reabrir Menu Lateral (Ctrl+B)" aria-label="Reabrir Menu Lateral">
+      <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+
     <!-- BARRA LATERAL ESQUERDA ESTILO ORCA (.sidebar / .orca-worktree-sidebar) -->
     <aside class="app-sidebar sidebar orca-worktree-sidebar" id="app-sidebar">
       <!-- CABEÇALHO SUPERIOR DA SIDEBAR (TOGGLE & TITULO) -->
@@ -1442,55 +1460,202 @@
     </div>
   </div>
 
-  <!-- MODAL SOBRE O ZEUS AGENT (ISSUE #10) -->
+  <!-- MODAL SOBRE O ZEUS AGENT (ZEUSICONPROTOTIPE) -->
   <div class="modal-backdrop" id="modal-about-zeus" style="display: none;">
     <div class="modal-card about-zeus-card">
       <div class="about-zeus-header">
         <button class="modal-close-btn" id="btn-close-about-zeus" aria-label="Fechar">&times;</button>
       </div>
       <div class="about-zeus-body">
-        <div class="about-zeus-icon-wrapper">
-          <svg id="zeusModalSvg" viewBox="0 0 500 500" width="110" height="110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZEUS AGENT - Deus Olímpico">
+        <!-- 1. TERMINAL WINDOW FRAME COM O ÍCONE DIVINO SVG -->
+        <div class="zeus-modal-terminal-window">
+          <svg id="zeusModalFullSvg" viewBox="0 0 500 500" class="zeus-modal-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZEUS AGENT - Terminal Bash God">
             <defs>
-              <linearGradient id="termGradAbout" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="modalTermGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stop-color="#34D399"/>
                 <stop offset="50%" stop-color="#00FF66"/>
                 <stop offset="100%" stop-color="#059669"/>
               </linearGradient>
+
+              <linearGradient id="modalHotSparks" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#FFFFFF"/>
+                <stop offset="70%" stop-color="#6EE7B7"/>
+                <stop offset="100%" stop-color="#00FF66"/>
+              </linearGradient>
+
+              <filter id="modalTerminalGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur"/>
+                <feMerge>
+                  <feMergeNode in="blur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
             </defs>
-            <rect x="15" y="15" width="470" height="470" rx="40" fill="#040707" stroke="#00ff66" stroke-width="12"/>
-            <rect x="15" y="15" width="470" height="60" rx="40" fill="#09120e" stroke="#00ff66" stroke-width="6"/>
-            <circle cx="50" cy="45" r="14" fill="#EF4444"/>
-            <circle cx="95" cy="45" r="14" fill="#F59E0B"/>
-            <circle cx="140" cy="45" r="14" fill="#10B981"/>
-            <g stroke="#00ff66" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M190 125 C200 95, 230 85, 250 85 C270 85, 300 95, 310 125" fill="none" stroke-width="16"/>
-              <path d="M150 145 C170 105, 205 98, 225 105" fill="none" stroke-width="14"/>
-              <path d="M350 145 C330 105, 295 98, 275 105" fill="none" stroke-width="14"/>
-              <polygon points="250,90 244,115 256,115 242,142 262,118 250,118 256,90" fill="#FFFFFF"/>
-              <path d="M175 188 L232 202 L245 208" fill="none" stroke-width="16"/>
-              <path d="M325 188 L268 202 L255 208" fill="none" stroke-width="16"/>
-              <path d="M250 208 L244 265 L235 275 L250 278 L265 275 L256 265" fill="none" stroke-width="14"/>
-              <rect x="195" y="210" width="22" height="15" rx="3" fill="#FFFFFF"/>
-              <rect x="285" y="210" width="22" height="15" rx="3" fill="#FFFFFF"/>
-              <path d="M250 282 C235 280, 205 285, 175 315 C205 315, 235 298, 250 292 C265 298, 295 315, 325 315 C295 285, 265 280, 250 282 Z" fill="#05170d" stroke-width="14"/>
-              <path d="M145 255 C130 295, 140 340, 160 375 C180 410, 210 435, 250 445 C290 435, 320 410, 340 375 C360 340, 370 295, 355 255" fill="none" stroke-width="14"/>
-              <path d="M250 312 L250 370 L242 385 L258 405 L250 442" fill="none" stroke-width="18" stroke="#FFFFFF"/>
+
+            <!-- Outer Shell -->
+            <rect x="15" y="15" width="470" height="470" rx="20" fill="#040707" stroke="#00ff66" stroke-width="2.5" stroke-opacity="0.8"/>
+            
+            <!-- Terminal Window Header Bar -->
+            <rect x="15" y="15" width="470" height="46" rx="20" fill="#09120e" stroke="#00ff66" stroke-width="1.5" stroke-opacity="0.3"/>
+            <line x1="15" y1="61" x2="485" y2="61" stroke="#00ff66" stroke-width="2" stroke-opacity="0.6"/>
+
+            <!-- Window Action Controls -->
+            <circle cx="42" cy="38" r="6" fill="#EF4444" opacity="0.85"/>
+            <circle cx="62" cy="38" r="6" fill="#F59E0B" opacity="0.85"/>
+            <circle cx="82" cy="38" r="6" fill="#10B981" opacity="0.85"/>
+
+            <!-- Header Bash Title & Status -->
+            <text x="110" y="43" font-family="'Fira Code', monospace" font-size="12" font-weight="600" fill="#00ff66" letter-spacing="1">
+              zeus@agent:~# ./godmode --daemon
+            </text>
+            
+            <text x="445" y="43" text-anchor="end" font-family="'Fira Code', monospace" font-size="11" fill="#00ff66" opacity="0.6">[CLI:OK]</text>
+
+            <!-- Background Matrix -->
+            <g font-family="'Fira Code', monospace" font-size="10" fill="#00ff66" opacity="0.16">
+              <text x="35" y="90">$ sudo init olympus-core.sh</text>
+              <text x="35" y="110">[SYS] 12 Olympus Threads Allocated</text>
+              <text x="35" y="130">&gt;&gt;&gt; AST.bind("lightning_strike")</text>
+              <text x="35" y="445">return &amp;&amp; eval $(zeus --godspeed)</text>
+              <text x="35" y="465">root@zeus-agent:~# █</text>
+              
+              <text x="465" y="90" text-anchor="end">&lt;agentic:ai&gt;</text>
+              <text x="465" y="110" text-anchor="end">0x7F_THUNDER</text>
+              <text x="465" y="445" text-anchor="end">PID: 0001</text>
+              <text x="465" y="465" text-anchor="end">EXIT 0</text>
+            </g>
+
+            <!-- Subtle Terminal CRT Grid lines -->
+            <g stroke="#00ff66" stroke-width="0.5" opacity="0.1">
+              <line x1="15" y1="150" x2="485" y2="150" stroke-dasharray="4 8"/>
+              <line x1="15" y1="250" x2="485" y2="250" stroke-dasharray="4 8"/>
+              <line x1="15" y1="350" x2="485" y2="350" stroke-dasharray="4 8"/>
+              <line x1="250" y1="61" x2="250" y2="485" stroke-dasharray="4 8"/>
+            </g>
+
+            <!-- ZEUS DIVINE HEAD (BASH/TERMINAL STYLE) -->
+            <g filter="url(#modalTerminalGlowFilter)" stroke="#00ff66" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M190 125 C200 95, 230 85, 250 85 C270 85, 300 95, 310 125" fill="none" stroke-width="4"/>
+              <path d="M150 145 C170 105, 205 98, 225 105" fill="none" stroke-width="3"/>
+              <path d="M350 145 C330 105, 295 98, 275 105" fill="none" stroke-width="3"/>
+              
+              <path d="M135 180 C125 150, 140 130, 165 130 C180 130, 185 140, 175 160 C165 180, 140 185, 130 215" fill="none" stroke-width="3.5"/>
+              <path d="M365 180 C375 150, 360 130, 335 130 C320 130, 315 140, 325 160 C335 180, 360 185, 370 215" fill="none" stroke-width="3.5"/>
+              
+              <path d="M120 220 C110 240, 125 260, 145 255" fill="none" stroke-width="3"/>
+              <path d="M380 220 C390 240, 375 260, 355 255" fill="none" stroke-width="3"/>
+
+              <!-- Central Lightning Forehead Tiara -->
+              <polygon points="250,90 244,115 256,115 242,142 262,118 250,118 256,90" fill="url(#modalHotSparks)" stroke="none"/>
+              
+              <!-- Eyebrows -->
+              <path d="M175 188 L232 202 L245 208" fill="none" stroke-width="4.5"/>
+              <path d="M325 188 L268 202 L255 208" fill="none" stroke-width="4.5"/>
+              
+              <!-- Nose -->
+              <path d="M250 208 L244 265 L235 275 L250 278 L265 275 L256 265" fill="none" stroke-width="3"/>
+
+              <!-- Eyes -->
+              <path d="M182 215 C195 208, 220 208, 230 216 C220 224, 195 224, 182 215 Z" fill="#040f09" stroke-width="2.5"/>
+              <rect x="200" y="212" width="10" height="7" rx="1.5" fill="url(#modalHotSparks)" stroke="none"/>
+              <path d="M175 210 L170 216 L175 222" fill="none" stroke-width="2"/>
+
+              <path d="M318 215 C305 208, 280 208, 270 216 C280 224, 305 224, 318 215 Z" fill="#040f09" stroke-width="2.5"/>
+              <rect x="290" y="212" width="10" height="7" rx="1.5" fill="url(#modalHotSparks)" stroke="none"/>
+              <path d="M325 210 L330 216 L325 222" fill="none" stroke-width="2"/>
+
+              <path d="M152 230 L168 260" fill="none" stroke-width="2.5" stroke-dasharray="6 4"/>
+              <path d="M348 230 L332 260" fill="none" stroke-width="2.5" stroke-dasharray="6 4"/>
+
+              <!-- Mustache -->
+              <path d="M250 282 C235 280, 205 285, 175 315 C205 315, 235 298, 250 292 C265 298, 295 315, 325 315 C295 285, 265 280, 250 282 Z" fill="#05170d" stroke-width="3.5"/>
+              <line x1="250" y1="282" x2="250" y2="293" stroke-width="2.5"/>
+              <line x1="240" y1="304" x2="260" y2="304" stroke-width="3"/>
+
+              <!-- Beard -->
+              <path d="M145 255 C130 295, 140 340, 160 375 C180 410, 210 435, 250 445 C290 435, 320 410, 340 375 C360 340, 370 295, 355 255" fill="none" stroke-width="3" stroke-dasharray="12 4"/>
+
+              <!-- Main Beard Lightning Strand -->
+              <path d="M250 312 L250 370 L242 385 L258 405 L250 442" fill="none" stroke-width="4" stroke="url(#modalHotSparks)"/>
+              
+              <path d="M225 315 C215 340, 210 380, 230 420" fill="none" stroke-width="3"/>
+              <path d="M195 318 C180 345, 185 375, 210 405" fill="none" stroke-width="2.8"/>
+              <path d="M168 310 C155 335, 160 365, 185 390" fill="none" stroke-width="2.5"/>
+
+              <path d="M275 315 C285 340, 290 380, 270 420" fill="none" stroke-width="3"/>
+              <path d="M305 318 C320 345, 315 375, 290 405" fill="none" stroke-width="2.8"/>
+              <path d="M332 310 C345 335, 340 365, 315 390" fill="none" stroke-width="2.5"/>
+
+              <text x="180" y="345" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="#00ff66" stroke="none">{</text>
+              <text x="195" y="375" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="#00ff66" stroke="none">&gt;</text>
+              <text x="212" y="405" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="#00ff66" stroke="none">~</text>
+
+              <text x="305" y="345" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="#00ff66" stroke="none">}</text>
+              <text x="290" y="375" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="#00ff66" stroke="none">&lt;</text>
+              <text x="272" y="405" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="#00ff66" stroke="none">~</text>
+
+              <polygon points="250,390 243,410 252,410 244,435 258,414 249,414 254,390" fill="url(#modalHotSparks)" stroke="none"/>
+            </g>
+
+            <g font-family="'Fira Code', monospace" font-size="13" font-weight="700" fill="#00ff66">
+              <text x="250" y="468" text-anchor="middle" letter-spacing="3">
+                [ ZEUS_AGENT_CLI ]
+              </text>
             </g>
           </svg>
         </div>
-        <h2 class="about-zeus-title">ZEUS AGENT</h2>
-        <span class="about-zeus-version">v3.0.0 (Olympus)</span>
-        <p class="about-zeus-tagline">Sistema Operacional de Telemetria e Orquestração Multiagente Concorrente 3x3 com Isolamento por Worktrees e Avaliação Rigorosa Gauntlet.</p>
-        <div class="about-zeus-author-card">
-          <span class="about-author-label">Criado e Arquitetado por:</span>
-          <div class="about-author-info">
-            <span class="about-author-name">Bruno</span>
-            <a href="https://github.com/bruno33223" target="_blank" rel="noopener noreferrer" class="about-author-handle">@bruno33223</a>
+
+        <!-- 2. STATUS BAR BRILHANTE (COMO NO PROTÓTIPO) -->
+        <div class="zeus-modal-statusbar">
+          <div class="zeus-statusbar-status">
+            <span class="zeus-status-pulse-dot"></span>
+            <span class="zeus-status-label">STATUS:</span>
+            <span class="zeus-status-value">DIVINE_REASONING_ACTIVE</span>
+          </div>
+          <div class="zeus-statusbar-prompt">
+            <span class="zeus-prompt-label">PROMPT:</span>
+            <span class="zeus-prompt-value">bash$ zeus --autonomous</span>
+          </div>
+        </div>
+
+        <!-- 3. TERMINAL EXECUTION PREVIEW COM AS INFORMAÇÕES EXIGIDAS -->
+        <div class="zeus-terminal-preview">
+          <div class="zeus-preview-header">
+            <span class="zeus-preview-title">Terminal Execution Preview</span>
+            <span class="zeus-preview-bash">bash 5.2.15</span>
+          </div>
+          <div class="zeus-preview-body">
+            <div class="zeus-preview-line zeus-cmd-line">
+              <span class="term-user">user@devbox</span>:<span class="term-path">~/workspace</span><span class="term-prompt-char">$</span> <span class="term-cmd">npx zeus-agent --info</span>
+            </div>
+            <div class="zeus-preview-line zeus-info-line">
+              <span class="term-check">[✓]</span>
+              <span class="term-label">Nome do App:</span>
+              <span class="term-val highlight">ZEUS AGENT</span>
+            </div>
+            <div class="zeus-preview-line zeus-info-line">
+              <span class="term-check">[✓]</span>
+              <span class="term-label">Versão:</span>
+              <span class="term-val highlight">0.3.0</span>
+            </div>
+            <div class="zeus-preview-line zeus-info-line">
+              <span class="term-check">[✓]</span>
+              <span class="term-label">Repositório:</span>
+              <a href="https://github.com/bruno33223/agent-cockpit" target="_blank" rel="noopener noreferrer" class="term-link">https://github.com/bruno33223/agent-cockpit</a>
+            </div>
+            <div class="zeus-preview-line zeus-info-line">
+              <span class="term-check">[✓]</span>
+              <span class="term-label">Criador:</span>
+              <span class="term-val highlight">Bruno (<a href="https://github.com/bruno33223" target="_blank" rel="noopener noreferrer" class="term-link">@bruno33223</a>)</span>
+            </div>
+            <div class="zeus-preview-line zeus-ready-line">
+              <span class="term-lightning">[⚡]</span>
+              <span class="term-ready-text">ZEUS AGENT ready to execute autonomous programming commands.</span>
+            </div>
           </div>
         </div>
       </div>
-      <div class="about-zeus-footer">
+      <div class="about-zeus-footer" style="display: none;">
         <button class="action-btn primary btn-sm" id="btn-about-zeus-ok">Fechar</button>
       </div>
     </div>
