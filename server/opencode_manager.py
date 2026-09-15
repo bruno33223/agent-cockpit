@@ -1,12 +1,13 @@
 """
 opencode_manager.py: Gerenciador de integração para OpenCode e OmniRoute no Agent Cockpit.
-Cuida da configuração do OmniRoute (endpoint, API key, modelos), detecção do binário
-do OpenCode e geração determinística de opencode.json acoplado ao servidor MCP do Cockpit.
+Cuida da configuração do OmniRoute (endpoint, API key, modelos), detecção de credenciais,
+detecção de conectores e provedores, detecção de binários e geração de opencode.json.
 """
 
 import os
 import sys
 import json
+import re
 import shutil
 import urllib.request
 import urllib.error
@@ -23,19 +24,142 @@ DEFAULT_CONFIG = {
     "enabled": True
 }
 
+KNOWN_CONNECTOR_NAMES = {
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "ollama": "Ollama",
+    "groq": "Groq",
+    "google": "Google Gemini",
+    "gemini": "Google Gemini",
+    "deepseek": "DeepSeek",
+    "mistral": "Mistral AI",
+    "together": "Together AI",
+    "openrouter": "OpenRouter",
+    "general": "General / Local Models"
+}
+
+
+def _strip_json_comments(text: str) -> str:
+    """Remove comentários estilo C/JSONC mantendo strings e URLs intactas."""
+    try:
+        json.loads(text)
+        return text
+    except Exception:
+        pass
+        
+    pattern = re.compile(r'//.*?$|/\*.*?\*/|"(?:\\.|[^\\"])*"', re.DOTALL | re.MULTILINE)
+    def repl(m):
+        s = m.group(0)
+        if s.startswith('/'):
+            return ''
+        return s
+    return re.sub(pattern, repl, text)
+
+
+
+def detect_opencode_credentials(config_dir: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Detecta automaticamente credenciais e configurações existentes do OpenCode
+    a partir de ~/.config/opencode/ (opencode.json, config.json, opencode.jsonc)
+    e variáveis de ambiente do sistema.
+    """
+    detected: Dict[str, Any] = {
+        "omniroute_url": None,
+        "api_key": None,
+        "model": None,
+        "sources": [],
+        "file_path": None
+    }
+    
+    target_dir = config_dir or os.path.expanduser("~/.config/opencode")
+    candidate_files = [
+        os.path.join(target_dir, "opencode.json"),
+        os.path.join(target_dir, "config.json"),
+        os.path.join(target_dir, "opencode.jsonc")
+    ]
+    
+    file_found = None
+    file_data = None
+    for candidate in candidate_files:
+        if os.path.isfile(candidate):
+            try:
+                with open(candidate, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    file_data = json.loads(_strip_json_comments(content))
+                    file_found = candidate
+                    break
+            except Exception:
+                continue
+                
+    if file_data and isinstance(file_data, dict):
+        detected["file_path"] = file_found
+        detected["sources"].append("file")
+        
+        # Extrai provider omniroute
+        provider_cfg = file_data.get("provider", {})
+        omniroute_provider = provider_cfg.get("omniroute", {}) if isinstance(provider_cfg, dict) else {}
+        options = omniroute_provider.get("options", {}) if isinstance(omniroute_provider, dict) else {}
+        
+        url_from_file = options.get("baseURL") or file_data.get("omniroute_url") or file_data.get("baseURL")
+        key_from_file = options.get("apiKey") or file_data.get("api_key") or file_data.get("apiKey")
+        model_from_file = file_data.get("model")
+        
+        if model_from_file and isinstance(model_from_file, str) and model_from_file.startswith("omniroute/"):
+            model_from_file = model_from_file[len("omniroute/"):]
+            
+        if url_from_file:
+            detected["omniroute_url"] = url_from_file
+        if key_from_file:
+            detected["api_key"] = key_from_file
+        if model_from_file:
+            detected["model"] = model_from_file
+
+    # Variáveis de ambiente têm precedência se definidas
+    env_sources = []
+    env_url = os.environ.get("OMNIROUTE_URL") or os.environ.get("OMNIROUTE_BASE_URL")
+    if env_url:
+        detected["omniroute_url"] = env_url
+        env_sources.append("env")
+        
+    env_key = os.environ.get("OMNIROUTE_API_KEY") or os.environ.get("OPENCODE_API_KEY")
+    if env_key:
+        detected["api_key"] = env_key
+        env_sources.append("env")
+        
+    env_model = os.environ.get("OPENCODE_MODEL") or os.environ.get("OMNIROUTE_MODEL")
+    if env_model:
+        detected["model"] = env_model
+        env_sources.append("env")
+        
+    if env_sources and "env" not in detected["sources"]:
+        detected["sources"].append("env")
+        
+    return detected
+
 
 def load_config() -> Dict[str, Any]:
-    """Carrega as configurações salvas do OmniRoute/OpenCode ou retorna o padrão."""
+    """Carrega as configurações salvas do OmniRoute/OpenCode ou preenche com auto-detecção."""
+    cfg = dict(DEFAULT_CONFIG)
+    
+    # Auto-detecção de defaults
+    auto = detect_opencode_credentials()
+    if auto.get("omniroute_url"):
+        cfg["omniroute_url"] = auto["omniroute_url"]
+    if auto.get("api_key"):
+        cfg["api_key"] = auto["api_key"]
+    if auto.get("model"):
+        cfg["model"] = auto["model"]
+
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 saved = json.load(f)
-                cfg = dict(DEFAULT_CONFIG)
                 cfg.update(saved)
                 return cfg
         except Exception:
             pass
-    return dict(DEFAULT_CONFIG)
+            
+    return cfg
 
 
 def save_config(config_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -51,9 +175,11 @@ def save_config(config_data: Dict[str, Any]) -> Dict[str, Any]:
     return cfg
 
 
-def check_omniroute_health(base_url: Optional[str] = None) -> Dict[str, Any]:
+def detect_omniroute_connectors(base_url: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Testa se o OmniRoute está respondendo na URL especificada e lista os modelos disponíveis.
+    Detecta e agrupa os conectores e modelos disponíveis no OmniRoute.
+    Categoriza modelos com base no prefixo (ex: 'openai/gpt-4o' -> conector 'openai').
+    Modelos sem prefixo são mapeados para o conector 'general'.
     """
     url = (base_url or load_config().get("omniroute_url", "http://localhost:20128/v1")).rstrip("/")
     models_endpoint = f"{url}/models"
@@ -65,6 +191,81 @@ def check_omniroute_health(base_url: Optional[str] = None) -> Dict[str, Any]:
             "Accept": "application/json"
         }
     )
+    
+    models_list: List[str] = []
+    try:
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, dict):
+                raw_models = data.get("data", [])
+                for m in raw_models:
+                    if isinstance(m, dict) and "id" in m:
+                        models_list.append(m["id"])
+                    elif isinstance(m, str):
+                        models_list.append(m)
+            elif isinstance(data, list):
+                for m in data:
+                    if isinstance(m, dict) and "id" in m:
+                        models_list.append(m["id"])
+                    elif isinstance(m, str):
+                        models_list.append(m)
+    except Exception:
+        return []
+
+    # Agrupa por conector/provedor
+    groups: Dict[str, List[str]] = {}
+    for model_id in models_list:
+        if "/" in model_id:
+            connector_id = model_id.split("/", 1)[0].lower()
+        else:
+            connector_id = "general"
+            
+        if connector_id not in groups:
+            groups[connector_id] = []
+        groups[connector_id].append(model_id)
+
+    connectors = []
+    for cid, m_list in groups.items():
+        name = KNOWN_CONNECTOR_NAMES.get(cid, cid.capitalize())
+        connectors.append({
+            "id": cid,
+            "name": name,
+            "models": m_list,
+            "count": len(m_list)
+        })
+
+    # Ordena com general por último e conectores conhecidos primeiro
+    connectors.sort(key=lambda c: (1 if c["id"] == "general" else 0, c["name"]))
+    return connectors
+
+
+def check_omniroute_health(base_url: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Testa se o OmniRoute está respondendo na URL especificada, lista os modelos disponíveis,
+    agrupa conectores e anexa metadados de auto-detecção.
+    """
+    url = (base_url or load_config().get("omniroute_url", "http://localhost:20128/v1")).rstrip("/")
+    models_endpoint = f"{url}/models"
+    
+    req = urllib.request.Request(
+        models_endpoint,
+        headers={
+            "User-Agent": "Agent-Cockpit-Bridge/1.0",
+            "Accept": "application/json"
+        }
+    )
+    
+    connectors = detect_omniroute_connectors(url)
+    auto_detected = detect_opencode_credentials()
+    
+    # Mascara a api_key para não vazar nos logs/status
+    masked_auto = dict(auto_detected)
+    if masked_auto.get("api_key"):
+        raw_key = masked_auto["api_key"]
+        if len(raw_key) > 6:
+            masked_auto["api_key"] = f"{raw_key[:3]}...{raw_key[-2:]}"
+        else:
+            masked_auto["api_key"] = "***"
     
     try:
         with urllib.request.urlopen(req, timeout=3.0) as resp:
@@ -88,13 +289,17 @@ def check_omniroute_health(base_url: Optional[str] = None) -> Dict[str, Any]:
                 "online": True,
                 "endpoint": url,
                 "models": models_list,
-                "message": f"Conectado ao OmniRoute com {len(models_list)} modelos disponíveis."
+                "connectors": connectors,
+                "auto_detected": masked_auto,
+                "message": f"Conectado ao OmniRoute com {len(models_list)} modelos e {len(connectors)} conectores disponíveis."
             }
     except Exception as e:
         return {
             "online": False,
             "endpoint": url,
             "models": [],
+            "connectors": [],
+            "auto_detected": masked_auto,
             "message": f"OmniRoute inacessível em {url}: {str(e)}"
         }
 
