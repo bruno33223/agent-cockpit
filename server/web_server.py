@@ -1093,7 +1093,7 @@ DEFAULT_FS_IGNORE_DIRS = {
     ".output", ".turbo", ".cache", ".idea", ".vscode"
 }
 DEFAULT_FS_IGNORE_FILES = {
-    ".DS_Store", "Thumbs.db"
+    ".git", ".DS_Store", "Thumbs.db", ".env", ".env.local"
 }
 
 def _resolve_project_fs_root(project_id: Optional[str] = None) -> tuple:
@@ -1172,14 +1172,17 @@ def get_fs_tree(
         files = []
         for entry in items:
             name = entry.name
+            if (
+                name in DEFAULT_FS_IGNORE_DIRS
+                or name in DEFAULT_FS_IGNORE_FILES
+                or name.startswith(".env")
+                or name == ".git"
+            ):
+                continue
             try:
                 if entry.is_dir(follow_symlinks=False):
-                    if name in DEFAULT_FS_IGNORE_DIRS:
-                        continue
                     dirs.append(entry)
                 elif entry.is_file(follow_symlinks=False):
-                    if name in DEFAULT_FS_IGNORE_FILES:
-                        continue
                     files.append(entry)
             except OSError:
                 continue
@@ -1277,6 +1280,13 @@ def read_fs_file(
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
 
     file_name = os.path.basename(target_file)
+    if (
+        file_name in DEFAULT_FS_IGNORE_FILES
+        or file_name in DEFAULT_FS_IGNORE_DIRS
+        or file_name.startswith(".env")
+        or file_name == ".git"
+    ):
+        raise HTTPException(status_code=403, detail="Acesso negado: arquivo ou recurso restrito.")
     try:
         rel_path = os.path.relpath(target_file, root_path).replace("\\", "/")
     except ValueError:
