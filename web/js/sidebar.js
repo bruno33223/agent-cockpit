@@ -102,8 +102,8 @@ export function switchTab(viewId) {
   } else if (viewId === 'view-terminal') {
     if (typeof window.initOrFitTerminal === 'function') window.initOrFitTerminal();
   } else if (viewId === 'view-settings') {
-    if (typeof window.loadSettings === 'function') window.loadSettings();
-    if (typeof window.loadOmniRouteSettings === 'function') window.loadOmniRouteSettings();
+    openSettingsModal();
+    return;
   }
 }
 
@@ -340,7 +340,7 @@ export function initOrcaNavigationAndModals() {
   const navFooterSettings = document.getElementById('nav-footer-settings');
   if (navFooterSettings) {
     navFooterSettings.addEventListener('click', () => {
-      switchTab('view-settings');
+      openSettingsModal();
     });
   }
 
@@ -359,14 +359,18 @@ export function initOrcaNavigationAndModals() {
     });
   }
 
-  // 5. Atalho Global de Teclado (Ctrl+K / Cmd+K / Esc)
+  // 5. Atalho Global de Teclado (Ctrl+K / Ctrl+, / Esc)
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       openQuickSearch();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+      e.preventDefault();
+      openSettingsModal();
     } else if (e.key === 'Escape') {
       closeQuickSearch();
       closeAboutModal();
+      closeSettingsModal();
     }
   });
 
@@ -393,6 +397,9 @@ export function initOrcaNavigationAndModals() {
       if (e.target === modalAbout) closeAboutModal();
     });
   }
+
+  // 7. Modal de Configurações Estilo Antigravity
+  initAntigravitySettingsModal();
 }
 
 export function openAboutModal() {
@@ -403,6 +410,180 @@ export function openAboutModal() {
 export function closeAboutModal() {
   const modal = document.getElementById('modal-about-zeus');
   if (modal) modal.style.display = 'none';
+}
+
+export function openSettingsModal() {
+  const modal = document.getElementById('modal-settings-antigravity');
+  if (modal) {
+    modal.style.display = 'flex';
+    renderSettingsProjects();
+    syncSettingsValues();
+  }
+}
+
+export function closeSettingsModal() {
+  const modal = document.getElementById('modal-settings-antigravity');
+  if (modal) modal.style.display = 'none';
+}
+
+export function switchAgSettingsTab(tabName) {
+  document.querySelectorAll('.ag-nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-ag-tab') === tabName);
+  });
+  document.querySelectorAll('.ag-tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `ag-panel-${tabName}`);
+  });
+}
+
+export function renderSettingsProjects() {
+  const container = document.getElementById('ag-projects-nav-list');
+  if (!container) return;
+  container.innerHTML = '';
+  (knownProjects || []).forEach(p => {
+    const item = document.createElement('button');
+    const isCurrent = (p.id === currentProjectId);
+    item.className = `ag-project-nav-item ${isCurrent ? 'active' : ''}`;
+    item.innerHTML = `
+      <span class="ag-project-dot ${isCurrent ? 'active' : ''}"></span>
+      <span class="ag-project-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+    `;
+    item.addEventListener('click', () => {
+      switchProject(p.id);
+      closeSettingsModal();
+    });
+    container.appendChild(item);
+  });
+}
+
+export function syncSettingsValues() {
+  const urlInput = document.getElementById('ag-omniroute-url');
+  const keyInput = document.getElementById('ag-omniroute-key');
+  const modelInput = document.getElementById('ag-omniroute-model');
+  const origUrl = document.getElementById('omniroute-url-input');
+  const origKey = document.getElementById('omniroute-key-input');
+  const origModel = document.getElementById('omniroute-model-input');
+
+  if (urlInput && origUrl) urlInput.value = origUrl.value || 'http://localhost:20128/v1';
+  if (keyInput && origKey) keyInput.value = origKey.value || 'omniroute-local';
+  if (modelInput && origModel) modelInput.value = origModel.value || 'auto';
+
+  const workerToggle = document.getElementById('ag-toggle-local-worker');
+  const origWorkerToggle = document.getElementById('toggle-local-ai-worker');
+  if (workerToggle && origWorkerToggle) {
+    workerToggle.checked = origWorkerToggle.checked;
+  }
+
+  const agSelectModel = document.getElementById('ag-select-local-model');
+  const origSelectModel = document.getElementById('lw-sidebar-select') || document.getElementById('lw-topbar-select');
+  if (agSelectModel && origSelectModel) {
+    agSelectModel.innerHTML = origSelectModel.innerHTML;
+    agSelectModel.value = origSelectModel.value;
+  }
+}
+
+export function initAntigravitySettingsModal() {
+  document.querySelectorAll('.ag-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabName = btn.getAttribute('data-ag-tab');
+      if (tabName) switchAgSettingsTab(tabName);
+    });
+  });
+
+  const btnClose = document.getElementById('btn-close-ag-settings');
+  if (btnClose) btnClose.addEventListener('click', closeSettingsModal);
+
+  const modal = document.getElementById('modal-settings-antigravity');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeSettingsModal();
+    });
+  }
+
+  const btnShortcuts = document.getElementById('btn-ag-shortcuts');
+  if (btnShortcuts) {
+    btnShortcuts.addEventListener('click', () => switchAgSettingsTab('shortcuts'));
+  }
+
+  // OmniRoute Salvar & Testar no Modal
+  const btnSaveOmni = document.getElementById('btn-ag-save-omniroute');
+  if (btnSaveOmni) {
+    btnSaveOmni.addEventListener('click', async () => {
+      const urlInput = document.getElementById('ag-omniroute-url');
+      const keyInput = document.getElementById('ag-omniroute-key');
+      const modelInput = document.getElementById('ag-omniroute-model');
+      const feedback = document.getElementById('ag-omniroute-feedback');
+
+      const origUrl = document.getElementById('omniroute-url-input');
+      const origKey = document.getElementById('omniroute-key-input');
+      const origModel = document.getElementById('omniroute-model-input');
+      if (origUrl && urlInput) origUrl.value = urlInput.value;
+      if (origKey && keyInput) origKey.value = keyInput.value;
+      if (origModel && modelInput) origModel.value = modelInput.value;
+
+      const origSave = document.getElementById('btn-save-omniroute-config');
+      if (origSave) {
+        origSave.click();
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(0, 255, 102, 0.1)';
+          feedback.style.color = '#00ff66';
+          feedback.textContent = 'Configurações do OmniRoute salvas e sincronizadas!';
+          setTimeout(() => { feedback.style.display = 'none'; }, 3500);
+        }
+      }
+    });
+  }
+
+  const btnTestOmni = document.getElementById('btn-ag-test-omniroute');
+  if (btnTestOmni) {
+    btnTestOmni.addEventListener('click', () => {
+      const origTest = document.getElementById('btn-test-omniroute');
+      const feedback = document.getElementById('ag-omniroute-feedback');
+      if (origTest) {
+        origTest.click();
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(0, 255, 102, 0.1)';
+          feedback.style.color = '#00ff66';
+          feedback.textContent = 'Testando conexão com OmniRoute...';
+        }
+      }
+    });
+  }
+
+  // Worker toggle no modal
+  const workerToggle = document.getElementById('ag-toggle-local-worker');
+  if (workerToggle) {
+    workerToggle.addEventListener('change', () => {
+      const origWorkerToggle = document.getElementById('toggle-local-ai-worker');
+      if (origWorkerToggle) {
+        origWorkerToggle.checked = workerToggle.checked;
+        origWorkerToggle.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+
+  // Autostart toggles no modal
+  const btnAutoOn = document.getElementById('ag-toggle-autostart-on');
+  const btnAutoOff = document.getElementById('ag-toggle-autostart-off');
+  if (btnAutoOn && btnAutoOff) {
+    btnAutoOn.addEventListener('click', () => {
+      btnAutoOn.classList.add('active');
+      btnAutoOff.classList.remove('active');
+      const origBtn = document.getElementById('btn-autostart-toggle') || document.getElementById('btn-autostart-toggle-overview');
+      if (origBtn && !document.body.classList.contains('autostart-active')) {
+        origBtn.click();
+      }
+    });
+    btnAutoOff.addEventListener('click', () => {
+      btnAutoOff.classList.add('active');
+      btnAutoOn.classList.remove('active');
+      const origBtn = document.getElementById('btn-autostart-toggle') || document.getElementById('btn-autostart-toggle-overview');
+      if (origBtn && document.body.classList.contains('autostart-active')) {
+        origBtn.click();
+      }
+    });
+  }
 }
 
 export function openQuickSearch() {
@@ -434,7 +615,7 @@ export function renderQuickSearchResults(query) {
   items.push({ label: 'Handoff & Master Blueprint', badge: 'VIEW', action: () => switchTab('view-handoff') });
   items.push({ label: 'Terminal / OpenCode Runner', badge: 'TOOL', action: () => switchTab('view-terminal') });
   items.push({ label: 'Local Worker & Ollama Manager', badge: 'AI', action: () => switchTab('view-worker') });
-  items.push({ label: 'Configurações do Cockpit', badge: 'SETTINGS', action: () => switchTab('view-settings') });
+  items.push({ label: 'Configurações do Cockpit', badge: 'SETTINGS', action: () => openSettingsModal() });
 
   // Fatias verticais
   (state.nodes || []).forEach(n => {

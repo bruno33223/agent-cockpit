@@ -75,5 +75,30 @@ class TestIssue10TerminalWorkspaceUX(unittest.TestCase):
         self.assertIn("btn-topbar-sidebar-toggle", self.sidebar_js)
         self.assertIn("sidebar-pinned-hidden", self.css)
 
+    def test_topbar_cards_and_sidebar_header_cleaned(self):
+        """Valida que os cards de épico e worker foram removidos da topbar e cabeçalho ruidoso da sidebar removido."""
+        self.assertNotIn('class="epic-indicator"', self.html)
+        self.assertNotIn('class="local-worker-pill"', self.html)
+        self.assertNotIn('sidebar-top-title', self.html)
+
+    def test_antigravity_settings_modal(self):
+        """Valida a implementação do modal de configurações popup estilo Antigravity IDE."""
+        self.assertIn("modal-settings-antigravity", self.html)
+        self.assertIn("ag-settings-sidebar", self.html)
+        self.assertIn("ag-settings-main", self.html)
+        self.assertIn("nav-footer-settings", self.html)
+        self.assertIn("openSettingsModal", self.sidebar_js)
+        self.assertIn("closeSettingsModal", self.sidebar_js)
+        self.assertIn("switchAgSettingsTab", self.sidebar_js)
+        self.assertIn(".settings-modal-backdrop", self.css)
+        self.assertIn(".antigravity-settings-dialog", self.css)
+
+    def test_terminal_pane_dragging(self):
+        """Valida a funcionalidade de arrastar terminais no canvas virtual."""
+        self.assertIn("enablePaneDragging", self.term_js)
+        self.assertIn("is-dragging", self.css)
+        self.assertIn("cursor: grab", self.css)
+
 if __name__ == "__main__":
     unittest.main()
+

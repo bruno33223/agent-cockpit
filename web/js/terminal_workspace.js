@@ -168,6 +168,17 @@ export class TerminalWorkspaceManager {
     this.gridContainer.classList.remove('layout-grid', 'layout-side-by-side', 'layout-stacked', 'layout-free', 'layout-dynamic');
     this.gridContainer.classList.add(`layout-${mode}`);
 
+    if (mode !== 'free') {
+      this.sessions.forEach(s => {
+        if (s.elPane) {
+          s.elPane.style.position = '';
+          s.elPane.style.left = '';
+          s.elPane.style.top = '';
+          s.elPane.style.zIndex = '';
+        }
+      });
+    }
+
     document.querySelectorAll('#grid-config-dropdown .grid-config-item').forEach(item => {
       item.classList.toggle('active', item.getAttribute('data-grid-layout') === mode);
     });
@@ -630,8 +641,12 @@ export class TerminalWorkspaceManager {
     });
 
     elPane.addEventListener('mousedown', () => {
+      document.querySelectorAll('.terminal-pane').forEach(p => p.style.zIndex = '1');
+      elPane.style.zIndex = '10';
       this.selectSession(id, false);
     });
+
+    this.enablePaneDragging(elPane, session);
 
     // Botão de Subagentes Vinculados no Cabeçalho do Orquestrador (Issue #10)
     const btnSubagents = elPane.querySelector('.btn-orchestrator-subagents');
@@ -717,6 +732,102 @@ export class TerminalWorkspaceManager {
     }
 
     return session;
+  }
+
+  enablePaneDragging(elPane, session) {
+    const header = elPane.querySelector('.orca-pane-header');
+    if (!header) return;
+
+    header.style.cursor = 'grab';
+
+    let isDragging = false;
+    let startMouseX = 0;
+    let startMouseY = 0;
+    let startPaneX = 0;
+    let startPaneY = 0;
+
+    const onMouseDown = (e) => {
+      // Não inicia arrasto ao clicar em botões, selects, links ou dropdowns
+      if (e.target.closest('button, select, input, a, .orca-agent-picker-wrap, .orchestrator-subagents-dropdown, .btn-orchestrator-subagents, .orca-btn-close, .orca-btn-terminate-subagent')) {
+        return;
+      }
+      if (e.button !== 0) return;
+
+      isDragging = true;
+      header.style.cursor = 'grabbing';
+      elPane.classList.add('is-dragging');
+
+      // Traz o painel arrastado para a camada de foco superior
+      document.querySelectorAll('.terminal-pane').forEach(p => p.style.zIndex = '1');
+      elPane.style.zIndex = '100';
+      this.selectSession(session.id, false);
+
+      // Garante modo livre no gridContainer
+      if (!this.gridContainer.classList.contains('layout-free')) {
+        this.gridContainer.classList.add('layout-free');
+        this.gridContainer.classList.remove('layout-grid', 'layout-side-by-side', 'layout-stacked');
+        this.layout = 'free';
+        localStorage.setItem('cockpit_terminal_layout', 'free');
+        document.querySelectorAll('#grid-config-dropdown .grid-config-item').forEach(item => {
+          item.classList.toggle('active', item.getAttribute('data-grid-layout') === 'free');
+        });
+      }
+
+      const gridRect = this.gridContainer.getBoundingClientRect();
+      const paneRect = elPane.getBoundingClientRect();
+
+      // Posição normalizada no sistema de coordenadas do canvas (dividindo pelo zoomLevel)
+      startPaneX = (paneRect.left - gridRect.left) / this.zoomLevel;
+      startPaneY = (paneRect.top - gridRect.top) / this.zoomLevel;
+
+      if (!elPane.style.width) {
+        elPane.style.width = `${Math.max(480, paneRect.width / this.zoomLevel)}px`;
+      }
+      if (!elPane.style.height) {
+        elPane.style.height = `${Math.max(340, paneRect.height / this.zoomLevel)}px`;
+      }
+
+      elPane.style.position = 'absolute';
+      elPane.style.left = `${startPaneX}px`;
+      elPane.style.top = `${startPaneY}px`;
+
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const onMouseMove = (moveEvt) => {
+        if (!isDragging) return;
+        const deltaX = (moveEvt.clientX - startMouseX) / this.zoomLevel;
+        const deltaY = (moveEvt.clientY - startMouseY) / this.zoomLevel;
+
+        const newLeft = Math.max(0, startPaneX + deltaX);
+        const newTop = Math.max(0, startPaneY + deltaY);
+
+        elPane.style.left = `${newLeft}px`;
+        elPane.style.top = `${newTop}px`;
+        session.customPos = { x: newLeft, y: newTop };
+      };
+
+      const onMouseUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        header.style.cursor = 'grab';
+        elPane.classList.remove('is-dragging');
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+
+        if (session.fitAddon && session.term) {
+          try { session.fitAddon.fit(); } catch (_) {}
+        }
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    };
+
+    header.addEventListener('mousedown', onMouseDown);
   }
 
   setSessionAgent(sessionId, newAgentType, autoLaunch = false) {
