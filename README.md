@@ -4,7 +4,7 @@
 
 **Visual Multi-Agent Telemetry, AST Dependency Graph & Governance Hub for AI Coding Fleets**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![MCP](https://img.shields.io/badge/Protocol-MCP%20%28JSON--RPC%202.0%29-8A2BE2)]()
@@ -343,6 +343,6 @@ Validates MCP JSON-RPC handshakes, state store atomicity, REST endpoints, and We
 
 ## 📄 License & Third-Party Credits
 
-Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+Distributed under the GNU Affero General Public License v3 (AGPLv3). See [LICENSE](LICENSE) for details.
 
 This project integrates and adapts the engineering skills and guidelines from **Superpowers** (`obra/superpowers`) by Jesse Vincent, distributed under the MIT License. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full licensing details.

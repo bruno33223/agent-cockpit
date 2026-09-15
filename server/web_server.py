@@ -5,14 +5,41 @@ import time
 import socket
 import asyncio
 import threading
+import mimetypes
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+try:
+    import pty
+    import fcntl
+    import termios
+    import struct
+    import signal
+except ImportError:
+    pass
+
 sys.path.insert(0, os.path.dirname(__file__))
 from state_store import db
+try:
+    import opencode_manager
+except ImportError:
+    try:
+        from server import opencode_manager
+    except ImportError:
+        opencode_manager = None
+
+try:
+    import pty_manager
+    pty_session_manager = pty_manager.pty_session_manager
+except ImportError:
+    try:
+        from server import pty_manager
+        pty_session_manager = pty_manager.pty_session_manager
+    except ImportError:
+        pty_session_manager = None
 
 app = FastAPI(title="Agent Cockpit Offline Server")
 
@@ -843,6 +870,361 @@ def post_local_worker_pull(payload: LocalWorkerPullPayload):
         "model": model_name,
         "message": f"Download de '{model_name}' iniciado em segundo plano no Ollama. Acompanhe o progresso no Console de Logs."
     }
+
+# =========================================================================
+# ROTAS DE INTEGRAÇÃO: OMNIROUTE & OPENCODE
+# =========================================================================
+
+class OmniRouteConfigPayload(BaseModel):
+    omniroute_url: Optional[str] = "http://localhost:20128/v1"
+    api_key: Optional[str] = "omniroute-local"
+    model: Optional[str] = "auto"
+    enabled: Optional[bool] = True
+
+@app.get("/api/omniroute/status")
+def get_omniroute_status(base_url: Optional[str] = None):
+    """Testa a conectividade com o OmniRoute e recupera a lista de modelos."""
+    if opencode_manager:
+        return opencode_manager.check_omniroute_health(base_url)
+    return {"online": False, "models": [], "message": "Módulo opencode_manager não disponível"}
+
+@app.get("/api/omniroute/config")
+def get_omniroute_config():
+    """Retorna as configurações salvas de OmniRoute e OpenCode."""
+    if opencode_manager:
+        return opencode_manager.load_config()
+    return {"omniroute_url": "http://localhost:20128/v1", "api_key": "omniroute-local", "model": "auto"}
+
+@app.post("/api/omniroute/config")
+def post_omniroute_config(payload: OmniRouteConfigPayload):
+    """Salva configurações de OmniRoute e sincroniza opencode.json."""
+    if opencode_manager:
+        data = payload.dict(exclude_unset=True)
+        res = opencode_manager.save_config(data)
+        manager.broadcast_sync("OMNIROUTE_CONFIG_UPDATED", res)
+        return {"status": "success", "config": res}
+    return {"status": "error", "message": "Módulo opencode_manager não disponível"}
+
+@app.get("/api/opencode/binaries")
+def get_opencode_binaries():
+    """Verifica a presença dos binários de opencode, omniroute, node e npm."""
+    if opencode_manager:
+        return opencode_manager.detect_binaries()
+    return {"opencode": {"installed": False}, "omniroute": {"installed": False}}
+
+@app.post("/api/opencode/sync-config")
+def post_opencode_sync():
+    """Gera/sincroniza o arquivo opencode.json na raiz do projeto com MCP do Cockpit."""
+    if opencode_manager:
+        return opencode_manager.sync_opencode_config()
+    return {"status": "error", "message": "Módulo opencode_manager não disponível"}
+
+# =========================================================================
+# WEBSOCKET: TERMINAL PTY MULTI-SESSÃO (XTERM.JS RUNNER / ALETHE STYLE)
+# =========================================================================
+
+@app.websocket("/ws/terminal")
+async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Query("term-1"), cwd: Optional[str] = Query(None)):
+    await websocket.accept()
+    
+    if not pty_session_manager:
+        await websocket.send_text("\r\n[Erro: Suporte PTY indisponível nesta plataforma]\r\n")
+        await websocket.close()
+        return
+
+    # Determina diretório de trabalho do projeto ativo se não fornecido
+    if not cwd:
+        state = db.get_state(db.get_current_project_id())
+        project_root = state.get("config", {}).get("project_root")
+        cwd = project_root if (project_root and os.path.isdir(project_root)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    session = pty_session_manager.get_or_create(session_id=session_id, cwd=cwd)
+    history = session.attach(websocket)
+    if history:
+        await websocket.send_text(history)
+        
+    await session.start_reader_if_needed()
+
+    try:
+        while True:
+            msg = await websocket.receive_text()
+            try:
+                payload = json.loads(msg)
+                if isinstance(payload, dict) and payload.get("type") == "resize":
+                    cols = int(payload.get("cols", 80))
+                    rows = int(payload.get("rows", 24))
+                    session.resize(cols, rows)
+                    continue
+                elif isinstance(payload, dict) and "data" in payload:
+                    session.write(payload["data"])
+                    continue
+            except Exception:
+                pass
+            session.write(msg)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        session.detach(websocket)
+
+@app.get("/api/terminal/sessions")
+def get_terminal_sessions():
+    """Lista as sessões ativas de terminal PTY com PID, CWD e status."""
+    if pty_session_manager:
+        return pty_session_manager.list_sessions()
+    return []
+
+@app.delete("/api/terminal/sessions/{session_id}")
+def delete_terminal_session(session_id: str):
+    """Encerra um terminal PTY específico."""
+    if pty_session_manager:
+        closed = pty_session_manager.close_session(session_id)
+        return {"status": "ok" if closed else "not_found", "session_id": session_id}
+    return {"status": "error"}
+
+# ROTAS DO FILE EXPLORER (ORCA RIGHT SIDEBAR)
+DEFAULT_FS_IGNORE_DIRS = {
+    ".git", "node_modules", "__pycache__", ".venv", "venv", ".pytest_cache",
+    ".mypy_cache", ".ruff_cache", "dist", "build", ".next", ".nuxt",
+    ".output", ".turbo", ".cache", ".idea", ".vscode"
+}
+DEFAULT_FS_IGNORE_FILES = {
+    ".DS_Store", "Thumbs.db"
+}
+
+def _resolve_project_fs_root(project_id: Optional[str] = None) -> tuple:
+    """Resolve o caminho raiz físico, nome e ID canônico do projeto especificado ou atual."""
+    target_pid = db.resolve_project_id(project_id)
+    root_path = db.get_project_root(target_pid)
+    
+    project_name = None
+    if not root_path or not os.path.exists(root_path):
+        index_data = db._read_index()
+        proj_meta = index_data.get("projects", {}).get(target_pid, {})
+        idx_root = proj_meta.get("project_root")
+        if idx_root and os.path.exists(idx_root):
+            root_path = idx_root
+        project_name = proj_meta.get("name")
+    
+    base_cockpit_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if not root_path or not os.path.exists(root_path):
+        root_path = base_cockpit_dir
+
+    root_path = os.path.abspath(root_path)
+    if not project_name:
+        state = db.get_state(target_pid)
+        project_name = state.get("epic", {}).get("name") or os.path.basename(root_path) or "Projeto"
+        
+    return root_path, project_name, target_pid
+
+@app.get("/api/fs/tree")
+def get_fs_tree(
+    project_id: Optional[str] = None,
+    subpath: Optional[str] = "",
+    max_depth: int = 4
+):
+    """
+    Retorna a árvore hierárquica de arquivos e pastas do projeto em formato JSON:
+    {"root": "/path", "name": "project_name", "project_id": "...", "entries": [...]}
+    """
+    if not isinstance(project_id, str):
+        project_id = None
+    if not isinstance(subpath, str):
+        subpath = ""
+    if not isinstance(max_depth, int):
+        max_depth = 4
+
+    root_path, project_name, target_pid = _resolve_project_fs_root(project_id)
+    
+    clean_subpath = os.path.normpath((subpath or "").strip().lstrip("/\\"))
+    if clean_subpath and clean_subpath != ".":
+        target_dir = os.path.abspath(os.path.join(root_path, clean_subpath))
+        try:
+            if os.path.commonpath([root_path, target_dir]) != root_path:
+                raise HTTPException(status_code=403, detail="Acesso negado: subcaminho fora da raiz do projeto.")
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Acesso negado: unidade diferente ou caminho inválido.")
+    else:
+        target_dir = root_path
+        clean_subpath = ""
+
+    if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+        raise HTTPException(status_code=404, detail="Diretório não encontrado.")
+
+    def _build_tree(curr_dir: str, rel_prefix: str, current_depth: int) -> List[Dict[str, Any]]:
+        if current_depth > max_depth:
+            return []
+        
+        try:
+            with os.scandir(curr_dir) as it:
+                items = list(it)
+        except (PermissionError, OSError):
+            return []
+
+        dirs = []
+        files = []
+        for entry in items:
+            name = entry.name
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    if name in DEFAULT_FS_IGNORE_DIRS:
+                        continue
+                    dirs.append(entry)
+                elif entry.is_file(follow_symlinks=False):
+                    if name in DEFAULT_FS_IGNORE_FILES:
+                        continue
+                    files.append(entry)
+            except OSError:
+                continue
+
+        dirs.sort(key=lambda x: x.name.lower())
+        files.sort(key=lambda x: x.name.lower())
+
+        result = []
+        for d in dirs:
+            child_rel = os.path.join(rel_prefix, d.name) if rel_prefix else d.name
+            child_rel_norm = child_rel.replace("\\", "/")
+            children = []
+            if current_depth < max_depth:
+                children = _build_tree(d.path, child_rel_norm, current_depth + 1)
+            result.append({
+                "name": d.name,
+                "path": child_rel_norm,
+                "type": "directory",
+                "children": children
+            })
+
+        for f in files:
+            child_rel = os.path.join(rel_prefix, f.name) if rel_prefix else f.name
+            child_rel_norm = child_rel.replace("\\", "/")
+            try:
+                size = f.stat().st_size
+            except OSError:
+                size = 0
+            result.append({
+                "name": f.name,
+                "path": child_rel_norm,
+                "type": "file",
+                "size": size
+            })
+
+        return result
+
+    entries = _build_tree(target_dir, clean_subpath.replace("\\", "/"), 1)
+    
+    return {
+        "root": root_path,
+        "name": project_name,
+        "project_id": target_pid,
+        "subpath": clean_subpath.replace("\\", "/"),
+        "entries": entries
+    }
+
+@app.get("/api/fs/read")
+def read_fs_file(
+    path: str,
+    project_id: Optional[str] = None,
+    max_bytes: int = 512 * 1024
+):
+    """
+    Retorna o conteúdo do arquivo em texto seguro para visualização ou preview rápido.
+    """
+    if not isinstance(project_id, str):
+        project_id = None
+    if not isinstance(max_bytes, int):
+        max_bytes = 512 * 1024
+
+    root_path, project_name, target_pid = _resolve_project_fs_root(project_id)
+    
+    clean_p = (path or "").strip()
+    if not clean_p:
+        raise HTTPException(status_code=400, detail="Parâmetro 'path' é obrigatório.")
+    if os.path.isabs(clean_p):
+        target_file = os.path.abspath(clean_p)
+        allowed_roots = [root_path]
+        for p in db.list_projects():
+            pr = p.get("project_root")
+            if pr and os.path.exists(pr):
+                allowed_roots.append(os.path.abspath(pr))
+        
+        is_safe = False
+        for r in allowed_roots:
+            try:
+                if os.path.commonpath([r, target_file]) == r:
+                    is_safe = True
+                    break
+            except ValueError:
+                continue
+        if not is_safe:
+            raise HTTPException(status_code=403, detail="Acesso negado fora do espaço do projeto.")
+    else:
+        norm_p = os.path.normpath(clean_p.lstrip("/\\"))
+        target_file = os.path.abspath(os.path.join(root_path, norm_p))
+        try:
+            if os.path.commonpath([root_path, target_file]) != root_path:
+                raise HTTPException(status_code=403, detail="Acesso negado: tentativa de escape da raiz.")
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Caminho inválido.")
+
+    if not os.path.exists(target_file) or not os.path.isfile(target_file):
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+
+    file_name = os.path.basename(target_file)
+    try:
+        rel_path = os.path.relpath(target_file, root_path).replace("\\", "/")
+    except ValueError:
+        rel_path = file_name
+
+    file_size = os.path.getsize(target_file)
+    
+    mime_type, _ = mimetypes.guess_type(target_file)
+    mime_type = mime_type or "text/plain"
+
+    try:
+        with open(target_file, "rb") as f:
+            chunk = f.read(max_bytes)
+        
+        if b"\x00" in chunk[:8192]:
+            return {
+                "path": rel_path,
+                "name": file_name,
+                "size": file_size,
+                "is_binary": True,
+                "content": "",
+                "truncated": False,
+                "mime": mime_type,
+                "error": "Arquivo binário não suportado para visualização em texto."
+            }
+
+        try:
+            text_content = chunk.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text_content = chunk.decode("latin-1")
+            except Exception:
+                return {
+                    "path": rel_path,
+                    "name": file_name,
+                    "size": file_size,
+                    "is_binary": True,
+                    "content": "",
+                    "truncated": False,
+                    "mime": mime_type,
+                    "error": "Codificação de arquivo não suportada para preview de texto."
+                }
+
+        return {
+            "path": rel_path,
+            "name": file_name,
+            "size": file_size,
+            "is_binary": False,
+            "content": text_content,
+            "truncated": file_size > max_bytes,
+            "mime": mime_type
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo: {str(e)}")
 
 # Monta arquivos estáticos do dashboard visual
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))

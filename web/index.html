@@ -8,91 +8,243 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- xterm.js para Terminal Embutido e OpenCode Runner -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.js"></script>
 </head>
 <body>
+  <!-- 1. TITLEBAR SUPERIOR ESTILO ORCA (.orca-titlebar / .titlebar) -->
+  <header class="orca-titlebar titlebar" id="orca-titlebar">
+    <div class="orca-titlebar-left titlebar-left">
+      <!-- Traffic lights estilo macOS -->
+      <div class="mac-traffic-lights" aria-label="Controles da Janela">
+        <span class="mac-dot close" title="Fechar Janela"></span>
+        <span class="mac-dot minimize" title="Minimizar Janela"></span>
+        <span class="mac-dot maximize" title="Maximizar Janela"></span>
+      </div>
+
+      <!-- Marca do app (.orca-brand com ícone 🐋 e título "Orca Cockpit") -->
+      <div class="orca-brand" title="Orca Cockpit">
+        <span class="orca-brand-logo">🐋</span>
+        <span class="orca-brand-title">Orca Cockpit</span>
+        <span class="orca-brand-badge">AGENT</span>
+      </div>
+
+      <!-- Navegação rápida (.orca-quick-nav) -->
+      <nav class="orca-quick-nav" aria-label="Navegação Rápida Orca">
+        <button class="orca-quick-nav-search" id="nav-quick-search" title="Busca Rápida (Ctrl+K)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Search</span>
+          <kbd class="orca-kbd">Ctrl+K</kbd>
+        </button>
+
+        <button class="orca-quick-nav-btn active" id="nav-quick-tasks" title="Tarefas & Kanban">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span>Tasks</span>
+        </button>
+
+        <button class="orca-quick-nav-btn" id="nav-quick-automations" title="Automações & Blueprints">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span>Automations</span>
+        </button>
+
+        <button class="orca-quick-nav-btn" id="nav-quick-mobile" title="Orca Mobile Companion">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+          <span>Orca Mobile</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="orca-titlebar-right topbar-right">
+      <div class="epic-indicator" title="Épico atualmente sincronizado">
+        <span class="epic-tag">ÉPICO</span>
+        <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
+      </div>
+
+      <div class="project-selector-wrapper" title="Seletor de Workspace / Projeto Concorrente">
+        <span class="project-tag">📁 PROJETO</span>
+        <select id="project-select" class="project-dropdown" aria-label="Selecione o Projeto">
+          <option value="default">Carregando projetos...</option>
+        </select>
+        <button id="btn-scan-projects" class="project-scan-btn" title="Escanear e sincronizar projetos reais em ~/Projects">⟳</button>
+      </div>
+
+      <div class="local-worker-pill" id="local-worker-pill" title="Status e Seletor do Local Worker (Ollama)">
+        <span class="pulse-led online" id="lw-pill-led"></span>
+        <span class="lw-pill-label">WORKER:</span>
+        <select id="lw-topbar-select" class="lw-topbar-dropdown" aria-label="Selecione o Modelo Local">
+          <option value="">Carregando...</option>
+        </select>
+        <button id="btn-topbar-pull-modal" class="lw-pull-btn" title="Baixar novos modelos">⬇</button>
+      </div>
+
+      <div class="conn-pill" id="ws-status">
+        <span class="pulse-led online"></span>
+        <span class="conn-text" id="ws-status-text">WS Conectando...</span>
+      </div>
+    </div>
+  </header>
+
   <!-- APP LAYOUT -->
   <div class="app-layout">
-    <!-- ASIDE: EXPANDABLE SIDEBAR -->
-    <aside class="app-sidebar" id="app-sidebar">
-      <div class="sidebar-header">
-        <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" title="Expandir / Recolher Menu (Hambúrguer)" aria-label="Alternar Menu">
-          <svg class="hamburger-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
+    <!-- BARRA LATERAL ESQUERDA ESTILO ORCA (.sidebar / .orca-worktree-sidebar) -->
+    <aside class="app-sidebar sidebar orca-worktree-sidebar" id="app-sidebar">
+      <!-- CABEÇALHO "WORKSPACES" COM BOTÃO (+) -->
+      <div class="sidebar-workspaces-header">
+        <div class="sidebar-workspaces-title-group">
+          <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" title="Expandir / Recolher Menu" aria-label="Alternar Menu">
+            <svg class="hamburger-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <span class="sidebar-workspaces-title">WORKSPACES</span>
+        </div>
+        <button class="btn-sidebar-new-worktree" id="btn-sidebar-new-worktree" title="Criar Nova Worktree / Sessão" aria-label="Nova Worktree">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </button>
-        <div class="sidebar-brand">
-          <span class="sidebar-brand-badge">COCKPIT</span>
-          <span class="sidebar-brand-title">Agent Cockpit</span>
+      </div>
+
+      <!-- CORPO ROLÁVEL DA SIDEBAR -->
+      <div class="sidebar-scrollable-body">
+        <!-- SEÇÃO "PINNED" COLAPSÁVEL (.worktree-section-pinned) -->
+        <div class="worktree-section worktree-section-pinned" id="section-pinned">
+          <div class="worktree-section-header" data-target="worktree-pinned-list">
+            <span class="worktree-section-toggle">▾</span>
+            <span class="worktree-section-label">Pinned</span>
+            <span class="worktree-section-count" id="pinned-count">1</span>
+          </div>
+          <div class="worktree-sidebar-list worktree-pinned-list" id="worktree-pinned-list">
+            <div class="worktree-card active" id="pinned-main-card" data-project-id="default" tabindex="0">
+              <div class="worktree-header">
+                <span class="worktree-title" id="pinned-worktree-title">agent-cockpit</span>
+                <span class="agent-state-dot done" title="Status: Online / Conectado"></span>
+              </div>
+              <div class="worktree-meta-row">
+                <span class="worktree-repo-tag" id="pinned-repo-tag">cockpit</span>
+                <span class="worktree-branch">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="6" y1="3" x2="6" y2="15"></line>
+                    <circle cx="18" cy="6" r="3"></circle>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <path d="M18 9a9 9 0 0 1-9 9"></path>
+                  </svg>
+                  main
+                </span>
+                <span class="worktree-time">pinned</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEÇÃO "IN PROGRESS" COLAPSÁVEL (.worktree-section-progress) -->
+        <div class="worktree-section worktree-section-progress" id="section-progress">
+          <div class="worktree-section-header" data-target="worktree-cards-list">
+            <span class="worktree-section-toggle">▾</span>
+            <span class="worktree-section-label">In progress</span>
+            <span class="worktree-section-count" id="worktree-progress-count">0</span>
+          </div>
+          <div class="worktree-sidebar-list" id="worktree-cards-list">
+            <!-- Renderizado dinamicamente via renderWorktreeSidebar() -->
+          </div>
+        </div>
+
+        <!-- SEÇÃO VIEWS / COCKPIT TABS -->
+        <div class="worktree-section worktree-section-views" id="section-views">
+          <div class="worktree-section-header" data-target="sidebar-views-nav">
+            <span class="worktree-section-toggle">▾</span>
+            <span class="worktree-section-label">Views</span>
+          </div>
+          <nav class="sidebar-nav" id="sidebar-views-nav">
+            <button class="nav-tab active" data-view="view-overview" data-tooltip="Visão Geral">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="9"></rect>
+                <rect x="14" y="3" width="7" height="5"></rect>
+                <rect x="14" y="12" width="7" height="9"></rect>
+                <rect x="3" y="16" width="7" height="5"></rect>
+              </svg>
+              <span class="tab-label">Visão Geral</span>
+            </button>
+            <button class="nav-tab" data-view="view-flow" data-tooltip="Fluxo & Kanban">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span class="tab-label">Fluxo & Kanban</span>
+            </button>
+            <button class="nav-tab" data-view="view-graph" id="nav-tab-graph" data-tooltip="Code Graph">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+              <span class="tab-label">Code Graph</span>
+            </button>
+            <button class="nav-tab" data-view="view-gauntlet" data-tooltip="Gauntlet Log">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+              <span class="tab-label">Gauntlet Log</span>
+            </button>
+            <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff" data-tooltip="Handoff">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              </svg>
+              <span class="tab-label">Handoff</span>
+            </button>
+            <button class="nav-tab" data-view="view-worker" id="nav-tab-worker" data-tooltip="Local Worker & Ollama">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                <rect x="9" y="9" width="6" height="6"></rect>
+                <line x1="9" y1="1" x2="9" y2="4"></line>
+                <line x1="15" y1="1" x2="15" y2="4"></line>
+                <line x1="9" y1="20" x2="9" y2="23"></line>
+                <line x1="15" y1="20" x2="15" y2="23"></line>
+                <line x1="20" y1="9" x2="23" y2="9"></line>
+                <line x1="20" y1="14" x2="23" y2="14"></line>
+                <line x1="1" y1="9" x2="4" y2="9"></line>
+                <line x1="1" y1="14" x2="4" y2="14"></line>
+              </svg>
+              <span class="tab-label">Local Worker</span>
+            </button>
+            <button class="nav-tab" data-view="view-terminal" id="nav-tab-terminal" data-tooltip="Terminal & OpenCode">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+              <span class="tab-label">Terminal / OpenCode</span>
+            </button>
+            <button class="nav-tab" data-view="view-settings" id="nav-tab-settings" data-tooltip="Configurações">
+              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span class="tab-label">Configurações</span>
+            </button>
+          </nav>
         </div>
       </div>
 
-      <!-- MAIN NAVIGATION TABS -->
-      <nav class="sidebar-nav">
-        <button class="nav-tab active" data-view="view-overview" data-tooltip="Visão Geral">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="9"></rect>
-            <rect x="14" y="3" width="7" height="5"></rect>
-            <rect x="14" y="12" width="7" height="9"></rect>
-            <rect x="3" y="16" width="7" height="5"></rect>
-          </svg>
-          <span class="tab-label">Visão Geral</span>
-        </button>
-        <button class="nav-tab" data-view="view-flow" data-tooltip="Fluxo & Kanban">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-          <span class="tab-label">Fluxo & Kanban</span>
-        </button>
-        <button class="nav-tab" data-view="view-graph" id="nav-tab-graph" data-tooltip="Code Graph">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"></circle>
-            <circle cx="6" cy="12" r="3"></circle>
-            <circle cx="18" cy="19" r="3"></circle>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-          </svg>
-          <span class="tab-label">Code Graph</span>
-        </button>
-        <button class="nav-tab" data-view="view-gauntlet" data-tooltip="Gauntlet Log">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          </svg>
-          <span class="tab-label">Gauntlet Log</span>
-        </button>
-        <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff" data-tooltip="Handoff">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-          </svg>
-          <span class="tab-label">Handoff</span>
-        </button>
-        <button class="nav-tab" data-view="view-worker" id="nav-tab-worker" data-tooltip="Local Worker & Ollama">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-            <rect x="9" y="9" width="6" height="6"></rect>
-            <line x1="9" y1="1" x2="9" y2="4"></line>
-            <line x1="15" y1="1" x2="15" y2="4"></line>
-            <line x1="9" y1="20" x2="9" y2="23"></line>
-            <line x1="15" y1="20" x2="15" y2="23"></line>
-            <line x1="20" y1="9" x2="23" y2="9"></line>
-            <line x1="20" y1="14" x2="23" y2="14"></line>
-            <line x1="1" y1="9" x2="4" y2="9"></line>
-            <line x1="1" y1="14" x2="4" y2="14"></line>
-          </svg>
-          <span class="tab-label">Local Worker</span>
-        </button>
-        <button class="nav-tab" data-view="view-settings" id="nav-tab-settings" data-tooltip="Configurações">
-          <svg class="tab-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span class="tab-label">Configurações</span>
-        </button>
-      </nav>
-
-      <!-- SIDEBAR FOOTER -->
+      <!-- RODAPÉ DA BARRA LATERAL (.sidebar-footer) -->
       <div class="sidebar-footer">
         <button class="sidebar-action-btn" id="btn-autostart" data-tooltip="Status do Autostart">
           <svg class="action-svg autostart-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -109,11 +261,33 @@
           </svg>
           <span class="tab-label gate-text">Gate: Pendente</span>
         </button>
-        <div class="sidebar-meta">
-          <span class="meta-version tab-label">v2.1</span>
-          <div class="meta-actions">
-            <button class="meta-btn" id="btn-test-cycle" title="Simular Pulso" data-tooltip="Simular Pulso">⚡</button>
-            <button class="meta-btn danger" id="btn-reset" title="Resetar Estado" data-tooltip="Resetar">↺</button>
+
+        <!-- Barra de uso / cota de recursos estilo Orca (.sidebar-usage-meter) -->
+        <div class="sidebar-usage-meter" title="Uso de recursos e cota semanal">
+          <div class="usage-meter-header">
+            <span class="usage-meter-label">USAGE</span>
+            <span class="usage-meter-text">78% 5h 94% wk</span>
+          </div>
+          <div class="usage-meter-bar">
+            <div class="usage-meter-fill" style="width: 78%;"></div>
+          </div>
+        </div>
+
+        <!-- Botão de configurações (#nav-footer-settings) e meta -->
+        <div class="sidebar-footer-row">
+          <button class="sidebar-footer-btn" id="nav-footer-settings" title="Configurações (Settings)" data-tooltip="Configurações">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span class="tab-label">Settings</span>
+          </button>
+          <div class="sidebar-meta">
+            <span class="meta-version tab-label">v2.1</span>
+            <div class="meta-actions">
+              <button class="meta-btn" id="btn-test-cycle" title="Simular Pulso" data-tooltip="Simular Pulso">⚡</button>
+              <button class="meta-btn danger" id="btn-reset" title="Resetar Estado" data-tooltip="Resetar">↺</button>
+            </div>
           </div>
         </div>
       </div>
@@ -121,39 +295,6 @@
 
     <!-- MAIN CONTENT WRAPPER -->
     <div class="main-content">
-      <!-- TOPBAR MINIMALISTA -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <div class="epic-indicator" title="Épico atualmente sincronizado">
-            <span class="epic-tag">ÉPICO</span>
-            <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
-          </div>
-        </div>
-
-        <div class="topbar-right">
-          <div class="project-selector-wrapper" title="Seletor de Workspace / Projeto Concorrente">
-            <span class="project-tag">📁 PROJETO</span>
-            <select id="project-select" class="project-dropdown" aria-label="Selecione o Projeto">
-              <option value="default">Carregando projetos...</option>
-            </select>
-            <button id="btn-scan-projects" class="project-scan-btn" title="Escanear e sincronizar projetos reais em ~/Projects">⟳</button>
-          </div>
-
-          <div class="local-worker-pill" id="local-worker-pill" title="Status e Seletor do Local Worker (Ollama)">
-            <span class="pulse-led online" id="lw-pill-led"></span>
-            <span class="lw-pill-label">WORKER:</span>
-            <select id="lw-topbar-select" class="lw-topbar-dropdown" aria-label="Selecione o Modelo Local">
-              <option value="">Carregando...</option>
-            </select>
-            <button id="btn-topbar-pull-modal" class="lw-pull-btn" title="Baixar novos modelos">⬇</button>
-          </div>
-
-          <div class="conn-pill" id="ws-status">
-            <span class="pulse-led online"></span>
-            <span class="conn-text" id="ws-status-text">WS Conectando...</span>
-          </div>
-        </div>
-      </header>
 
   <!-- WORKSPACE WRAPPER -->
   <div class="workspace-wrapper">
@@ -683,6 +824,52 @@
         </div>
       </section>
 
+      <!-- VIEW 6: TERMINAL INTERATIVO & ORCA MULTI-PANE WORKBENCH -->
+      <section class="tab-view" id="view-terminal">
+        <div class="terminal-view-container orca-workbench-container">
+          <div class="terminal-view-header orca-workbench-header">
+            <div class="terminal-header-info">
+              <div class="terminal-header-title-row">
+                <h2>Orca Multi-Pane Workbench & Agent Terminal</h2>
+                <span class="tech-badge" id="terminal-session-badge">Multi-PTY Concorrente</span>
+              </div>
+              <p class="terminal-header-desc">
+                Workbench central com abas e split panes estilo Orca (stablyai/orca). Execute concorrentemente <strong>Claude Code</strong>, <strong>OpenCode</strong>, <strong>Codex</strong> e <strong>Bash</strong> com controle de sessões PTY e telemetria MCP em tempo real.
+              </p>
+            </div>
+            <div class="terminal-view-actions">
+              <!-- SELETOR DE LAYOUT MULTI-TERMINAL (ORCA WORKBENCH) -->
+              <div class="terminal-layout-picker" id="terminal-layout-picker">
+                <span class="layout-label">Layout:</span>
+                <button class="layout-btn active" data-layout="tabs" title="Modo Abas (1 terminal focado)">Tabs</button>
+                <button class="layout-btn" data-layout="split" title="Split Lado a Lado (2 terminais)">Split 1x2</button>
+                <button class="layout-btn" data-layout="grid" title="Grade 2x2 (4 terminais)">Grid 2x2</button>
+                <button class="layout-btn" id="btn-toggle-sidebar" title="Alternar largura total (ocultar/exibir telemetria lateral)">Max</button>
+              </div>
+              <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Abrir nova sessão de terminal PTY">
+                + Novo Terminal
+              </button>
+              <button class="action-btn secondary btn-sm" id="btn-run-opencode" title="Executar OpenCode no terminal ativo">
+                ⚡ OpenCode
+              </button>
+              <button class="action-btn secondary btn-sm" id="btn-run-claude" title="Executar Claude Code no terminal ativo">
+                Claude Code
+              </button>
+            </div>
+          </div>
+
+          <!-- BARRA DE ABAS DE SESSÕES PTY -->
+          <div class="terminal-tabs-bar orca-tab-strip" id="terminal-tabs-bar">
+            <!-- Abas geradas dinamicamente via JS -->
+          </div>
+
+          <!-- GRID MULTI-TERMINAL DO WORKSPACE -->
+          <div class="terminal-workspace-grid layout-tabs" id="terminal-workspace-grid">
+            <!-- Painéis de terminais gerados dinamicamente via JS -->
+          </div>
+        </div>
+      </section>
+
       <!-- VIEW 7: CONFIGURAÇÕES & MODELOS -->
       <section class="tab-view" id="view-settings">
         <div class="settings-view-container">
@@ -694,13 +881,65 @@
                 <span class="settings-badge">Governança Spec-Driven</span>
               </div>
               <p class="settings-header-desc">
-                Ajuste fino de delegação entre modelos de fronteira em nuvem e inferência local na GPU (Ollama), limites do circuit breaker e parâmetros de execução.
+                Ajuste fino da ponte com o OmniRoute, OpenCode, limites de rate limits e modelos locais/nuvem.
               </p>
             </div>
             <div class="settings-header-actions">
               <button class="action-btn secondary" id="btn-refresh-settings" title="Recarregar configurações do servidor">
                 ⟳ Recarregar
               </button>
+            </div>
+          </div>
+
+          <!-- CARD: INTEGRAÇÃO OMNIROUTE & OPENCODE -->
+          <div class="settings-card highlight-card" id="omniroute-card">
+            <div class="settings-card-header">
+              <div class="settings-card-title-group">
+                <span class="settings-icon">🌐</span>
+                <div>
+                  <div class="settings-card-title">GATEWAY OMNIROUTE & OPENCODE</div>
+                  <div class="settings-card-subtitle">Ponte unificada para 350+ provedores com fallback automático e MCP do Cockpit</div>
+                </div>
+              </div>
+              <div class="settings-toggle-wrapper">
+                <span class="lw-badge" id="omniroute-status-pill">Verificando...</span>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="settings-form-grid">
+                <div class="settings-field">
+                  <label class="settings-field-label" for="omniroute-url-input">Endpoint Base do OmniRoute (OpenAI Compatible):</label>
+                  <div class="settings-input-row">
+                    <input type="text" id="omniroute-url-input" class="settings-input-styled" value="http://localhost:20128/v1" placeholder="http://localhost:20128/v1">
+                  </div>
+                  <span class="settings-hint">URL padrão do proxy OmniRoute rodando localmente na máquina.</span>
+                </div>
+
+                <div class="settings-field">
+                  <label class="settings-field-label" for="omniroute-key-input">Chave de API (OmniRoute API Key):</label>
+                  <div class="settings-input-row">
+                    <input type="password" id="omniroute-key-input" class="settings-input-styled" value="omniroute-local" placeholder="omniroute-local ou sua chave">
+                  </div>
+                  <span class="settings-hint">Chave de autenticação utilizada pelo OpenCode para se conectar ao OmniRoute.</span>
+                </div>
+
+                <div class="settings-field">
+                  <label class="settings-field-label" for="omniroute-model-input">Modelo Ativo para o OpenCode:</label>
+                  <div class="settings-input-row">
+                    <input type="text" id="omniroute-model-input" class="settings-input-styled" value="auto" placeholder="auto, claude-3-5-sonnet, deepseek-v3...">
+                  </div>
+                  <span class="settings-hint">Modelo padrão configurado no <code>opencode.json</code>.</span>
+                </div>
+
+                <div class="settings-field full-width">
+                  <div class="omniroute-action-buttons" style="display: flex; gap: 8px; margin-top: 6px;">
+                    <button class="action-btn primary btn-sm" id="btn-save-omniroute-config">Salvar & Sincronizar opencode.json</button>
+                    <button class="action-btn secondary btn-sm" id="btn-test-omniroute">Testar Conexão OmniRoute</button>
+                  </div>
+                  <div class="omniroute-feedback" id="omniroute-feedback-msg" style="display: none; margin-top: 10px; font-size: 11px; font-family: var(--font-mono); padding: 8px 12px; border-radius: 4px;"></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -883,31 +1122,100 @@
       </section>
     </div>
 
-    <!-- RIGHT SIDEBAR: TELEMETRY & HUMAN STEERING -->
-    <aside class="workspace-sidebar">
-      <!-- PARES 3x3 -->
-      <div class="sidebar-block fleet-block">
-        <div class="block-header">
-          <span class="block-title">Frota 3x3 (Ao Vivo)</span>
-          <span class="block-badge">Topologia Fixa</span>
+    <!-- RIGHT SIDEBAR: ORCA FILE EXPLORER, 3X3 FLEET & HUMAN STEERING -->
+    <aside class="workspace-sidebar" id="orca-right-sidebar">
+      <!-- HEADER ESTILO ORCA -->
+      <div class="right-sidebar-header">
+        <div class="right-sidebar-title-group" title="Projeto Ativo">
+          <span class="right-sidebar-icon">📂</span>
+          <span class="right-sidebar-project-name" id="right-sidebar-project-name">Projeto Ativo</span>
         </div>
-        <div class="sidebar-pairs-list" id="pairs-container">
-          <!-- Pares renderizados via JS -->
+        <div class="right-sidebar-actions">
+          <button class="right-sidebar-action-btn" id="btn-refresh-right-sidebar" title="Recarregar Arquivos (⟳)" aria-label="Recarregar Arquivos">⟳</button>
+          <button class="right-sidebar-action-btn" id="btn-collapse-right-sidebar" title="Alternar / Colapsar Barra Lateral" aria-label="Colapsar Barra Lateral">⇤</button>
         </div>
       </div>
 
-      <!-- HUMAN STEERING CHAT -->
-      <div class="sidebar-block chat-block">
-        <div class="block-header">
-          <span class="block-title">Direcionamento (Steering)</span>
-          <span class="block-badge live">MCP Live</span>
+      <!-- TAB BAR SUPERIOR DA BARRA DIREITA -->
+      <div class="right-sidebar-tabs" role="tablist">
+        <button class="right-sidebar-tab active" id="tab-right-files" data-panel="right-panel-files" role="tab" aria-selected="true" title="Explorador de Arquivos">
+          <span class="tab-icon">📁</span>
+          <span class="tab-text">Arquivos</span>
+        </button>
+        <button class="right-sidebar-tab" id="tab-right-fleet" data-panel="right-panel-fleet" role="tab" aria-selected="false" title="Frota 3x3 de Agentes">
+          <span class="tab-icon">🤖</span>
+          <span class="tab-text">Frota 3x3</span>
+        </button>
+        <button class="right-sidebar-tab" id="tab-right-steering" data-panel="right-panel-steering" role="tab" aria-selected="false" title="Direcionamento Humano MCP">
+          <span class="tab-icon">💬</span>
+          <span class="tab-text">Steering</span>
+        </button>
+      </div>
+
+      <!-- PAINÉIS DE CONTEÚDO -->
+      <div class="right-sidebar-content">
+        <!-- PAINEL DE ARQUIVOS (FILE EXPLORER) -->
+        <div class="right-sidebar-panel right-panel-files active" id="right-panel-files" role="tabpanel">
+          <div class="file-explorer-toolbar">
+            <div class="file-filter-wrapper">
+              <span class="file-filter-icon">🔍</span>
+              <input type="text" id="file-filter-input" class="file-filter-input" placeholder="Filtrar arquivos..." autocomplete="off">
+              <button id="btn-clear-file-filter" class="btn-clear-filter" title="Limpar filtro" style="display:none;">✕</button>
+            </div>
+            <div class="file-explorer-stats">
+              <span id="file-explorer-count" class="file-count-badge">0 itens</span>
+            </div>
+          </div>
+          <div class="file-explorer-container" id="file-explorer-container">
+            <div class="file-tree-loading">Carregando árvore de arquivos...</div>
+          </div>
+          <!-- PREVIEW RÁPIDO DE ARQUIVO -->
+          <div class="file-preview-drawer" id="file-preview-drawer" style="display: none;">
+            <div class="file-preview-header">
+              <div class="file-preview-meta">
+                <span class="file-preview-icon" id="file-preview-icon">📄</span>
+                <span class="file-preview-name" id="file-preview-name">arquivo.ext</span>
+                <span class="file-preview-size" id="file-preview-size">0 KB</span>
+              </div>
+              <div class="file-preview-actions">
+                <button class="file-preview-btn" id="btn-copy-file-path" title="Copiar caminho relativo" aria-label="Copiar caminho relativo">📋 Copiar</button>
+                <button class="file-preview-btn" id="btn-close-file-preview" title="Fechar visualizador" aria-label="Fechar">✕</button>
+              </div>
+            </div>
+            <div class="file-preview-body">
+              <pre id="file-preview-content"><code></code></pre>
+            </div>
+          </div>
         </div>
-        <div class="steering-chat-feed" id="chat-messages"></div>
-        <form class="steering-form" id="chat-form">
-          <input type="text" id="chat-input" placeholder="Direcionar o orquestrador..." autocomplete="off">
-          <button type="submit" class="steering-send-btn">Enviar</button>
-        </form>
-      </div> <!-- /chat-block -->
+
+        <!-- PAINEL DA FROTA 3X3 -->
+        <div class="right-sidebar-panel right-panel-fleet" id="right-panel-fleet" role="tabpanel">
+          <div class="sidebar-block fleet-block">
+            <div class="block-header">
+              <span class="block-title">Frota 3x3 (Ao Vivo)</span>
+              <span class="block-badge">Topologia Fixa</span>
+            </div>
+            <div class="sidebar-pairs-list" id="pairs-container">
+              <!-- Pares renderizados via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL DE STEERING -->
+        <div class="right-sidebar-panel right-panel-steering" id="right-panel-steering" role="tabpanel">
+          <div class="sidebar-block chat-block">
+            <div class="block-header">
+              <span class="block-title">Direcionamento (Steering)</span>
+              <span class="block-badge live">MCP Live</span>
+            </div>
+            <div class="steering-chat-feed" id="chat-messages"></div>
+            <form class="steering-form" id="chat-form">
+              <input type="text" id="chat-input" placeholder="Direcionar o orquestrador..." autocomplete="off">
+              <button type="submit" class="steering-send-btn">Enviar</button>
+            </form>
+          </div>
+        </div>
+      </div>
     </aside>
   </div> <!-- /workspace-wrapper -->
 </div> <!-- /main-content -->
@@ -1032,6 +1340,213 @@
             <div class="terminal-placeholder">Aguardando logs do processo Ollama...</div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ORCA MOBILE COMPANION (#orca-mobile-modal) -->
+  <div class="orca-mobile-overlay" id="orca-mobile-modal" style="display: none;">
+    <div class="orca-phone-frame orca-mobile-card">
+      <!-- Status bar do smartphone -->
+      <div class="orca-phone-statusbar">
+        <span class="orca-phone-clock" id="orca-phone-time">3:53</span>
+        <div class="orca-phone-status-icons">
+          <!-- Ícone vibrate/bell -->
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+          <!-- Ícone Wi-Fi -->
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+            <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 4c3.48 0 6.64 1.35 9 3.55L12 19.4 3 11.55C5.36 9.35 8.52 8 12 8z"/>
+          </svg>
+          <!-- Ícone Sinal 4G/5G -->
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+            <rect x="2" y="16" width="3" height="5" rx="1"/>
+            <rect x="7" y="12" width="3" height="9" rx="1"/>
+            <rect x="12" y="8" width="3" height="13" rx="1"/>
+            <rect x="17" y="4" width="3" height="17" rx="1"/>
+          </svg>
+          <!-- Ícone Bateria 100% -->
+          <div class="orca-phone-battery">
+            <span class="orca-phone-battery-pct">100</span>
+            <div class="orca-phone-battery-icon">
+              <div class="orca-phone-battery-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- App Header dentro do telefone -->
+      <div class="orca-phone-header">
+        <div class="orca-phone-brand">
+          <svg class="orca-phone-logo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 14c4 0 5-5 9-5s5 5 9 5c1 0 2-.5 2-1s-1-4-5-6-6-2-8-1-5 4-7 7z"/>
+            <circle cx="6" cy="11" r="1" fill="currentColor"/>
+          </svg>
+          <span class="orca-phone-app-title">Orca</span>
+        </div>
+        <div class="orca-phone-header-actions">
+          <button class="orca-phone-action-btn" title="Configurações">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+          <button class="orca-phone-close-btn orca-mobile-close" id="btn-close-mobile-modal" aria-label="Fechar Modal">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Welcome back -->
+      <h2 class="orca-phone-welcome">Welcome back</h2>
+
+      <!-- 3 Stat cards em grade -->
+      <div class="orca-phone-stats-grid">
+        <div class="orca-phone-stat-card">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+            <circle cx="12" cy="5" r="2"></circle>
+            <path d="M12 7v4"></path>
+            <line x1="8" y1="16" x2="8" y2="16"></line>
+            <line x1="16" y1="16" x2="16" y2="16"></line>
+          </svg>
+          <span class="orca-phone-stat-value">5,065</span>
+          <span class="orca-phone-stat-label">Agents spawned</span>
+        </div>
+        <div class="orca-phone-stat-card">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span class="orca-phone-stat-value">26d 10h</span>
+          <span class="orca-phone-stat-label">Agent time</span>
+        </div>
+        <div class="orca-phone-stat-card">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="6" cy="6" r="3"></circle>
+            <circle cx="18" cy="6" r="3"></circle>
+            <line x1="6" y1="9" x2="6" y2="15"></line>
+            <path d="M18 9a9 9 0 0 1-9 9"></path>
+          </svg>
+          <span class="orca-phone-stat-value">359</span>
+          <span class="orca-phone-stat-label">PRs created</span>
+        </div>
+      </div>
+
+      <!-- DESKTOPS -->
+      <div class="orca-phone-section-label">DESKTOPS</div>
+      <div class="orca-phone-card-item">
+        <div class="orca-phone-card-left">
+          <div class="orca-phone-card-icon desktop">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </div>
+          <div class="orca-phone-card-texts">
+            <div class="orca-phone-card-title">Host 1</div>
+            <div class="orca-phone-card-sub" id="orca-mobile-status-value">
+              <span class="orca-status-dot-inline green"></span> Connected · 200 worktrees · 47 active
+            </div>
+          </div>
+        </div>
+        <svg class="orca-phone-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+
+      <!-- RESUME -->
+      <div class="orca-phone-section-label">RESUME</div>
+      <div class="orca-phone-card-item">
+        <div class="orca-phone-card-left">
+          <div class="orca-phone-card-icon terminal">
+            <span class="orca-prompt-sym">&gt;_</span>
+          </div>
+          <div class="orca-phone-card-texts">
+            <div class="orca-phone-card-title" id="orca-mobile-resume-title">notes-feat</div>
+            <div class="orca-phone-card-sub">
+              <span class="orca-status-dot-inline orange"></span> orca · <span id="orca-mobile-resume-branch">refs/heads/Jinwoo-H/notes-feat</span>
+            </div>
+          </div>
+        </div>
+        <svg class="orca-phone-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+
+      <!-- ACCOUNT USAGE -->
+      <div class="orca-phone-section-label">ACCOUNT USAGE</div>
+      <div class="orca-phone-card-item account-usage-card">
+        <div class="orca-phone-user-row">
+          <div class="orca-phone-avatar">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <span class="orca-phone-email">bruno@agent-cockpit</span>
+        </div>
+        <div class="orca-phone-usage-bars">
+          <div class="orca-phone-usage-bar-row">
+            <span class="orca-phone-usage-time">5h</span>
+            <div class="orca-phone-bar-track">
+              <div class="orca-phone-bar-fill" style="width: 99%;"></div>
+            </div>
+            <span class="orca-phone-usage-pct">99%</span>
+          </div>
+          <div class="orca-phone-usage-bar-row">
+            <span class="orca-phone-usage-time">7d</span>
+            <div class="orca-phone-bar-track">
+              <div class="orca-phone-bar-fill" style="width: 100%;"></div>
+            </div>
+            <span class="orca-phone-usage-pct">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="orca-phone-section-label">QUICK ACTIONS</div>
+      <div class="orca-phone-actions-grid">
+        <button class="orca-phone-btn orca-mobile-btn primary" id="btn-mobile-sync-now">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12" y2="18"></line>
+          </svg>
+          <span>Pair Desktop</span>
+        </button>
+        <button class="orca-phone-btn orca-mobile-btn secondary" id="btn-mobile-dismiss">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Worktree</span>
+        </button>
+      </div>
+
+      <!-- Home gesture bar no rodapé -->
+      <div class="orca-phone-home-indicator"></div>
+    </div>
+  </div>
+
+  <!-- MODAL DE BUSCA RÁPIDA / COMMAND PALETTE (CTRL+K) -->
+  <div class="orca-command-palette-overlay" id="orca-quick-search-modal" style="display: none;">
+    <div class="orca-command-palette-card">
+      <div class="orca-command-search-bar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="quick-search-input" placeholder="Buscar fatias, arquivos, tarefas ou comandos... (Esc para fechar)" autocomplete="off">
+        <kbd class="orca-kbd">Esc</kbd>
+      </div>
+      <div class="orca-command-results" id="quick-search-results">
+        <!-- Itens de busca filtráveis gerados via JS -->
       </div>
     </div>
   </div>

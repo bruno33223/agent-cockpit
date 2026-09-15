@@ -106,14 +106,27 @@ window.switchTab = function(viewId) {
     v.classList.toggle('active', v.id === viewId);
   });
 
+  // Sincroniza estado ativo nos botões da Quick-Nav Orca
+  const navQuickTasks = document.getElementById('nav-quick-tasks');
+  const navQuickAutomations = document.getElementById('nav-quick-automations');
+  if (navQuickTasks) {
+    navQuickTasks.classList.toggle('active', viewId === 'view-overview' || viewId === 'view-flow');
+  }
+  if (navQuickAutomations) {
+    navQuickAutomations.classList.toggle('active', viewId === 'view-handoff');
+  }
+
   if (viewId === 'view-graph') {
     initOrRefreshGraph();
   } else if (viewId === 'view-handoff') {
     loadHandoff();
   } else if (viewId === 'view-worker') {
     loadLocalWorker();
+  } else if (viewId === 'view-terminal') {
+    initOrFitTerminal();
   } else if (viewId === 'view-settings') {
     loadSettings();
+    loadOmniRouteSettings();
   }
 };
 
@@ -139,6 +152,7 @@ async function loadProjects() {
         localStorage.setItem('cockpit_project_id', currentProjectId);
       }
       renderProjectSelectOptions();
+      renderWorktreeSidebar();
     }
   } catch (err) {
     console.warn('[Projects] Falha ao carregar lista de projetos:', err);
@@ -187,13 +201,23 @@ async function switchProject(projectId) {
       state = await res.json();
       renderAll();
       loadHandoff();
-      fetchGraph();
+      initOrRefreshGraph();
       loadLocalWorker();
+      if (typeof terminalWorkspace !== 'undefined') {
+        terminalWorkspace.onProjectSwitched(currentProjectId);
+      }
+      if (typeof fileExplorerManager !== 'undefined') {
+        fileExplorerManager.loadFileTree(currentProjectId);
+      }
     }
   } catch (err) {
     console.error('[Projects] Erro ao carregar estado do projeto:', err);
   }
   renderProjectSelectOptions();
+  renderWorktreeSidebar();
+  if (typeof fileExplorerManager !== 'undefined') {
+    fileExplorerManager.loadFileTree(currentProjectId);
+  }
 }
 
 if (projectSelect) {
@@ -214,6 +238,7 @@ async function triggerScanProjects() {
       const data = await res.json();
       knownProjects = data.projects || [];
       renderProjectSelectOptions();
+      renderWorktreeSidebar();
     }
   } catch (err) {
     console.warn('[Projects] Erro ao escanear projetos:', err);
@@ -227,6 +252,389 @@ async function triggerScanProjects() {
 
 if (btnScanProjects) {
   btnScanProjects.addEventListener('click', triggerScanProjects);
+}
+
+// =========================================================================
+// 1.8. ORCA NAVIGATION, WORKTREE SIDEBAR & MODALS
+// =========================================================================
+
+function renderWorktreeSidebar() {
+  const container = document.getElementById('worktree-cards-list');
+  if (!container) return;
+
+  const activeProj = (knownProjects && knownProjects.find(p => p.id === currentProjectId)) || {
+    id: currentProjectId || 'default',
+    name: currentProjectId || 'agent-cockpit',
+    project_root: ''
+  };
+
+  // 1. Atualiza Card Pinned (Pasta raiz / branch main do projeto ativo)
+  const pinnedTitle = document.getElementById('pinned-worktree-title');
+  const pinnedTag = document.getElementById('pinned-repo-tag');
+  const pinnedCard = document.getElementById('pinned-main-card');
+  if (pinnedTitle) pinnedTitle.textContent = activeProj.name || 'agent-cockpit';
+  if (pinnedTag) pinnedTag.textContent = (activeProj.id || 'cockpit').toLowerCase().slice(0, 10);
+  if (pinnedCard) {
+    pinnedCard.setAttribute('data-project-id', activeProj.id);
+    pinnedCard.onclick = () => {
+      document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
+      pinnedCard.classList.add('active');
+      activeSliceId = null;
+      switchTab('view-overview');
+      if (activeProj.project_root && typeof sendTerminalCommand === 'function') {
+        sendTerminalCommand(`cd "${activeProj.project_root}"\n`);
+      }
+    };
+  }
+
+  // 2. Renderiza lista dinâmica de Worktree Cards (In progress)
+  container.innerHTML = '';
+  let progressCount = 0;
+
+  // A. Fatias verticais do projeto ativo (Branches/Worktrees das fatias)
+  const nodes = state.nodes || [];
+  nodes.forEach(node => {
+    progressCount++;
+    const card = document.createElement('div');
+    const isCardActive = (activeSliceId === node.id);
+    card.className = `worktree-card ${isCardActive ? 'active' : ''}`;
+    card.setAttribute('data-slice-id', node.id);
+    card.setAttribute('data-project-id', currentProjectId);
+    card.setAttribute('tabindex', '0');
+
+    // Determina o indicador de estado do agente (.agent-state-dot)
+    let dotClass = 'idle';
+    if (node.kanban_status === 'EXECUTING') dotClass = 'working';
+    else if (node.kanban_status === 'CRITIQUING') dotClass = 'working';
+    else if (node.kanban_status === 'WAITING_REVIEW') dotClass = 'waiting';
+    else if (node.kanban_status === 'APPROVED') dotClass = 'done';
+    else if (['REJECTED', 'BLOCKED_NO_CREDIT', 'STALLED'].includes(node.kanban_status)) dotClass = 'blocked';
+
+    const repoTag = (activeProj.id || 'cockpit').toLowerCase().slice(0, 10);
+    const branchName = node.branch || `cockpit/${node.id}`;
+    const timeText = node.kanban_status === 'APPROVED' ? 'done' : (node.attempt > 1 ? `${node.attempt * 4}m` : 'now');
+
+    card.innerHTML = `
+      <div class="worktree-header">
+        <span class="worktree-title" title="${escapeHtml(node.title)}">${escapeHtml(node.id.toUpperCase())}: ${escapeHtml(node.title)}</span>
+        <span class="agent-state-dot ${dotClass}" title="Status: ${node.kanban_status}"></span>
+      </div>
+      <div class="worktree-meta-row">
+        <span class="worktree-repo-tag" title="${escapeHtml(repoTag)}">${escapeHtml(repoTag)}</span>
+        <span class="worktree-branch" title="${escapeHtml(branchName)}">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15"></line>
+            <circle cx="18" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <path d="M18 9a9 9 0 0 1-9 9"></path>
+          </svg>
+          ${escapeHtml(branchName)}
+        </span>
+        <span class="worktree-time">${timeText}</span>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      activeSliceId = node.id;
+
+      // Atualiza terminal para o diretório da slice worktree se existir
+      const sliceWorktreePath = activeProj.project_root 
+        ? `${activeProj.project_root}/.worktrees/${node.id}`
+        : '';
+      if (sliceWorktreePath && typeof sendTerminalCommand === 'function') {
+        sendTerminalCommand(`cd "${sliceWorktreePath}" || cd "${activeProj.project_root}"\n`);
+      }
+
+      if (typeof openDrawer === 'function') {
+        openDrawer(node.id);
+      }
+    });
+
+    container.appendChild(card);
+  });
+
+  // B. Workspaces / Projetos concorrentes conhecidos
+  const otherProjects = (knownProjects || []).filter(p => p.id !== currentProjectId);
+  otherProjects.forEach(proj => {
+    progressCount++;
+    const card = document.createElement('div');
+    card.className = 'worktree-card';
+    card.setAttribute('data-project-id', proj.id);
+    card.setAttribute('tabindex', '0');
+
+    const isDone = (proj.total_slices > 0 && proj.approved_slices === proj.total_slices);
+    const dotClass = isDone ? 'done' : (proj.total_slices > 0 ? 'working' : 'idle');
+    const repoTag = (proj.id || 'proj').toLowerCase().slice(0, 10);
+    const timeText = proj.total_slices > 0 ? `${proj.approved_slices}/${proj.total_slices}` : 'idle';
+
+    card.innerHTML = `
+      <div class="worktree-header">
+        <span class="worktree-title" title="${escapeHtml(proj.name)}">${escapeHtml(proj.name)}</span>
+        <span class="agent-state-dot ${dotClass}" title="Workspace Concorrente"></span>
+      </div>
+      <div class="worktree-meta-row">
+        <span class="worktree-repo-tag" title="${escapeHtml(repoTag)}">${escapeHtml(repoTag)}</span>
+        <span class="worktree-branch" title="main">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15"></line>
+            <circle cx="18" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <path d="M18 9a9 9 0 0 1-9 9"></path>
+          </svg>
+          main
+        </span>
+        <span class="worktree-time">${timeText}</span>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      switchProject(proj.id);
+      if (proj.project_root && typeof sendTerminalCommand === 'function') {
+        sendTerminalCommand(`cd "${proj.project_root}"\n`);
+      }
+    });
+
+    container.appendChild(card);
+  });
+
+  // 3. Atualiza contador de itens na seção In progress
+  const countBadge = document.getElementById('worktree-progress-count');
+  if (countBadge) {
+    countBadge.textContent = String(progressCount);
+  }
+}
+
+// INICIALIZAÇÃO DE NAVEGAÇÃO, MODAIS E ATALHOS ORCA
+function initOrcaNavigationAndModals() {
+  // 1. Seções Colapsáveis da Sidebar (Pinned, In Progress, Views)
+  document.querySelectorAll('.worktree-section-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const section = header.closest('.worktree-section');
+      if (section) {
+        section.classList.toggle('collapsed');
+      }
+    });
+  });
+
+  // 2. Botão (+) Nova Worktree / Sessão (#btn-sidebar-new-worktree)
+  const btnNewWorktree = document.getElementById('btn-sidebar-new-worktree');
+  if (btnNewWorktree) {
+    btnNewWorktree.addEventListener('click', () => {
+      const branch = prompt('Nome da nova Worktree / Branch (ex: feature/nova-fatia):');
+      if (branch && branch.trim()) {
+        const cleanBranch = branch.trim();
+        if (typeof sendTerminalCommand === 'function') {
+          sendTerminalCommand(`git checkout -b "${cleanBranch}"\n`);
+          switchTab('view-terminal');
+        }
+      }
+    });
+  }
+
+  // 3. Quick-Nav Buttons
+  const navQuickTasks = document.getElementById('nav-quick-tasks');
+  if (navQuickTasks) {
+    navQuickTasks.addEventListener('click', () => {
+      switchTab('view-overview');
+    });
+  }
+
+  const navQuickAutomations = document.getElementById('nav-quick-automations');
+  if (navQuickAutomations) {
+    navQuickAutomations.addEventListener('click', () => {
+      switchTab('view-handoff');
+    });
+  }
+
+  const navQuickMobile = document.getElementById('nav-quick-mobile');
+  if (navQuickMobile) {
+    navQuickMobile.addEventListener('click', openOrcaMobileModal);
+  }
+
+  const navQuickSearch = document.getElementById('nav-quick-search');
+  if (navQuickSearch) {
+    navQuickSearch.addEventListener('click', openQuickSearch);
+  }
+
+  const navFooterSettings = document.getElementById('nav-footer-settings');
+  if (navFooterSettings) {
+    navFooterSettings.addEventListener('click', () => {
+      switchTab('view-settings');
+    });
+  }
+
+  // 4. Modal Orca Mobile Companion (#orca-mobile-modal)
+  const mobileModal = document.getElementById('orca-mobile-modal');
+  const btnCloseMobile = document.getElementById('btn-close-mobile-modal');
+  const btnDismissMobile = document.getElementById('btn-mobile-dismiss');
+  const btnSyncMobile = document.getElementById('btn-mobile-sync-now');
+
+  if (btnCloseMobile) btnCloseMobile.addEventListener('click', closeOrcaMobileModal);
+  if (btnDismissMobile) btnDismissMobile.addEventListener('click', closeOrcaMobileModal);
+  if (mobileModal) {
+    mobileModal.addEventListener('click', (e) => {
+      if (e.target === mobileModal) closeOrcaMobileModal();
+    });
+  }
+  if (btnSyncMobile) {
+    btnSyncMobile.addEventListener('click', () => {
+      btnSyncMobile.textContent = 'Sincronizado! ✓';
+      setTimeout(() => {
+        btnSyncMobile.textContent = 'Sincronizar Celular';
+        closeOrcaMobileModal();
+      }, 900);
+    });
+  }
+
+  // 5. Modal de Busca Rápida (Command Palette)
+  const quickSearchModal = document.getElementById('orca-quick-search-modal');
+  const quickSearchInput = document.getElementById('quick-search-input');
+
+  if (quickSearchModal) {
+    quickSearchModal.addEventListener('click', (e) => {
+      if (e.target === quickSearchModal) closeQuickSearch();
+    });
+  }
+  if (quickSearchInput) {
+    quickSearchInput.addEventListener('input', (e) => {
+      renderQuickSearchResults(e.target.value);
+    });
+  }
+
+  // 6. Atalho Global de Teclado (Ctrl+K / Cmd+K / Esc)
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openQuickSearch();
+    } else if (e.key === 'Escape') {
+      closeQuickSearch();
+      closeOrcaMobileModal();
+    }
+  });
+}
+
+function openOrcaMobileModal() {
+  const modal = document.getElementById('orca-mobile-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  // Atualiza relógio do smartphone com a hora local atual
+  const phoneClock = document.getElementById('orca-phone-time');
+  if (phoneClock) {
+    const now = new Date();
+    phoneClock.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Atualiza status do Host
+  const statusVal = document.getElementById('orca-mobile-status-value');
+  if (statusVal) {
+    const pairsCount = state.pairs_3x3 ? state.pairs_3x3.length : 3;
+    const projectCount = state.projects ? state.projects.length : 1;
+    statusVal.innerHTML = `<span class="orca-status-dot-inline green"></span> Connected · ${projectCount} worktree${projectCount > 1 ? 's' : ''} · ${pairsCount} pares ativos`;
+  }
+
+  // Atualiza seção Resume com a fatia ou projeto ativo
+  const resumeTitle = document.getElementById('orca-mobile-resume-title');
+  const resumeBranch = document.getElementById('orca-mobile-resume-branch');
+  if (resumeTitle && state.active_slice) {
+    resumeTitle.textContent = state.active_slice;
+  } else if (resumeTitle && state.active_project_id) {
+    resumeTitle.textContent = state.active_project_id;
+  }
+  if (resumeBranch && state.active_project_id) {
+    resumeBranch.textContent = `refs/heads/main · ${state.active_project_id}`;
+  }
+}
+
+function closeOrcaMobileModal() {
+  const modal = document.getElementById('orca-mobile-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function openQuickSearch() {
+  const modal = document.getElementById('orca-quick-search-modal');
+  const input = document.getElementById('quick-search-input');
+  if (!modal || !input) return;
+  modal.style.display = 'flex';
+  input.value = '';
+  renderQuickSearchResults('');
+  setTimeout(() => input.focus(), 50);
+}
+
+function closeQuickSearch() {
+  const modal = document.getElementById('orca-quick-search-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderQuickSearchResults(query) {
+  const resultsContainer = document.getElementById('quick-search-results');
+  if (!resultsContainer) return;
+  resultsContainer.innerHTML = '';
+
+  const items = [];
+  // Views principais
+  items.push({ label: 'Visão Geral do Cockpit', badge: 'VIEW', action: () => switchTab('view-overview') });
+  items.push({ label: 'Fluxo & Kanban das Fatias', badge: 'VIEW', action: () => switchTab('view-flow') });
+  items.push({ label: 'Codebase Knowledge Graph', badge: 'VIEW', action: () => switchTab('view-graph') });
+  items.push({ label: 'Gauntlet Verdicts Log', badge: 'VIEW', action: () => switchTab('view-gauntlet') });
+  items.push({ label: 'Handoff & Master Blueprint', badge: 'VIEW', action: () => switchTab('view-handoff') });
+  items.push({ label: 'Terminal / OpenCode Runner', badge: 'TOOL', action: () => switchTab('view-terminal') });
+  items.push({ label: 'Local Worker & Ollama Manager', badge: 'AI', action: () => switchTab('view-worker') });
+  items.push({ label: 'Configurações do Cockpit', badge: 'SETTINGS', action: () => switchTab('view-settings') });
+  items.push({ label: 'Orca Mobile Companion', badge: 'MOBILE', action: () => openOrcaMobileModal() });
+
+  // Fatias verticais
+  (state.nodes || []).forEach(n => {
+    items.push({
+      label: `${n.id.toUpperCase()}: ${n.title}`,
+      badge: `SLICE (${n.kanban_status})`,
+      action: () => {
+        activeSliceId = n.id;
+        switchTab('view-flow');
+        if (typeof openDrawer === 'function') openDrawer(n.id);
+      }
+    });
+  });
+
+  // Projetos conhecidos
+  (knownProjects || []).forEach(p => {
+    items.push({
+      label: `Workspace: ${p.name}`,
+      badge: 'PROJECT',
+      action: () => switchProject(p.id)
+    });
+  });
+
+  const q = (query || '').toLowerCase().trim();
+  const filtered = q
+    ? items.filter(it => it.label.toLowerCase().includes(q) || it.badge.toLowerCase().includes(q))
+    : items;
+
+  if (filtered.length === 0) {
+    resultsContainer.innerHTML = '<div style="padding: 12px; color: var(--muted-foreground); text-align: center; font-size: 12px;">Nenhum resultado encontrado.</div>';
+    return;
+  }
+
+  filtered.forEach((it, idx) => {
+    const el = document.createElement('div');
+    el.className = `orca-command-item ${idx === 0 ? 'selected' : ''}`;
+    el.innerHTML = `
+      <div class="orca-command-item-left">
+        <span>${escapeHtml(it.label)}</span>
+      </div>
+      <span class="orca-command-item-badge">${escapeHtml(it.badge)}</span>
+    `;
+    el.addEventListener('click', () => {
+      closeQuickSearch();
+      it.action();
+    });
+    resultsContainer.appendChild(el);
+  });
 }
 
 // 2. WEBSOCKET
@@ -260,11 +668,21 @@ function initWebSocket() {
       if (data.event === 'PROJECTS_UPDATED') {
         knownProjects = data.payload || [];
         renderProjectSelectOptions();
+        renderWorktreeSidebar();
       } else if (data.event === 'STATE_FULL') {
         if (!data.project_id || data.project_id === currentProjectId) {
           state = data.payload;
           renderAll();
           loadLocalWorker();
+          if (typeof fileExplorerManager !== 'undefined') {
+            fileExplorerManager.updateProjectHeader();
+          }
+        }
+      } else if (data.event === 'PROJECT_ROOT_UPDATED' || data.event === 'PROJECT_SWITCHED') {
+        if (!data.project_id || data.project_id === currentProjectId) {
+          if (typeof fileExplorerManager !== 'undefined') {
+            fileExplorerManager.loadFileTree(currentProjectId, true);
+          }
         }
       } else if (data.event === 'SETTINGS_UPDATED') {
         if (!data.project_id || data.project_id === currentProjectId) {
@@ -402,7 +820,9 @@ function renderAll() {
   renderFinalGate();
   renderChatMessages();
   renderGauntletFull();
+  renderWorktreeSidebar();
   if (activeSliceId) updateDrawerContent();
+  if (typeof fileExplorerManager !== 'undefined') fileExplorerManager.updateProjectHeader();
 }
 
 function renderHeaderAndKPIs() {
@@ -2609,13 +3029,1340 @@ function initSettingsEvents() {
   }
 }
 
+// =========================================================================
+// TERMINAL PTY & OPENCODE / OMNIROUTE RUNNER (ORCA WORKBENCH)
+// =========================================================================
+
+class TerminalWorkspaceManager {
+  constructor() {
+    this.sessions = new Map(); // id -> { id, name, agentType, cwd, term, fitAddon, socket, isConnected, elPane, elTab, resizeObserver }
+    this.activeSessionId = null;
+    this.layout = localStorage.getItem('cockpit_terminal_layout') || 'tabs';
+    this.counter = 0;
+    this.tabsBar = null;
+    this.gridContainer = null;
+    this.isInitialized = false;
+  }
+
+  getAgentIcon(agentType) {
+    switch (agentType) {
+      case 'claude':
+        return `<span class="orca-tab-agent-icon orca-agent-claude" title="Claude Code"><svg class="orca-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="#D97757" aria-label="Claude Code"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></svg></span>`;
+      case 'opencode':
+        return `<span class="orca-tab-agent-icon orca-agent-opencode" title="OpenCode">⚡</span>`;
+      case 'codex':
+        return `<span class="orca-tab-agent-icon orca-agent-codex" title="Codex">&gt;_</span>`;
+      case 'bash':
+      default:
+        return `<span class="orca-tab-agent-icon orca-agent-bash" title="Bash">&gt;</span>`;
+    }
+  }
+
+  getAgentDisplayName(agentType, sessionIndex) {
+    switch (agentType) {
+      case 'claude':
+        return 'Claude Code';
+      case 'opencode':
+        return 'OpenCode';
+      case 'codex':
+        return 'Codex';
+      case 'bash':
+      default:
+        return sessionIndex ? `Term ${sessionIndex}` : 'Bash';
+    }
+  }
+
+  getAgentCommand(agentType) {
+    switch (agentType) {
+      case 'claude': return 'claude';
+      case 'opencode': return 'opencode';
+      case 'codex': return 'codex';
+      case 'bash':
+      default: return '';
+    }
+  }
+
+  getCurrentModel() {
+    if (typeof localWorkerStatus !== 'undefined' && localWorkerStatus && localWorkerStatus.model) {
+      return localWorkerStatus.model;
+    }
+    if (typeof state !== 'undefined' && state && state.config && state.config.model) {
+      return state.config.model;
+    }
+    return 'Fable 5 1M';
+  }
+
+  getCurrentSliceOrBranch() {
+    if (typeof activeSliceId !== 'undefined' && activeSliceId) {
+      if (typeof state !== 'undefined' && state.nodes && Array.isArray(state.nodes)) {
+        const node = state.nodes.find(n => n.id === activeSliceId);
+        if (node) {
+          return node.title || node.branch || `slice/${node.id}`;
+        }
+      }
+      return `slice/${activeSliceId}`;
+    }
+    return 'main';
+  }
+
+  formatRelativeCwd(cwd) {
+    if (!cwd) return './';
+    const root = this.getActiveProjectRoot();
+    if (root && cwd.startsWith(root)) {
+      let rel = cwd.slice(root.length).replace(/^[\\\/]+/, '');
+      return rel ? `./${rel}` : './';
+    }
+    return this.formatCwd(cwd);
+  }
+
+  init() {
+    this.tabsBar = document.getElementById('terminal-tabs-bar');
+    this.gridContainer = document.getElementById('terminal-workspace-grid');
+    if (!this.tabsBar || !this.gridContainer) return;
+
+    if (this.isInitialized) {
+      this.fitAll();
+      return;
+    }
+    this.isInitialized = true;
+
+    // Seletor de layouts (Tabs, Split, Grid)
+    const layoutPicker = document.getElementById('terminal-layout-picker');
+    if (layoutPicker) {
+      layoutPicker.querySelectorAll('.layout-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const l = btn.getAttribute('data-layout');
+          if (l) this.setLayout(l);
+        });
+      });
+    }
+
+    // Botão novo terminal (+ Novo Terminal)
+    const btnNewTerm = document.getElementById('btn-new-terminal');
+    if (btnNewTerm) {
+      btnNewTerm.addEventListener('click', () => {
+        this.createSession();
+      });
+    }
+
+    // Botão global executar opencode
+    const btnRunOpenCode = document.getElementById('btn-run-opencode');
+    if (btnRunOpenCode) {
+      btnRunOpenCode.addEventListener('click', () => {
+        this.sendToActive('opencode');
+      });
+    }
+
+    // Botão global executar claude code
+    const btnRunClaude = document.getElementById('btn-run-claude');
+    if (btnRunClaude) {
+      btnRunClaude.addEventListener('click', () => {
+        this.sendToActive('claude');
+      });
+    }
+
+    // Botão alternar largura total (recolher/expandir barra lateral de telemetria)
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    if (btnToggleSidebar) {
+      btnToggleSidebar.addEventListener('click', () => {
+        const wrapper = document.querySelector('.workspace-wrapper');
+        if (wrapper) {
+          wrapper.classList.toggle('collapse-sidebar');
+          const isCollapsed = wrapper.classList.contains('collapse-sidebar');
+          btnToggleSidebar.classList.toggle('active', isCollapsed);
+          this.fitAll();
+        }
+      });
+    }
+
+    // Redimensionamento global da janela
+    window.addEventListener('resize', () => {
+      this.fitAll();
+    });
+
+    // Aplica layout configurado
+    this.setLayout(this.layout, false);
+
+    // Cria a primeira sessão inicial se vazio
+    if (this.sessions.size === 0) {
+      this.createSession({ name: 'Term 1' });
+    }
+
+    checkOmniRouteStatus();
+  }
+
+  getActiveProjectRoot() {
+    if (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) {
+      const activeProj = knownProjects.find(p => p.id === currentProjectId);
+      if (activeProj && activeProj.project_root) return activeProj.project_root;
+    }
+    if (typeof state !== 'undefined' && state && state.config && state.config.project_root) {
+      return state.config.project_root;
+    }
+    return '';
+  }
+
+  formatCwd(cwd) {
+    if (!cwd) return 'cockpit-root';
+    const parts = cwd.replace(/\\/g, '/').split('/').filter(Boolean);
+    return parts.length > 0 ? parts[parts.length - 1] : cwd;
+  }
+
+  createSession(options = {}) {
+    if (typeof Terminal === 'undefined') {
+      if (this.gridContainer) {
+        this.gridContainer.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace;">Aguardando carregamento da biblioteca xterm.js...</div>';
+      }
+      return null;
+    }
+
+    this.counter++;
+    const id = options.id || `term-${Date.now()}-${this.counter}`;
+    const agentType = options.agentType || (options.name && options.name.toLowerCase().includes('claude') ? 'claude' : (options.name && options.name.toLowerCase().includes('opencode') ? 'opencode' : 'bash'));
+    const name = options.name || this.getAgentDisplayName(agentType, this.counter);
+    const cwd = options.cwd || this.getActiveProjectRoot();
+    const model = this.getCurrentModel();
+    const branchOrSlice = this.getCurrentSliceOrBranch();
+    const relCwd = this.formatRelativeCwd(cwd);
+    const iconHtml = this.getAgentIcon(agentType);
+
+    // 1. Instância do Xterm
+    const term = new Terminal({
+      cursorBlink: true,
+      cursorStyle: 'block',
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: 13,
+      lineHeight: 1.25,
+      theme: {
+        background: '#09090b',
+        foreground: '#f4f4f5',
+        cursor: '#f4f4f5',
+        selectionBackground: 'rgba(255, 255, 255, 0.18)',
+        black: '#18181b',
+        red: '#f43f5e',
+        green: '#10b981',
+        yellow: '#f59e0b',
+        blue: '#3b82f6',
+        magenta: '#a855f7',
+        cyan: '#38bdf8',
+        white: '#f4f4f5',
+        brightBlack: '#71717a',
+        brightRed: '#fb7185',
+        brightGreen: '#34d399',
+        brightYellow: '#fbbf24',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#c084fc',
+        brightCyan: '#7dd3fc',
+        brightWhite: '#ffffff'
+      }
+    });
+
+    let fitAddon = null;
+    if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+      fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+    }
+    if (typeof WebLinksAddon !== 'undefined' && WebLinksAddon.WebLinksAddon) {
+      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+    }
+
+    // 2. Elementos DOM (Tab superior do workspace e Pane do terminal estilo Orca)
+    const elTab = document.createElement('div');
+    elTab.className = 'term-tab orca-tab';
+    elTab.id = `tab-${id}`;
+    elTab.setAttribute('data-session-id', id);
+    elTab.innerHTML = `
+      <span class="term-tab-dot disconnected"></span>
+      <span class="term-tab-icon">${iconHtml}</span>
+      <span class="term-tab-title orca-tab-title">${name}</span>
+      <button class="term-tab-close orca-tab-close" title="Encerrar terminal">×</button>
+    `;
+
+    const elPane = document.createElement('div');
+    elPane.className = 'terminal-pane orca-split-pane';
+    elPane.id = `pane-${id}`;
+    elPane.setAttribute('data-session-id', id);
+    elPane.innerHTML = `
+      <div class="orca-pane-header">
+        <div class="orca-tab-strip">
+          <div class="orca-tab active">
+            <span class="orca-tab-icon">${iconHtml}</span>
+            <span class="orca-tab-title">${name}</span>
+          </div>
+          <div class="orca-agent-picker-wrap">
+            <select class="orca-agent-select" title="Trocar tipo de agente no painel">
+              <option value="bash" ${agentType === 'bash' ? 'selected' : ''}>&gt; Bash</option>
+              <option value="opencode" ${agentType === 'opencode' ? 'selected' : ''}>⚡ OpenCode</option>
+              <option value="claude" ${agentType === 'claude' ? 'selected' : ''}>Claude Code</option>
+              <option value="codex" ${agentType === 'codex' ? 'selected' : ''}>&gt;_ Codex</option>
+            </select>
+          </div>
+          <div class="orca-pane-controls ml-auto">
+            <button class="orca-pane-btn orca-btn-split" title="Dividir terminal ([|] Split)">[|]</button>
+            <button class="orca-pane-btn orca-btn-clear" title="Limpar buffer (⌧)">⌧</button>
+            <button class="orca-pane-btn orca-btn-restart" title="Reconectar sessão PTY (⟳)">⟳</button>
+            <button class="orca-pane-btn orca-btn-close danger" title="Fechar sessão (×)">×</button>
+          </div>
+        </div>
+        <div class="orca-pane-subtitle" title="${model} · ${branchOrSlice} · ${cwd || 'Padrão'}">
+          <span class="orca-pane-sub-item orca-sub-model">${model}</span>
+          <span class="orca-sub-separator">·</span>
+          <span class="orca-pane-sub-item orca-sub-branch">${branchOrSlice}</span>
+          <span class="orca-sub-separator">·</span>
+          <span class="orca-pane-sub-item orca-sub-cwd">${relCwd}</span>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="xterm-mount" style="width: 100%; height: 100%; position: relative;"></div>
+      </div>
+      <div class="orca-terminal-statusline">
+        <div class="orca-statusline-item orca-statusline-model orca-status-model" title="Modelo ativo do worker">
+          <span class="orca-status-dot-active">●</span>
+          <span class="orca-status-text orca-status-model-text">${model}</span>
+        </div>
+        <div class="orca-statusline-item orca-statusline-branch orca-status-branch" title="Fatia ou branch ativa">
+          <span class="orca-status-icon">🌱</span>
+          <span class="orca-status-text orca-status-branch-text">${branchOrSlice}</span>
+        </div>
+        <div class="orca-statusline-item orca-statusline-perms orca-status-perms" title="Bypass permissions">
+          <span class="orca-status-text">⚡ bypass permissions on (shift+tab to cycle) - for agents</span>
+        </div>
+        <div class="orca-statusline-item orca-statusline-mcp orca-status-mcp" title="Telemetria MCP Live">
+          <span class="orca-status-mcp-indicator live">●</span>
+          <span class="orca-status-text">MCP Live</span>
+        </div>
+      </div>
+    `;
+
+    // Botão "+" na barra de abas
+    let btnAddTab = document.getElementById('btn-tab-add');
+    if (!btnAddTab) {
+      btnAddTab = document.createElement('button');
+      btnAddTab.id = 'btn-tab-add';
+      btnAddTab.className = 'term-tab-add orca-tab';
+      btnAddTab.title = 'Abrir novo terminal';
+      btnAddTab.innerHTML = '+ Novo';
+      btnAddTab.addEventListener('click', () => this.createSession());
+      this.tabsBar.appendChild(btnAddTab);
+    }
+
+    this.tabsBar.insertBefore(elTab, btnAddTab);
+    this.gridContainer.appendChild(elPane);
+
+    const mountEl = elPane.querySelector('.xterm-mount');
+    term.open(mountEl);
+
+    // 3. Estrutura da Sessão
+    const session = {
+      id,
+      name,
+      agentType,
+      cwd,
+      term,
+      fitAddon,
+      socket: null,
+      isConnected: false,
+      elPane,
+      elTab,
+      resizeObserver: null
+    };
+    this.sessions.set(id, session);
+
+    // 4. WebSocket Conexão
+    this.connectSessionSocket(session);
+
+    // 5. Eventos de Entrada no Terminal
+    term.onData(data => {
+      if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+        session.socket.send(data);
+      }
+    });
+
+    // 6. Eventos de Interação DOM
+    elTab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('term-tab-close') || e.target.classList.contains('orca-tab-close')) {
+        this.closeSession(id);
+      } else {
+        this.selectSession(id);
+      }
+    });
+
+    elPane.addEventListener('mousedown', () => {
+      this.selectSession(id, false);
+    });
+
+    // Controles do cabeçalho do painel Orca
+    const btnSplit = elPane.querySelector('.orca-btn-split');
+    if (btnSplit) {
+      btnSplit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.splitSession(id);
+      });
+    }
+
+    const btnClear = elPane.querySelector('.orca-btn-clear');
+    if (btnClear) {
+      btnClear.addEventListener('click', (e) => {
+        e.stopPropagation();
+        term.clear();
+        term.focus();
+      });
+    }
+
+    const btnRestart = elPane.querySelector('.orca-btn-restart');
+    if (btnRestart) {
+      btnRestart.addEventListener('click', (e) => {
+        e.stopPropagation();
+        term.clear();
+        this.connectSessionSocket(session);
+      });
+    }
+
+    const btnClose = elPane.querySelector('.orca-btn-close');
+    if (btnClose) {
+      btnClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeSession(id);
+      });
+    }
+
+    // Seletor de tipo de agente no cabeçalho
+    const agentSelect = elPane.querySelector('.orca-agent-select');
+    if (agentSelect) {
+      agentSelect.addEventListener('change', (e) => {
+        e.stopPropagation();
+        this.setSessionAgent(id, e.target.value, true);
+      });
+    }
+
+    // ResizeObserver para redimensionamento perfeito em tempo real
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        if (session.elPane.offsetParent !== null && session.fitAddon && session.term) {
+          try {
+            session.fitAddon.fit();
+            if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+              session.socket.send(JSON.stringify({
+                type: 'resize',
+                cols: session.term.cols,
+                rows: session.term.rows
+              }));
+            }
+          } catch (e) {}
+        }
+      });
+      ro.observe(elPane);
+      session.resizeObserver = ro;
+    }
+
+    // Seleciona a sessão criada
+    this.selectSession(id);
+    this.fitAll();
+
+    return session;
+  }
+
+  setSessionAgent(sessionId, newAgentType, autoLaunch = false) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    session.agentType = newAgentType;
+    session.name = this.getAgentDisplayName(newAgentType, this.counter);
+
+    const iconHtml = this.getAgentIcon(newAgentType);
+
+    // Atualiza tab bar interna do painel
+    const paneIcon = session.elPane.querySelector('.orca-tab-icon');
+    if (paneIcon) paneIcon.innerHTML = iconHtml;
+    const paneTitle = session.elPane.querySelector('.orca-tab-title');
+    if (paneTitle) paneTitle.textContent = session.name;
+
+    const selectEl = session.elPane.querySelector('.orca-agent-select');
+    if (selectEl && selectEl.value !== newAgentType) {
+      selectEl.value = newAgentType;
+    }
+
+    // Atualiza tab bar do topo
+    const topTabIcon = session.elTab.querySelector('.term-tab-icon');
+    if (topTabIcon) topTabIcon.innerHTML = iconHtml;
+    const topTabTitle = session.elTab.querySelector('.term-tab-title');
+    if (topTabTitle) topTabTitle.textContent = session.name;
+
+    // Se autoLaunch estiver habilitado e houver comando correspondente, dispara
+    if (autoLaunch) {
+      const cmd = this.getAgentCommand(newAgentType);
+      if (cmd) {
+        this.sendToSession(sessionId, cmd);
+      }
+    }
+
+    this.updateHeaderBadge();
+  }
+
+  splitSession(sourceSessionId) {
+    if (this.layout === 'tabs') {
+      this.setLayout('split', true);
+    } else if (this.layout === 'split') {
+      this.setLayout('grid', true);
+    } else {
+      this.createSession();
+    }
+  }
+
+  connectSessionSocket(session) {
+    if (session.socket) {
+      try { session.socket.close(); } catch (e) {}
+    }
+
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const params = new URLSearchParams();
+    params.set('session_id', session.id);
+    if (session.cwd) params.set('cwd', session.cwd);
+
+    const url = `${proto}//${window.location.host}/ws/terminal?${params.toString()}`;
+    const dot = session.elTab.querySelector('.term-tab-dot');
+
+    const ws = new WebSocket(url);
+    session.socket = ws;
+
+    ws.onopen = () => {
+      session.isConnected = true;
+      if (dot) dot.className = 'term-tab-dot active';
+      this.updateHeaderBadge();
+      setTimeout(() => {
+        if (session.fitAddon && session.term) {
+          try {
+            session.fitAddon.fit();
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'resize',
+                cols: session.term.cols,
+                rows: session.term.rows
+              }));
+            }
+          } catch (e) {}
+        }
+      }, 50);
+    };
+
+    ws.onmessage = (event) => {
+      session.term.write(event.data);
+    };
+
+    ws.onclose = () => {
+      session.isConnected = false;
+      if (dot) dot.className = 'term-tab-dot disconnected';
+      this.updateHeaderBadge();
+      session.term.write('\r\n\x1b[33m[PTY desconectado. Clique em ⟳ para reiniciar a sessão]\x1b[0m\r\n');
+    };
+
+    ws.onerror = () => {
+      session.isConnected = false;
+      if (dot) dot.className = 'term-tab-dot disconnected';
+      this.updateHeaderBadge();
+    };
+  }
+
+  selectSession(id, focus = true) {
+    if (!this.sessions.has(id)) return;
+    this.activeSessionId = id;
+
+    // Atualiza tabs e panes
+    this.sessions.forEach((s, sId) => {
+      const isActive = (sId === id);
+      s.elTab.classList.toggle('active', isActive);
+      s.elPane.classList.toggle('active-pane', isActive);
+    });
+
+    this.updateHeaderBadge();
+
+    const activeSession = this.sessions.get(id);
+    if (activeSession && focus) {
+      setTimeout(() => {
+        activeSession.term.focus();
+      }, 50);
+    }
+  }
+
+  closeSession(id) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+
+    if (session.resizeObserver) {
+      try { session.resizeObserver.disconnect(); } catch (e) {}
+      session.resizeObserver = null;
+    }
+
+    if (session.socket) {
+      try { session.socket.close(); } catch (e) {}
+    }
+
+    // Notifica backend
+    apiFetch(`/api/terminal/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+
+    // Remove elementos do DOM
+    if (session.elTab && session.elTab.parentNode) {
+      session.elTab.parentNode.removeChild(session.elTab);
+    }
+    if (session.elPane && session.elPane.parentNode) {
+      session.elPane.parentNode.removeChild(session.elPane);
+    }
+
+    try {
+      session.term.dispose();
+    } catch (e) {}
+
+    this.sessions.delete(id);
+
+    // Seleciona outra sessão se a atual foi fechada
+    if (this.activeSessionId === id) {
+      const remainingIds = Array.from(this.sessions.keys());
+      if (remainingIds.length > 0) {
+        this.selectSession(remainingIds[remainingIds.length - 1]);
+      } else {
+        this.createSession({ name: 'Term 1' });
+      }
+    }
+
+    this.fitAll();
+  }
+
+  setLayout(layout, autoSpawn = true) {
+    if (!['tabs', 'split', 'grid'].includes(layout)) layout = 'tabs';
+    this.layout = layout;
+    localStorage.setItem('cockpit_terminal_layout', layout);
+
+    // Atualiza botões
+    const layoutPicker = document.getElementById('terminal-layout-picker');
+    if (layoutPicker) {
+      layoutPicker.querySelectorAll('.layout-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-layout') === layout);
+      });
+    }
+
+    // Atualiza container
+    if (this.gridContainer) {
+      this.gridContainer.className = `terminal-workspace-grid layout-${layout}`;
+    }
+
+    // Auto-cria sessões se necessário para Split ou Grid
+    if (autoSpawn) {
+      if (layout === 'split' && this.sessions.size < 2) {
+        this.createSession({ name: 'Term 2' });
+      } else if (layout === 'grid' && this.sessions.size < 4) {
+        const needed = 4 - this.sessions.size;
+        for (let i = 0; i < needed; i++) {
+          this.createSession({ name: `Term ${this.sessions.size + 1}` });
+        }
+      }
+    }
+
+    this.fitAll();
+    setTimeout(() => this.fitAll(), 160);
+  }
+
+  fitAll() {
+    setTimeout(() => {
+      this.sessions.forEach(session => {
+        if (session.elPane.offsetParent !== null && session.fitAddon && session.term) {
+          try {
+            session.fitAddon.fit();
+            if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+              session.socket.send(JSON.stringify({
+                type: 'resize',
+                cols: session.term.cols,
+                rows: session.term.rows
+              }));
+            }
+          } catch (e) {}
+        }
+      });
+    }, 60);
+  }
+
+  sendToSession(sessionId, cmd) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+      session.socket.send(cmd + '\r');
+      session.term.focus();
+    } else {
+      this.connectSessionSocket(session);
+      setTimeout(() => {
+        if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+          session.socket.send(cmd + '\r');
+          session.term.focus();
+        }
+      }, 500);
+    }
+  }
+
+  sendToActive(cmd) {
+    if (!this.activeSessionId || !this.sessions.has(this.activeSessionId)) {
+      const keys = Array.from(this.sessions.keys());
+      if (keys.length > 0) {
+        this.activeSessionId = keys[0];
+      } else {
+        const newSess = this.createSession();
+        if (newSess) {
+          setTimeout(() => this.sendToSession(newSess.id, cmd), 600);
+        }
+        return;
+      }
+    }
+    this.sendToSession(this.activeSessionId, cmd);
+  }
+
+  updatePaneContexts() {
+    const model = this.getCurrentModel();
+    const branchOrSlice = this.getCurrentSliceOrBranch();
+
+    this.sessions.forEach(session => {
+      const relCwd = this.formatRelativeCwd(session.cwd);
+
+      const subModel = session.elPane.querySelector('.orca-sub-model');
+      if (subModel) subModel.textContent = model;
+      const subBranch = session.elPane.querySelector('.orca-sub-branch');
+      if (subBranch) subBranch.textContent = branchOrSlice;
+      const subCwd = session.elPane.querySelector('.orca-sub-cwd');
+      if (subCwd) subCwd.textContent = relCwd;
+
+      const statusModel = session.elPane.querySelector('.orca-status-model-text');
+      if (statusModel) statusModel.textContent = model;
+      const statusBranch = session.elPane.querySelector('.orca-status-branch-text');
+      if (statusBranch) statusBranch.textContent = branchOrSlice;
+    });
+  }
+
+  updateHeaderBadge() {
+    const badge = document.getElementById('terminal-session-badge');
+    if (!badge) return;
+
+    const total = this.sessions.size;
+    const active = this.activeSessionId ? this.sessions.get(this.activeSessionId) : null;
+    const activeName = active ? active.name : 'Nenhum';
+    const status = active && active.isConnected ? 'Conectado' : 'Pronto';
+    const layoutName = this.layout ? this.layout.toUpperCase() : 'TABS';
+
+    badge.textContent = `${total} PTYs | ${activeName} (${status}) | Layout: ${layoutName}`;
+  }
+
+  onProjectSwitched(newProjectId) {
+    this.updateHeaderBadge();
+    this.updatePaneContexts();
+  }
+}
+
+const terminalWorkspace = new TerminalWorkspaceManager();
+
+function initOrFitTerminal() {
+  terminalWorkspace.init();
+  terminalWorkspace.fitAll();
+}
+
+function sendTerminalCommand(cmd) {
+  terminalWorkspace.sendToActive(cmd);
+}
+
+async function checkOmniRouteStatus() {
+  const indicator = document.getElementById('terminal-omni-indicator');
+  const pill = document.getElementById('omniroute-status-pill');
+  try {
+    const res = await apiFetch('/api/omniroute/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.online) {
+        const text = `OmniRoute: Online (${data.models ? data.models.length : 0} modelos)`;
+        if (indicator) indicator.textContent = text;
+        if (pill) {
+          pill.className = 'lw-badge active';
+          pill.textContent = 'Online';
+        }
+      } else {
+        const text = 'OmniRoute: Offline';
+        if (indicator) indicator.textContent = text;
+        if (pill) {
+          pill.className = 'lw-badge stopped';
+          pill.textContent = 'Offline';
+        }
+      }
+    }
+  } catch (e) {
+    if (indicator) indicator.textContent = 'OmniRoute: Offline';
+    if (pill) {
+      pill.className = 'lw-badge stopped';
+      pill.textContent = 'Offline';
+    }
+  }
+}
+
+async function loadOmniRouteSettings() {
+  const urlInput = document.getElementById('omniroute-url-input');
+  const keyInput = document.getElementById('omniroute-key-input');
+  const modelInput = document.getElementById('omniroute-model-input');
+
+  try {
+    const res = await apiFetch('/api/omniroute/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      if (urlInput && cfg.omniroute_url) urlInput.value = cfg.omniroute_url;
+      if (keyInput && cfg.api_key) keyInput.value = cfg.api_key;
+      if (modelInput && cfg.model) modelInput.value = cfg.model;
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar configurações do OmniRoute:', e);
+  }
+
+  checkOmniRouteStatus();
+}
+
+function initTerminalAndOmniEvents() {
+  const btnSaveOmni = document.getElementById('btn-save-omniroute-config');
+  if (btnSaveOmni) {
+    btnSaveOmni.addEventListener('click', async () => {
+      const urlInput = document.getElementById('omniroute-url-input');
+      const keyInput = document.getElementById('omniroute-key-input');
+      const modelInput = document.getElementById('omniroute-model-input');
+      const feedback = document.getElementById('omniroute-feedback-msg');
+
+      const payload = {
+        omniroute_url: urlInput ? urlInput.value.trim() : 'http://localhost:20128/v1',
+        api_key: keyInput ? keyInput.value.trim() : 'omniroute-local',
+        model: modelInput ? modelInput.value.trim() : 'auto'
+      };
+
+      try {
+        btnSaveOmni.textContent = 'Salvando...';
+        const res = await fetch('/api/omniroute/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        btnSaveOmni.textContent = 'Salvar & Sincronizar opencode.json';
+
+        if (result.status === 'success') {
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.className = 'omniroute-feedback success';
+            feedback.textContent = 'Configurações salvas! Arquivo opencode.json sincronizado com MCP do Cockpit com sucesso.';
+          }
+          checkOmniRouteStatus();
+        } else {
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.className = 'omniroute-feedback error';
+            feedback.textContent = `Erro ao salvar: ${result.message || 'Falha'}`;
+          }
+        }
+      } catch (err) {
+        btnSaveOmni.textContent = 'Salvar & Sincronizar opencode.json';
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.className = 'omniroute-feedback error';
+          feedback.textContent = `Erro de conexão: ${err.message}`;
+        }
+      }
+    });
+  }
+
+  const btnTestOmni = document.getElementById('btn-test-omniroute');
+  if (btnTestOmni) {
+    btnTestOmni.addEventListener('click', async () => {
+      const urlInput = document.getElementById('omniroute-url-input');
+      const feedback = document.getElementById('omniroute-feedback-msg');
+      const targetUrl = urlInput ? urlInput.value.trim() : 'http://localhost:20128/v1';
+
+      try {
+        btnTestOmni.textContent = 'Testando...';
+        const res = await apiFetch(`/api/omniroute/status?base_url=${encodeURIComponent(targetUrl)}`);
+        const data = await res.json();
+        btnTestOmni.textContent = 'Testar Conexão OmniRoute';
+
+        if (feedback) {
+          feedback.style.display = 'block';
+          if (data.online) {
+            feedback.className = 'omniroute-feedback success';
+            feedback.textContent = `OmniRoute ONLINE em ${data.endpoint}! Modelos detectados: ${data.models.length > 0 ? data.models.slice(0, 5).join(', ') + (data.models.length > 5 ? '...' : '') : 'Nenhum modelo retornado'}`;
+          } else {
+            feedback.className = 'omniroute-feedback error';
+            feedback.textContent = `OmniRoute OFFLINE em ${data.endpoint}. Verifique se o processo "omniroute" foi iniciado no terminal. (${data.message})`;
+          }
+        }
+        checkOmniRouteStatus();
+      } catch (err) {
+        btnTestOmni.textContent = 'Testar Conexão OmniRoute';
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.className = 'omniroute-feedback error';
+          feedback.textContent = `Erro ao testar: ${err.message}`;
+        }
+      }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12. ORCA RIGHT SIDEBAR & FILE EXPLORER MANAGER
+// ─────────────────────────────────────────────────────────────────────────────
+class FileExplorerManager {
+  constructor() {
+    this.projectId = null;
+    this.treeData = null;
+    this.expandedPaths = new Set();
+    this.selectedFilePath = null;
+    this.filterQuery = '';
+    this.activeRightTab = 'tab-right-files';
+    this.debounceTimer = null;
+    this.totalFileCount = 0;
+
+    // Elementos DOM
+    this.container = document.getElementById('file-explorer-container');
+    this.filterInput = document.getElementById('file-filter-input');
+    this.btnClearFilter = document.getElementById('btn-clear-file-filter');
+    this.countBadge = document.getElementById('file-explorer-count');
+    this.projectNameDisplay = document.getElementById('right-sidebar-project-name');
+    this.btnRefresh = document.getElementById('btn-refresh-right-sidebar');
+    this.btnCollapse = document.getElementById('btn-collapse-right-sidebar');
+
+    // Preview Drawer Elements
+    this.previewDrawer = document.getElementById('file-preview-drawer');
+    this.previewName = document.getElementById('file-preview-name');
+    this.previewSize = document.getElementById('file-preview-size');
+    this.previewIcon = document.getElementById('file-preview-icon');
+    this.previewContent = document.getElementById('file-preview-content');
+    this.btnClosePreview = document.getElementById('btn-close-file-preview');
+    this.btnCopyPath = document.getElementById('btn-copy-file-path');
+  }
+
+  init() {
+    // 1. Alternância de abas da barra lateral direita
+    document.querySelectorAll('.right-sidebar-tab').forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        const panelId = tabBtn.getAttribute('data-panel');
+        this.switchRightTab(tabBtn.id, panelId);
+      });
+    });
+
+    // 2. Filtro em tempo real com debounce
+    if (this.filterInput) {
+      this.filterInput.addEventListener('input', (e) => {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+          this.filterQuery = e.target.value.trim().toLowerCase();
+          if (this.btnClearFilter) {
+            this.btnClearFilter.style.display = this.filterQuery ? 'block' : 'none';
+          }
+          this.renderTree();
+        }, 120);
+      });
+    }
+
+    if (this.btnClearFilter) {
+      this.btnClearFilter.addEventListener('click', () => {
+        if (this.filterInput) this.filterInput.value = '';
+        this.filterQuery = '';
+        this.btnClearFilter.style.display = 'none';
+        this.renderTree();
+      });
+    }
+
+    // 3. Botão Refresh (⟳)
+    if (this.btnRefresh) {
+      this.btnRefresh.addEventListener('click', () => {
+        this.btnRefresh.style.transform = 'rotate(360deg)';
+        this.btnRefresh.style.transition = 'transform 0.4s ease';
+        setTimeout(() => {
+          if (this.btnRefresh) {
+            this.btnRefresh.style.transform = 'none';
+            this.btnRefresh.style.transition = 'none';
+          }
+        }, 400);
+        this.loadFileTree(currentProjectId, true);
+      });
+    }
+
+    // 4. Botão Alternar/Colapsar barra lateral
+    if (this.btnCollapse) {
+      this.btnCollapse.addEventListener('click', () => {
+        const wrapper = document.querySelector('.workspace-wrapper');
+        if (wrapper) {
+          wrapper.classList.toggle('collapse-sidebar');
+          const isCollapsed = wrapper.classList.contains('collapse-sidebar');
+          this.btnCollapse.title = isCollapsed ? 'Expandir Barra Lateral' : 'Colapsar Barra Lateral';
+          this.btnCollapse.textContent = isCollapsed ? '⇤' : '⇥';
+        }
+      });
+    }
+
+    // 5. Botões do Preview Drawer
+    if (this.btnClosePreview) {
+      this.btnClosePreview.addEventListener('click', () => {
+        this.closeFilePreview();
+      });
+    }
+
+    if (this.btnCopyPath) {
+      this.btnCopyPath.addEventListener('click', () => {
+        if (this.selectedFilePath) {
+          navigator.clipboard.writeText(this.selectedFilePath).then(() => {
+            const originalText = this.btnCopyPath.innerHTML;
+            this.btnCopyPath.innerHTML = '✓ Copiado!';
+            this.btnCopyPath.classList.add('copied');
+            setTimeout(() => {
+              if (this.btnCopyPath) {
+                this.btnCopyPath.innerHTML = originalText;
+                this.btnCopyPath.classList.remove('copied');
+              }
+            }, 1800);
+          }).catch(err => {
+            console.error('[FileExplorer] Falha ao copiar caminho:', err);
+          });
+        }
+      });
+    }
+
+    // Adiciona a raiz como expandida
+    this.expandedPaths.add('');
+  }
+
+  switchRightTab(tabId, panelId) {
+    this.activeRightTab = tabId;
+    document.querySelectorAll('.right-sidebar-tab').forEach(t => {
+      const isSelected = t.id === tabId;
+      t.classList.toggle('active', isSelected);
+      t.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+    });
+
+    document.querySelectorAll('.right-sidebar-panel').forEach(p => {
+      p.classList.toggle('active', p.id === panelId);
+    });
+
+    // Se mudou para a aba de arquivos e não carregou ainda, carrega
+    if (panelId === 'right-panel-files' && (!this.treeData || this.projectId !== currentProjectId)) {
+      this.loadFileTree(currentProjectId);
+    }
+  }
+
+  async loadFileTree(projectId, forceRefresh = false) {
+    const targetPid = projectId || currentProjectId || 'default';
+    if (!forceRefresh && this.projectId === targetPid && this.treeData) {
+      this.updateProjectHeader();
+      return;
+    }
+
+    this.projectId = targetPid;
+    if (this.container) {
+      this.container.innerHTML = '<div class="file-tree-loading">Carregando arquivos do projeto...</div>';
+    }
+
+    try {
+      const res = await apiFetch(`/api/fs/tree?project_id=${encodeURIComponent(targetPid)}&max_depth=5`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      this.treeData = await res.json();
+      this.updateProjectHeader();
+      this.renderTree();
+    } catch (err) {
+      console.error('[FileExplorer] Erro ao carregar árvore:', err);
+      if (this.container) {
+        this.container.innerHTML = `<div class="file-tree-empty">Erro ao carregar árvore de arquivos.<br><small style="color:var(--text-muted)">${escapeHtml(err.message)}</small></div>`;
+      }
+    }
+  }
+
+  updateProjectHeader() {
+    if (!this.projectNameDisplay) return;
+    let name = (this.treeData && this.treeData.name) || '';
+    if (!name && state && state.epic && state.epic.name) {
+      name = state.epic.name;
+    }
+    if (!name) {
+      name = currentProjectId || 'Projeto Ativo';
+    }
+    this.projectNameDisplay.textContent = name;
+    this.projectNameDisplay.title = `${name} (${this.treeData ? this.treeData.root : ''})`;
+  }
+
+  renderTree() {
+    if (!this.container || !this.treeData) return;
+
+    const entries = this.treeData.entries || [];
+    this.totalFileCount = 0;
+
+    if (entries.length === 0) {
+      this.container.innerHTML = '<div class="file-tree-empty">Nenhum arquivo encontrado neste projeto.</div>';
+      if (this.countBadge) this.countBadge.textContent = '0 itens';
+      return;
+    }
+
+    // Filtra e conta
+    const filteredEntries = this.filterEntries(entries, this.filterQuery);
+
+    this.container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    filteredEntries.forEach(entry => {
+      const nodeEl = this.createTreeNodeElement(entry, 0);
+      fragment.appendChild(nodeEl);
+    });
+
+    this.container.appendChild(fragment);
+
+    if (this.countBadge) {
+      this.countBadge.textContent = `${this.totalFileCount} ${this.totalFileCount === 1 ? 'item' : 'itens'}`;
+    }
+  }
+
+  filterEntries(entries, query) {
+    if (!query) {
+      this.countEntriesRecursive(entries);
+      return entries;
+    }
+
+    const result = [];
+    for (const entry of entries) {
+      const matchesSelf = entry.name.toLowerCase().includes(query) || entry.path.toLowerCase().includes(query);
+      if (entry.type === 'directory') {
+        const matchingChildren = this.filterEntries(entry.children || [], query);
+        if (matchesSelf || matchingChildren.length > 0) {
+          // Auto-expande para exibir resultados no filtro
+          this.expandedPaths.add(entry.path);
+          result.push({
+            ...entry,
+            children: matchingChildren
+          });
+          this.totalFileCount++;
+        }
+      } else {
+        if (matchesSelf) {
+          result.push(entry);
+          this.totalFileCount++;
+        }
+      }
+    }
+    return result;
+  }
+
+  countEntriesRecursive(entries) {
+    for (const entry of entries) {
+      this.totalFileCount++;
+      if (entry.type === 'directory' && entry.children) {
+        this.countEntriesRecursive(entry.children);
+      }
+    }
+  }
+
+  createTreeNodeElement(entry, depth = 0) {
+    const isDir = entry.type === 'directory';
+    const isExpanded = this.expandedPaths.has(entry.path);
+    const isSelected = this.selectedFilePath === entry.path;
+
+    const node = document.createElement('div');
+    node.className = `tree-node${isExpanded ? ' expanded' : ''}`;
+    node.dataset.path = entry.path;
+
+    const row = document.createElement('div');
+    row.className = `tree-row${isSelected ? ' selected' : ''}`;
+    row.style.paddingLeft = `${depth * 14 + 6}px`;
+
+    // Seta toggle para pastas
+    const toggle = document.createElement('span');
+    toggle.className = 'tree-toggle';
+    toggle.textContent = isDir ? '›' : '';
+    row.appendChild(toggle);
+
+    // Ícone
+    const icon = document.createElement('span');
+    icon.className = 'tree-icon';
+    if (isDir) {
+      icon.className += ' ext-folder';
+      icon.textContent = isExpanded ? '📂' : '📁';
+    } else {
+      const fileIconMeta = this.getFileIconInfo(entry.name);
+      icon.className += ` ${fileIconMeta.className}`;
+      icon.textContent = fileIconMeta.icon;
+    }
+    row.appendChild(icon);
+
+    // Label
+    const label = document.createElement('span');
+    label.className = 'tree-label';
+    label.textContent = entry.name;
+    label.title = entry.path;
+    row.appendChild(label);
+
+    // Tamanho para arquivos
+    if (!isDir && entry.size !== undefined) {
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'tree-size';
+      sizeSpan.textContent = this.formatFileSize(entry.size);
+      row.appendChild(sizeSpan);
+    }
+
+    // Evento de clique
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isDir) {
+        this.toggleDirectory(entry.path, node, icon);
+      } else {
+        this.selectAndOpenFile(entry.path, entry.name, row);
+      }
+    });
+
+    node.appendChild(row);
+
+    // Filhos do diretório
+    if (isDir && entry.children && entry.children.length > 0) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'tree-children';
+      entry.children.forEach(child => {
+        childrenContainer.appendChild(this.createTreeNodeElement(child, depth + 1));
+      });
+      node.appendChild(childrenContainer);
+    }
+
+    return node;
+  }
+
+  toggleDirectory(dirPath, nodeEl, iconEl) {
+    if (this.expandedPaths.has(dirPath)) {
+      this.expandedPaths.delete(dirPath);
+      nodeEl.classList.remove('expanded');
+      if (iconEl) iconEl.textContent = '📁';
+    } else {
+      this.expandedPaths.add(dirPath);
+      nodeEl.classList.add('expanded');
+      if (iconEl) iconEl.textContent = '📂';
+    }
+  }
+
+  async selectAndOpenFile(filePath, fileName, rowEl) {
+    document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
+    if (rowEl) rowEl.classList.add('selected');
+
+    this.selectedFilePath = filePath;
+
+    if (!this.previewDrawer) return;
+
+    this.previewDrawer.style.display = 'flex';
+    if (this.previewName) this.previewName.textContent = fileName;
+    if (this.previewSize) this.previewSize.textContent = 'Carregando...';
+    if (this.previewIcon) {
+      const info = this.getFileIconInfo(fileName);
+      this.previewIcon.textContent = info.icon;
+    }
+    if (this.previewContent) {
+      this.previewContent.innerHTML = '<code>Carregando conteúdo...</code>';
+    }
+
+    try {
+      const res = await apiFetch(`/api/fs/read?path=${encodeURIComponent(filePath)}&project_id=${encodeURIComponent(this.projectId || currentProjectId)}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (this.previewSize) {
+        this.previewSize.textContent = this.formatFileSize(data.size) + (data.truncated ? ' (truncado)' : '');
+      }
+      if (this.previewContent) {
+        if (data.is_binary) {
+          this.previewContent.innerHTML = `<span style="color:var(--amber-bright);">${escapeHtml(data.error || 'Arquivo binário não suportado para visualização')}</span>`;
+        } else {
+          this.previewContent.textContent = data.content;
+        }
+      }
+    } catch (err) {
+      if (this.previewSize) this.previewSize.textContent = 'Erro';
+      if (this.previewContent) {
+        this.previewContent.innerHTML = `<span style="color:var(--red-bright)">Erro ao ler arquivo: ${escapeHtml(err.message)}</span>`;
+      }
+    }
+  }
+
+  closeFilePreview() {
+    if (this.previewDrawer) {
+      this.previewDrawer.style.display = 'none';
+    }
+    this.selectedFilePath = null;
+    document.querySelectorAll('.tree-row.selected').forEach(r => r.classList.remove('selected'));
+  }
+
+  getFileIconInfo(fileName) {
+    const parts = fileName.split('.');
+    const ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+    switch (ext) {
+      case 'js':
+      case 'mjs':
+      case 'cjs':
+        return { icon: '📄', className: 'ext-js' };
+      case 'ts':
+      case 'tsx':
+        return { icon: '🔷', className: 'ext-ts' };
+      case 'py':
+      case 'pyw':
+        return { icon: '🐍', className: 'ext-py' };
+      case 'html':
+      case 'htm':
+        return { icon: '🌐', className: 'ext-html' };
+      case 'css':
+      case 'scss':
+      case 'sass':
+      case 'less':
+        return { icon: '🎨', className: 'ext-css' };
+      case 'json':
+      case 'json5':
+        return { icon: '⚙️', className: 'ext-json' };
+      case 'md':
+      case 'markdown':
+        return { icon: '📝', className: 'ext-md' };
+      case 'sh':
+      case 'bash':
+      case 'zsh':
+        return { icon: '💻', className: 'ext-sh' };
+      case 'yml':
+      case 'yaml':
+        return { icon: '📋', className: 'ext-json' };
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'svg':
+      case 'webp':
+        return { icon: '🖼️', className: 'ext-file' };
+      default:
+        return { icon: '📄', className: 'ext-file' };
+    }
+  }
+
+  formatFileSize(bytes) {
+    if (bytes === undefined || bytes === null || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+}
+
+// Instância global
+const fileExplorerManager = new FileExplorerManager();
+
 // Inicializa
 initSidebar();
+initOrcaNavigationAndModals();
+renderWorktreeSidebar();
 loadProjects();
 initWebSocket();
 checkAutostartStatus();
 initLocalWorkerEvents();
 initSettingsEvents();
+initTerminalAndOmniEvents();
 loadLocalWorker();
 loadSettings();
+loadOmniRouteSettings();
+fileExplorerManager.init();
+fileExplorerManager.loadFileTree(currentProjectId);
+
+
 
