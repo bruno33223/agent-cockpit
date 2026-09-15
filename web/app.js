@@ -245,43 +245,168 @@ if (btnScanProjects) {
 }
 
 // =========================================================================
-// 1.8. ORCA NAVIGATION, WORKTREE SIDEBAR & MODALS
+// 1.8. ORCA NAVIGATION, WORKTREE SIDEBAR & PROJETOS
 // =========================================================================
 
+function getPinnedProjectIds() {
+  try {
+    const raw = localStorage.getItem('cockpit_pinned_projects');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('[Projects] Erro ao ler cockpit_pinned_projects:', e);
+  }
+  return currentProjectId ? [currentProjectId] : ['default'];
+}
+
+function savePinnedProjectIds(ids) {
+  try {
+    localStorage.setItem('cockpit_pinned_projects', JSON.stringify(ids));
+  } catch (e) {
+    console.warn('[Projects] Erro ao gravar cockpit_pinned_projects:', e);
+  }
+}
+
+function getRecentProjectIds() {
+  try {
+    const raw = localStorage.getItem('cockpit_recent_projects');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function recordRecentProject(projectId) {
+  if (!projectId) return;
+  try {
+    let recent = getRecentProjectIds();
+    recent = [projectId, ...recent.filter(id => id !== projectId)].slice(0, 15);
+    localStorage.setItem('cockpit_recent_projects', JSON.stringify(recent));
+  } catch (e) {}
+}
+
+window.togglePinProject = function(projectId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  if (!projectId) return;
+
+  let pinnedIds = getPinnedProjectIds();
+  if (pinnedIds.includes(projectId)) {
+    pinnedIds = pinnedIds.filter(id => id !== projectId);
+  } else {
+    pinnedIds.push(projectId);
+  }
+  savePinnedProjectIds(pinnedIds);
+  renderWorktreeSidebar();
+};
+
+let isProjectsExpanded = false;
+
+window.toggleShowMoreProjects = function(event) {
+  if (event) event.stopPropagation();
+  isProjectsExpanded = !isProjectsExpanded;
+  renderWorktreeSidebar();
+};
+
 function renderWorktreeSidebar() {
-  const container = document.getElementById('worktree-cards-list');
-  if (!container) return;
+  const pinnedList = document.getElementById('worktree-pinned-list');
+  const cardsList = document.getElementById('worktree-cards-list');
+  const pinnedCountBadge = document.getElementById('pinned-count');
+  const progressCountBadge = document.getElementById('worktree-progress-count');
+  const btnShowMore = document.getElementById('btn-show-more-projects');
+  const btnShowMoreText = document.getElementById('btn-show-more-text');
+  const btnShowMoreIcon = document.getElementById('btn-show-more-icon');
 
-  const activeProj = (knownProjects && knownProjects.find(p => p.id === currentProjectId)) || {
-    id: currentProjectId || 'default',
-    name: currentProjectId || 'agent-cockpit',
-    project_root: ''
-  };
+  if (!cardsList) return;
 
-  // 1. Atualiza Card Pinned (Pasta raiz / branch main do projeto ativo)
-  const pinnedTitle = document.getElementById('pinned-worktree-title');
-  const pinnedTag = document.getElementById('pinned-repo-tag');
-  const pinnedCard = document.getElementById('pinned-main-card');
-  if (pinnedTitle) pinnedTitle.textContent = activeProj.name || 'agent-cockpit';
-  if (pinnedTag) pinnedTag.textContent = (activeProj.id || 'cockpit').toLowerCase().slice(0, 10);
-  if (pinnedCard) {
-    pinnedCard.setAttribute('data-project-id', activeProj.id);
-    pinnedCard.onclick = () => {
-      document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
-      pinnedCard.classList.add('active');
-      activeSliceId = null;
-      switchTab('view-overview');
-      if (activeProj.project_root && typeof sendTerminalCommand === 'function') {
-        sendTerminalCommand(`cd "${activeProj.project_root}"\n`);
-      }
-    };
+  if (currentProjectId) {
+    recordRecentProject(currentProjectId);
   }
 
-  // 2. Renderiza lista dinâmica de Worktree Cards (In progress)
-  container.innerHTML = '';
+  const pinnedIds = getPinnedProjectIds();
+  const recentIds = getRecentProjectIds();
+
+  // 1. Renderiza lista Pinned
+  if (pinnedList) {
+    pinnedList.innerHTML = '';
+    const pinnedProjects = (knownProjects || []).filter(p => pinnedIds.includes(p.id));
+
+    if (pinnedProjects.length === 0 && currentProjectId) {
+      const fallback = (knownProjects || []).find(p => p.id === currentProjectId) || {
+        id: currentProjectId,
+        name: currentProjectId,
+        project_root: ''
+      };
+      pinnedProjects.push(fallback);
+    }
+
+    if (pinnedCountBadge) {
+      pinnedCountBadge.textContent = String(pinnedProjects.length);
+    }
+
+    pinnedProjects.forEach(proj => {
+      const card = document.createElement('div');
+      const isCardActive = (proj.id === currentProjectId);
+      card.className = `worktree-card ${isCardActive ? 'active' : ''}`;
+      card.setAttribute('data-project-id', proj.id);
+      card.setAttribute('tabindex', '0');
+
+      const isDone = (proj.total_slices > 0 && proj.approved_slices === proj.total_slices);
+      const dotClass = isDone ? 'done' : (proj.total_slices > 0 ? 'working' : 'idle');
+      const repoTag = (proj.id || 'cockpit').toLowerCase().slice(0, 10);
+      const slicesInfo = proj.total_slices > 0 ? `${proj.approved_slices}/${proj.total_slices}` : 'pinned';
+
+      card.innerHTML = `
+        <div class="worktree-header">
+          <span class="worktree-title" title="${escapeHtml(proj.name)}">${escapeHtml(proj.name)}</span>
+          <div class="worktree-header-actions">
+            <button class="btn-pin-action pinned" title="Desafixar da lista Pinned" data-tooltip="Desafixar" onclick="togglePinProject('${escapeHtml(proj.id)}', event)" aria-label="Desafixar">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
+              </svg>
+            </button>
+            <span class="agent-state-dot ${dotClass}" title="Status: Online / Conectado"></span>
+          </div>
+        </div>
+        <div class="worktree-meta-row">
+          <span class="worktree-repo-tag" title="${escapeHtml(repoTag)}">${escapeHtml(repoTag)}</span>
+          <span class="worktree-branch" title="main">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="6" y1="3" x2="6" y2="15"></line>
+              <circle cx="18" cy="6" r="3"></circle>
+              <circle cx="6" cy="18" r="3"></circle>
+              <path d="M18 9a9 9 0 0 1-9 9"></path>
+            </svg>
+            main
+          </span>
+          <span class="worktree-time">${slicesInfo}</span>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        activeSliceId = null;
+        switchProject(proj.id);
+        if (proj.project_root && typeof sendTerminalCommand === 'function') {
+          sendTerminalCommand(`cd "${proj.project_root}"\n`);
+        }
+      });
+
+      pinnedList.appendChild(card);
+    });
+  }
+
+  // 2. Renderiza lista Projects / Recentes / In Progress
+  cardsList.innerHTML = '';
   let progressCount = 0;
 
-  // A. Fatias verticais do projeto ativo (Branches/Worktrees das fatias)
+  // A. Fatias verticais do projeto ativo
   const nodes = state.nodes || [];
   nodes.forEach(node => {
     progressCount++;
@@ -292,7 +417,6 @@ function renderWorktreeSidebar() {
     card.setAttribute('data-project-id', currentProjectId);
     card.setAttribute('tabindex', '0');
 
-    // Determina o indicador de estado do agente (.agent-state-dot)
     let dotClass = 'idle';
     if (node.kanban_status === 'EXECUTING') dotClass = 'working';
     else if (node.kanban_status === 'CRITIQUING') dotClass = 'working';
@@ -300,14 +424,16 @@ function renderWorktreeSidebar() {
     else if (node.kanban_status === 'APPROVED') dotClass = 'done';
     else if (['REJECTED', 'BLOCKED_NO_CREDIT', 'STALLED'].includes(node.kanban_status)) dotClass = 'blocked';
 
-    const repoTag = (activeProj.id || 'cockpit').toLowerCase().slice(0, 10);
+    const repoTag = (currentProjectId || 'cockpit').toLowerCase().slice(0, 10);
     const branchName = node.branch || `cockpit/${node.id}`;
     const timeText = node.kanban_status === 'APPROVED' ? 'done' : (node.attempt > 1 ? `${node.attempt * 4}m` : 'now');
 
     card.innerHTML = `
       <div class="worktree-header">
         <span class="worktree-title" title="${escapeHtml(node.title)}">${escapeHtml(node.id.toUpperCase())}: ${escapeHtml(node.title)}</span>
-        <span class="agent-state-dot ${dotClass}" title="Status: ${node.kanban_status}"></span>
+        <div class="worktree-header-actions">
+          <span class="agent-state-dot ${dotClass}" title="Status: ${node.kanban_status}"></span>
+        </div>
       </div>
       <div class="worktree-meta-row">
         <span class="worktree-repo-tag" title="${escapeHtml(repoTag)}">${escapeHtml(repoTag)}</span>
@@ -329,8 +455,8 @@ function renderWorktreeSidebar() {
       card.classList.add('active');
       activeSliceId = node.id;
 
-      // Atualiza terminal para o diretório da slice worktree se existir
-      const sliceWorktreePath = activeProj.project_root 
+      const activeProj = (knownProjects && knownProjects.find(p => p.id === currentProjectId));
+      const sliceWorktreePath = (activeProj && activeProj.project_root)
         ? `${activeProj.project_root}/.worktrees/${node.id}`
         : '';
       if (sliceWorktreePath && typeof sendTerminalCommand === 'function') {
@@ -342,15 +468,27 @@ function renderWorktreeSidebar() {
       }
     });
 
-    container.appendChild(card);
+    cardsList.appendChild(card);
   });
 
-  // B. Workspaces / Projetos concorrentes conhecidos
-  const otherProjects = (knownProjects || []).filter(p => p.id !== currentProjectId);
-  otherProjects.forEach(proj => {
+  // B. Projetos não fixados ordenados por histórico recente
+  const unpinnedProjects = (knownProjects || []).filter(p => !pinnedIds.includes(p.id));
+  unpinnedProjects.sort((a, b) => {
+    const idxA = recentIds.indexOf(a.id);
+    const idxB = recentIds.indexOf(b.id);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const projectsToDisplay = isProjectsExpanded ? unpinnedProjects : unpinnedProjects.slice(0, 3);
+
+  projectsToDisplay.forEach(proj => {
     progressCount++;
     const card = document.createElement('div');
-    card.className = 'worktree-card';
+    const isCardActive = (proj.id === currentProjectId);
+    card.className = `worktree-card ${isCardActive ? 'active' : ''}`;
     card.setAttribute('data-project-id', proj.id);
     card.setAttribute('tabindex', '0');
 
@@ -362,7 +500,15 @@ function renderWorktreeSidebar() {
     card.innerHTML = `
       <div class="worktree-header">
         <span class="worktree-title" title="${escapeHtml(proj.name)}">${escapeHtml(proj.name)}</span>
-        <span class="agent-state-dot ${dotClass}" title="Workspace Concorrente"></span>
+        <div class="worktree-header-actions">
+          <button class="btn-pin-action" title="Fixar na lista Pinned" data-tooltip="Fixar" onclick="togglePinProject('${escapeHtml(proj.id)}', event)" aria-label="Fixar">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="17" x2="12" y2="22"></line>
+              <path d="M5 17h14l-2-7V4h1V2H6v2h1v6l-2 7z"></path>
+            </svg>
+          </button>
+          <span class="agent-state-dot ${dotClass}" title="Workspace Concorrente"></span>
+        </div>
       </div>
       <div class="worktree-meta-row">
         <span class="worktree-repo-tag" title="${escapeHtml(repoTag)}">${escapeHtml(repoTag)}</span>
@@ -388,13 +534,28 @@ function renderWorktreeSidebar() {
       }
     });
 
-    container.appendChild(card);
+    cardsList.appendChild(card);
   });
 
-  // 3. Atualiza contador de itens na seção In progress
-  const countBadge = document.getElementById('worktree-progress-count');
-  if (countBadge) {
-    countBadge.textContent = String(progressCount);
+  if (progressCountBadge) {
+    progressCountBadge.textContent = String(progressCount);
+  }
+
+  // 3. Controle do botão Exibir Mais
+  if (btnShowMore) {
+    if (unpinnedProjects.length > 3) {
+      btnShowMore.style.display = 'flex';
+      if (isProjectsExpanded) {
+        if (btnShowMoreText) btnShowMoreText.textContent = 'Exibir Menos';
+        if (btnShowMoreIcon) btnShowMoreIcon.innerHTML = '<polyline points="18 15 12 9 6 15"></polyline>';
+      } else {
+        const remaining = unpinnedProjects.length - 3;
+        if (btnShowMoreText) btnShowMoreText.textContent = `Exibir Mais (+${remaining})`;
+        if (btnShowMoreIcon) btnShowMoreIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+      }
+    } else {
+      btnShowMore.style.display = 'none';
+    }
   }
 }
 
@@ -424,6 +585,12 @@ function initOrcaNavigationAndModals() {
         }
       }
     });
+  }
+
+  // 2.5. Botão Exibir Mais / Menos Projetos (#btn-show-more-projects)
+  const btnShowMoreProjects = document.getElementById('btn-show-more-projects');
+  if (btnShowMoreProjects) {
+    btnShowMoreProjects.addEventListener('click', toggleShowMoreProjects);
   }
 
   // 3. Quick-Nav Buttons

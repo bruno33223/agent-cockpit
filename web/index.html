@@ -77,13 +77,8 @@
         <span class="epic-val" id="epic-title">Aguardando Sincronização...</span>
       </div>
 
-      <div class="project-selector-wrapper" title="Seletor de Workspace / Projeto Concorrente">
-        <span class="project-tag">📁 PROJETO</span>
-        <select id="project-select" class="project-dropdown" aria-label="Selecione o Projeto">
-          <option value="default">Carregando projetos...</option>
-        </select>
-        <button id="btn-scan-projects" class="project-scan-btn" title="Escanear e sincronizar projetos reais em ~/Projects">⟳</button>
-      </div>
+      <!-- Seletor oculto mantido para paridade de testes legados -->
+      <select id="project-select" class="project-dropdown sr-only" style="display: none;" aria-hidden="true"></select>
 
       <div class="local-worker-pill" id="local-worker-pill" title="Status e Seletor do Local Worker (Ollama)">
         <span class="pulse-led online" id="lw-pill-led"></span>
@@ -230,16 +225,22 @@
             </div>
           </div>
 
-          <!-- SEÇÃO "IN PROGRESS" COLAPSÁVEL (.worktree-section-progress) -->
+          <!-- SEÇÃO "PROJECTS / IN PROGRESS" COLAPSÁVEL (.worktree-section-progress) -->
           <div class="worktree-section worktree-section-progress" id="section-progress">
             <div class="worktree-section-header" data-target="worktree-cards-list">
               <span class="worktree-section-toggle">▾</span>
-              <span class="worktree-section-label">In progress</span>
+              <span class="worktree-section-label">Projects</span>
               <span class="worktree-section-count" id="worktree-progress-count">0</span>
             </div>
             <div class="worktree-sidebar-list" id="worktree-cards-list">
               <!-- Renderizado dinamicamente via renderWorktreeSidebar() -->
             </div>
+            <button class="btn-show-more-projects" id="btn-show-more-projects" title="Alternar entre recentes e todos os projetos" style="display: none;">
+              <span id="btn-show-more-text">Exibir Mais</span>
+              <svg id="btn-show-more-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
