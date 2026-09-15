@@ -168,7 +168,8 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
         Verifica que quando delegate_styles_to_cloud está desativado (False),
         execute_local_builder NÃO retorna DELEGATED_TO_CLOUD para CSS.
         """
-        db.update_settings({"delegate_styles_to_cloud": False})
+        db.update_settings({"delegate_styles_to_cloud": False, "enable_local_ai": True})
+        db.update_local_worker_config({"enabled": True})
 
         res = execute_local_builder(
             slice_id="slice-test",
@@ -185,7 +186,8 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
         Verifica que arquivos de lógica/backend (.py, .js, .json) NUNCA são delegados para nuvem,
         mesmo com a opção delegate_styles_to_cloud ativa.
         """
-        db.update_settings({"delegate_styles_to_cloud": True})
+        db.update_settings({"delegate_styles_to_cloud": True, "enable_local_ai": True})
+        db.update_local_worker_config({"enabled": True})
 
         res = execute_local_builder(
             slice_id="slice-test",

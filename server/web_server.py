@@ -931,7 +931,18 @@ def post_opencode_sync():
 # =========================================================================
 
 @app.websocket("/ws/terminal")
-async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Query("term-1"), cwd: Optional[str] = Query(None), project_id: Optional[str] = Query(None), task_id: Optional[str] = Query(None)):
+async def websocket_terminal(
+    websocket: WebSocket,
+    session_id: Optional[str] = Query("term-1"),
+    cwd: Optional[str] = Query(None),
+    project_id: Optional[str] = Query(None),
+    task_id: Optional[str] = Query(None),
+    role: Optional[str] = Query("orchestrator"),
+    name: Optional[str] = Query(None),
+    agent_type: Optional[str] = Query("bash"),
+    agent_name: Optional[str] = Query(None),
+    slice_id: Optional[str] = Query(None)
+):
     await websocket.accept()
     
     if not pty_session_manager:
@@ -943,9 +954,25 @@ async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Q
     # Determina diretório de trabalho do projeto ativo se não fornecido
     if not cwd:
         root_path, _, _ = _resolve_project_fs_root(target_pid)
-        cwd = root_path if (root_path and os.path.isdir(root_path)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        target_slice = slice_id or task_id
+        if target_slice and root_path:
+            worktree_dir = os.path.join(root_path, ".worktrees", target_slice)
+            if os.path.isdir(worktree_dir):
+                cwd = worktree_dir
+        if not cwd:
+            cwd = root_path if (root_path and os.path.isdir(root_path)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    session = pty_session_manager.get_or_create(session_id=session_id, cwd=cwd, project_id=target_pid, task_id=task_id)
+    session = pty_session_manager.get_or_create(
+        session_id=session_id,
+        cwd=cwd,
+        project_id=target_pid,
+        task_id=task_id,
+        role=role or "orchestrator",
+        name=name,
+        agent_type=agent_type or "bash",
+        agent_name=agent_name,
+        slice_id=slice_id or task_id
+    )
     history = session.attach(websocket)
     if history:
         await websocket.send_text(history)
@@ -976,21 +1003,60 @@ async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Q
         session.detach(websocket)
 
 @app.get("/api/terminal/sessions")
-def get_terminal_sessions(project_id: Optional[str] = None, task_id: Optional[str] = None):
-    """Lista as sessões ativas de terminal PTY com PID, CWD e status."""
+def get_terminal_sessions(project_id: Optional[str] = None, task_id: Optional[str] = None, role: Optional[str] = None):
+    """Lista as sessões ativas e persistidas de terminal PTY com PID, CWD, papel (role) e status."""
     if pty_session_manager:
-        if project_id or task_id:
-            return [s.to_dict() for s in pty_session_manager.get_sessions_by_context(project_id, task_id)]
+        if project_id or task_id or role:
+            return [s.to_dict() for s in pty_session_manager.get_sessions_by_context(project_id, task_id, role)]
         return pty_session_manager.list_sessions()
     return []
 
+@app.post("/api/terminal/sessions")
+def create_terminal_session(data: Dict[str, Any]):
+    """Cria ou registra programaticamente uma sessão de terminal especializada com persistência em disco."""
+    if not pty_session_manager:
+        raise HTTPException(status_code=503, detail="Suporte PTY indisponível nesta plataforma")
+    
+    session_id = data.get("session_id") or f"term-{int(time.time()*1000)}"
+    project_id = data.get("project_id") or db.get_current_project_id()
+    task_id = data.get("task_id")
+    role = data.get("role", "orchestrator")
+    name = data.get("name")
+    agent_type = data.get("agent_type", "bash")
+    agent_name = data.get("agent_name")
+    slice_id = data.get("slice_id") or task_id
+    cwd = data.get("cwd")
+
+    if not cwd:
+        root_path, _, _ = _resolve_project_fs_root(project_id)
+        if slice_id and root_path:
+            worktree_dir = os.path.join(root_path, ".worktrees", slice_id)
+            if os.path.isdir(worktree_dir):
+                cwd = worktree_dir
+        if not cwd:
+            cwd = root_path if (root_path and os.path.isdir(root_path)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    session = pty_session_manager.get_or_create(
+        session_id=session_id,
+        cwd=cwd,
+        project_id=project_id,
+        task_id=task_id,
+        role=role,
+        name=name,
+        agent_type=agent_type,
+        agent_name=agent_name,
+        slice_id=slice_id
+    )
+    return session.to_dict()
+
 @app.delete("/api/terminal/sessions/{session_id}")
 def delete_terminal_session(session_id: str):
-    """Encerra um terminal PTY específico."""
+    """Encerra um terminal PTY específico de forma limpa e remove da persistência."""
     if pty_session_manager:
         closed = pty_session_manager.close_session(session_id)
-        return {"status": "ok" if closed else "not_found", "session_id": session_id}
-    return {"status": "error"}
+        return {"status": "ok" if closed else "not_found", "closed": closed, "session_id": session_id}
+    return {"status": "error", "message": "Suporte PTY indisponível"}
+
 
 # ROTAS DO FILE EXPLORER (ORCA RIGHT SIDEBAR)
 DEFAULT_FS_IGNORE_DIRS = {

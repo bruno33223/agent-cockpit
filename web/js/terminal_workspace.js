@@ -4,20 +4,68 @@
  */
 
 import { escapeHtml, formatRelativeCwd } from './ui_utils.js';
-import { currentProjectId, activeSliceId, state, knownProjects, recordRecentProject } from './state.js';
+import { currentProjectId, activeSliceId, state, knownProjects, recordRecentProject, apiFetch } from './state.js';
 import { renderWorktreeSidebar } from './sidebar.js';
 
 export class TerminalWorkspaceManager {
   constructor() {
-    this.sessions = new Map(); // id -> { id, name, agentType, cwd, term, fitAddon, socket, isConnected, elPane, elTab, resizeObserver, contextKey, projectId, taskId }
+    this.sessions = new Map(); // id -> { id, name, role, sliceId, agentType, cwd, term, fitAddon, socket, isConnected, elPane, elTab, resizeObserver, contextKey, projectId, taskId }
     this.contextSessions = new Map(); // contextKey -> Set of sessionIds
     this.activeSessionId = null;
     this.activeContextKey = null;
+    this.roleFilter = 'all'; // 'all' | 'orchestrator' | 'agent' | 'subagent'
     this.layout = localStorage.getItem('cockpit_terminal_layout') || 'dynamic';
     this.counter = 0;
     this.tabsBar = null;
     this.gridContainer = null;
     this.isInitialized = false;
+  }
+
+  getRoleIcon(role) {
+    switch (role) {
+      case 'orchestrator': return '👑';
+      case 'agent': return '⚡';
+      case 'subagent': return '🔬';
+      default: return '💻';
+    }
+  }
+
+  getRoleTitle(role) {
+    switch (role) {
+      case 'orchestrator': return 'Orquestrador Staff';
+      case 'agent': return 'Agente Executor';
+      case 'subagent': return 'Subagente Efêmero';
+      default: return 'Terminal';
+    }
+  }
+
+  getRoleBadgeHtml(role) {
+    const title = this.getRoleTitle(role);
+    const icon = this.getRoleIcon(role);
+    return `<span class="term-tab-role-badge role-${role}" title="${title}"><span class="role-badge-icon">${icon}</span> <span class="role-badge-text">${title}</span></span>`;
+  }
+
+  getRolePermissionsText(role) {
+    switch (role) {
+      case 'orchestrator':
+        return '🛡️ Staff Orchestrator (Full Access / Blueprint Control)';
+      case 'agent':
+        return '⚡ Fleet Agent (Worktree Isolated / Auto-Red-Green)';
+      case 'subagent':
+        return '🔬 Ephemeral Subagent (Task Sandbox / Read-Write)';
+      default:
+        return '⚡ bypass permissions on (shift+tab to cycle) - for agents';
+    }
+  }
+
+  setRoleFilter(filter) {
+    this.roleFilter = filter || 'all';
+    this.sessions.forEach(s => {
+      const belongsContext = (!this.activeContextKey || s.contextKey === this.activeContextKey);
+      const matchesFilter = (this.roleFilter === 'all' || s.role === this.roleFilter);
+      const isVisible = belongsContext && matchesFilter;
+      if (s.elTab) s.elTab.style.display = isVisible ? '' : 'none';
+    });
   }
 
   getActiveContextSessions() {
@@ -191,9 +239,16 @@ export class TerminalWorkspaceManager {
       this.setLayout(this.layout, false);
     }
 
-    // Inicializa contexto do projeto ativo
+    // Inicializa controles de abas estilo Chrome, filtros e popovers
+    this.initTabsBarControls();
+
+    // Inicializa contexto do projeto ativo sincronizando do backend em disco
     const initialContext = currentProjectId ? `project:${currentProjectId}` : 'global';
-    this.switchContext(initialContext, this.getActiveProjectRoot(), true);
+    this.syncSessionsWithBackend(currentProjectId).then(() => {
+      this.switchContext(initialContext, this.getActiveProjectRoot(), true);
+    }).catch(() => {
+      this.switchContext(initialContext, this.getActiveProjectRoot(), true);
+    });
 
     if (typeof window !== 'undefined' && typeof window.checkOmniRouteStatus === 'function') {
       window.checkOmniRouteStatus();
@@ -263,13 +318,24 @@ export class TerminalWorkspaceManager {
       }
     }
 
+    const role = options.role || (options.taskId ? 'agent' : 'orchestrator');
+    const sliceId = options.sliceId || (role === 'agent' ? (activeSliceId || options.taskId) : null);
     const agentType = options.agentType || (options.name && options.name.toLowerCase().includes('claude') ? 'claude' : (options.name && options.name.toLowerCase().includes('opencode') ? 'opencode' : 'bash'));
-    const name = options.name || this.getAgentDisplayName(agentType, this.counter);
-    const cwd = options.cwd || (taskId ? this.getSliceCwd(taskId, projectId) : this.getActiveProjectRoot());
+    const defaultName = role === 'orchestrator'
+      ? (this.counter === 1 ? 'Orquestrador Staff' : `Orquestrador #${this.counter}`)
+      : (role === 'agent'
+        ? (sliceId ? `Agente (${sliceId})` : `Agente da Frota #${this.counter}`)
+        : (taskId ? `Subagente (${taskId})` : `Subagente #${this.counter}`));
+    const name = options.name || defaultName;
+    const cwd = options.cwd || (sliceId ? this.getSliceCwd(sliceId, projectId) : (taskId ? this.getSliceCwd(taskId, projectId) : this.getActiveProjectRoot()));
     const model = this.getCurrentModel();
-    const branchOrSlice = taskId ? `slice/${taskId}` : this.getCurrentSliceOrBranch();
+    const branchOrSlice = sliceId ? `slice/${sliceId}` : (taskId ? `task/${taskId}` : this.getCurrentSliceOrBranch());
     const relCwd = this.formatRelativeCwd(cwd);
     const iconHtml = this.getAgentIcon(agentType);
+    const roleIcon = this.getRoleIcon(role);
+    const roleTitle = this.getRoleTitle(role);
+    const roleBadgeHtml = this.getRoleBadgeHtml(role);
+    const rolePerms = this.getRolePermissionsText(role);
 
     // 1. Instância do Xterm
     const term = new Terminal({
@@ -311,15 +377,17 @@ export class TerminalWorkspaceManager {
       term.loadAddon(new WebLinksAddon.WebLinksAddon());
     }
 
-    // 2. Elementos DOM (Tab superior do workspace e Pane do terminal estilo Orca)
+    // 2. Elementos DOM (Aba estilo Chrome e Painel com badge e permissões)
     const elTab = document.createElement('div');
-    elTab.className = 'term-tab orca-tab';
+    elTab.className = `term-tab orca-tab role-${role}`;
     elTab.id = `tab-${id}`;
     elTab.setAttribute('data-session-id', id);
+    elTab.setAttribute('data-role', role);
     elTab.innerHTML = `
-      <span class="term-tab-dot disconnected"></span>
+      <span class="term-tab-dot disconnected" title="Status de Conexão"></span>
       <span class="term-tab-icon">${iconHtml}</span>
-      <span class="term-tab-title orca-tab-title">${name}</span>
+      <span class="term-tab-title orca-tab-title" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+      ${roleBadgeHtml}
       <button class="term-tab-close orca-tab-close" title="Encerrar terminal">×</button>
     `;
 
@@ -327,15 +395,17 @@ export class TerminalWorkspaceManager {
     elPane.className = 'terminal-pane orca-split-pane';
     elPane.id = `pane-${id}`;
     elPane.setAttribute('data-session-id', id);
+    elPane.setAttribute('data-role', role);
     elPane.innerHTML = `
       <div class="orca-pane-header">
         <div class="orca-tab-strip">
           <div class="orca-tab active">
             <span class="orca-tab-icon">${iconHtml}</span>
-            <span class="orca-tab-title">${name}</span>
+            <span class="orca-tab-title">${escapeHtml(name)}</span>
           </div>
+          <span class="orca-role-badge role-${role}" title="${roleTitle}">${roleIcon} ${roleTitle}</span>
           <div class="orca-agent-picker-wrap">
-            <select class="orca-agent-select" title="Trocar tipo de agente no painel">
+            <select class="orca-agent-select" title="Trocar tipo de ferramenta no painel">
               <option value="bash" ${agentType === 'bash' ? 'selected' : ''}>&gt; Bash</option>
               <option value="opencode" ${agentType === 'opencode' ? 'selected' : ''}>⚡ OpenCode</option>
               <option value="claude" ${agentType === 'claude' ? 'selected' : ''}>Claude Code</option>
@@ -343,6 +413,7 @@ export class TerminalWorkspaceManager {
             </select>
           </div>
           <div class="orca-pane-controls ml-auto">
+            ${role === 'subagent' ? '<button class="orca-pane-btn orca-btn-terminate-subagent danger" title="Encerrar Subagente (Limpeza de Processo)">Encerrar Subagente</button>' : ''}
             <button class="orca-pane-btn orca-btn-split" title="Dividir terminal ([|] Split)">[|]</button>
             <button class="orca-pane-btn orca-btn-clear" title="Limpar buffer (⌧)">⌧</button>
             <button class="orca-pane-btn orca-btn-restart" title="Reconectar sessão PTY (⟳)">⟳</button>
@@ -369,8 +440,8 @@ export class TerminalWorkspaceManager {
           <span class="orca-status-icon">🌱</span>
           <span class="orca-status-text orca-status-branch-text">${branchOrSlice}</span>
         </div>
-        <div class="orca-statusline-item orca-statusline-perms orca-status-perms" title="Bypass permissions">
-          <span class="orca-status-text">⚡ bypass permissions on (shift+tab to cycle) - for agents</span>
+        <div class="orca-statusline-item orca-statusline-perms orca-status-perms" title="Permissões do Papel">
+          <span class="orca-status-text">${rolePerms}</span>
         </div>
         <div class="orca-statusline-item orca-statusline-mcp orca-status-mcp" title="Telemetria MCP Live">
           <span class="orca-status-mcp-indicator live">●</span>
@@ -380,24 +451,17 @@ export class TerminalWorkspaceManager {
     `;
 
     // Botão "+" na barra de abas
-    let btnAddTab = document.getElementById('btn-tab-add');
+    let btnAddTab = document.getElementById('btn-tab-add-wrap') || document.getElementById('btn-tab-add');
     if (!btnAddTab) {
-      btnAddTab = document.createElement('button');
-      btnAddTab.id = 'btn-tab-add';
-      btnAddTab.className = 'term-tab-add orca-tab';
-      btnAddTab.title = 'Abrir novo terminal';
-      btnAddTab.innerHTML = '+ Novo';
-      btnAddTab.addEventListener('click', () => {
-        if (currentProjectId) {
-          recordRecentProject(currentProjectId);
-          renderWorktreeSidebar();
-        }
-        this.createSession();
-      });
-      this.tabsBar.appendChild(btnAddTab);
+      this.initTabsBarControls();
+      btnAddTab = document.getElementById('btn-tab-add-wrap') || document.getElementById('btn-tab-add');
     }
 
-    this.tabsBar.insertBefore(elTab, btnAddTab);
+    if (btnAddTab && btnAddTab.parentNode === this.tabsBar) {
+      this.tabsBar.insertBefore(elTab, btnAddTab);
+    } else {
+      this.tabsBar.appendChild(elTab);
+    }
     this.gridContainer.appendChild(elPane);
 
     const mountEl = elPane.querySelector('.xterm-mount');
@@ -407,6 +471,8 @@ export class TerminalWorkspaceManager {
     const session = {
       id,
       name,
+      role,
+      sliceId,
       agentType,
       cwd,
       contextKey,
@@ -421,6 +487,23 @@ export class TerminalWorkspaceManager {
       resizeObserver: null
     };
     this.sessions.set(id, session);
+
+    // Persistência REST no backend
+    apiFetch('/api/terminal/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: id,
+        project_id: projectId,
+        task_id: taskId,
+        role,
+        name,
+        agent_type: agentType,
+        agent_name: options.agentName || null,
+        slice_id: sliceId,
+        cwd
+      })
+    }).catch(() => {});
 
     if (!this.contextSessions.has(contextKey)) {
       this.contextSessions.set(contextKey, new Set());
@@ -492,6 +575,14 @@ export class TerminalWorkspaceManager {
     const btnClose = elPane.querySelector('.orca-btn-close');
     if (btnClose) {
       btnClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeSession(id);
+      });
+    }
+
+    const btnTerminateSub = elPane.querySelector('.orca-btn-terminate-subagent');
+    if (btnTerminateSub) {
+      btnTerminateSub.addEventListener('click', (e) => {
         e.stopPropagation();
         this.closeSession(id);
       });
@@ -595,6 +686,12 @@ export class TerminalWorkspaceManager {
     if (session.cwd) params.set('cwd', session.cwd);
     const pid = session.projectId || currentProjectId;
     if (pid) params.set('project_id', pid);
+    if (session.taskId) params.set('task_id', session.taskId);
+    if (session.role) params.set('role', session.role);
+    if (session.name) params.set('name', session.name);
+    if (session.agentType) params.set('agent_type', session.agentType);
+    if (session.agentName) params.set('agent_name', session.agentName);
+    if (session.sliceId) params.set('slice_id', session.sliceId);
     if (session.taskId) params.set('task_id', session.taskId);
 
     const url = `${proto}//${window.location.host}/ws/terminal?${params.toString()}`;
@@ -880,10 +977,13 @@ export class TerminalWorkspaceManager {
         this.selectSession(this.activeSessionId);
       }
     } else if (autoCreate) {
+      const defaultRole = contextKey.startsWith('slice:') ? 'agent' : 'orchestrator';
+      const defaultName = defaultRole === 'orchestrator' ? 'Orquestrador Staff' : 'Agente da Fatia';
       const newSess = this.createSession({
         contextKey,
         cwd: defaultCwd || this.getActiveProjectRoot(),
-        name: 'Term 1'
+        name: defaultName,
+        role: defaultRole
       });
       if (newSess) {
         this.selectSession(newSess.id);
@@ -897,10 +997,14 @@ export class TerminalWorkspaceManager {
     }
     this.updateHeaderBadge();
     this.updatePaneContexts();
+    this.setRoleFilter(this.roleFilter);
   }
 
-  onProjectSwitched(newProjectId) {
+  async onProjectSwitched(newProjectId) {
     const newRoot = this.getActiveProjectRoot();
+    try {
+      await this.syncSessionsWithBackend(newProjectId);
+    } catch (e) {}
     this.switchContext(`project:${newProjectId}`, newRoot, true);
   }
 
@@ -908,6 +1012,126 @@ export class TerminalWorkspaceManager {
     const projId = currentProjectId || 'default';
     const cwd = sliceCwd || this.getSliceCwd(sliceId, projId);
     this.switchContext(`slice:${projId}:${sliceId}`, cwd, true);
+  }
+
+  initTabsBarControls() {
+    if (!this.tabsBar) this.tabsBar = document.getElementById('terminal-tabs-bar');
+    if (!this.tabsBar) return;
+
+    // 1. Container de filtros rápidos por papel
+    let filtersContainer = document.getElementById('terminal-role-filters');
+    if (!filtersContainer) {
+      filtersContainer = document.createElement('div');
+      filtersContainer.id = 'terminal-role-filters';
+      filtersContainer.className = 'terminal-role-filters';
+      filtersContainer.innerHTML = `
+        <button class="term-filter-chip active" data-filter="all">Todos</button>
+        <button class="term-filter-chip" data-filter="orchestrator">👑 Orquestrador</button>
+        <button class="term-filter-chip" data-filter="agent">⚡ Agentes</button>
+        <button class="term-filter-chip" data-filter="subagent">🔬 Subagentes</button>
+      `;
+      filtersContainer.querySelectorAll('.term-filter-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          filtersContainer.querySelectorAll('.term-filter-chip').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.setRoleFilter(btn.getAttribute('data-filter'));
+        });
+      });
+      if (this.tabsBar.parentNode) {
+        this.tabsBar.parentNode.insertBefore(filtersContainer, this.tabsBar);
+      }
+    }
+
+    // 2. Popover / Dropdown de adição de terminais especializados
+    let btnAddTab = document.getElementById('btn-tab-add-wrap');
+    if (!btnAddTab) {
+      const oldBtn = document.getElementById('btn-tab-add');
+      if (oldBtn && oldBtn.parentNode) oldBtn.parentNode.removeChild(oldBtn);
+
+      btnAddTab = document.createElement('div');
+      btnAddTab.id = 'btn-tab-add-wrap';
+      btnAddTab.className = 'term-tab-add-wrap';
+      btnAddTab.innerHTML = `
+        <button id="btn-tab-add" class="term-tab-add orca-tab" title="Criar terminal especializado">
+          + Novo <span class="tab-add-arrow">▾</span>
+        </button>
+        <div class="terminal-add-dropdown" id="terminal-add-dropdown" style="display: none;">
+          <div class="terminal-add-item" data-role="orchestrator">
+            <span class="role-icon">👑</span>
+            <div class="role-text">
+              <span class="role-name">Orquestrador Staff</span>
+              <span class="role-desc">Comando do blueprint</span>
+            </div>
+          </div>
+          <div class="terminal-add-item" data-role="agent">
+            <span class="role-icon">⚡</span>
+            <div class="role-text">
+              <span class="role-name">Agente da Fatia</span>
+              <span class="role-desc">Worktree isolada</span>
+            </div>
+          </div>
+          <div class="terminal-add-item" data-role="subagent">
+            <span class="role-icon">🔬</span>
+            <div class="role-text">
+              <span class="role-name">Subagente Efêmero</span>
+              <span class="role-desc">Pesquisa, testes e refactor</span>
+            </div>
+          </div>
+        </div>
+      `;
+      const btn = btnAddTab.querySelector('#btn-tab-add');
+      const dropdown = btnAddTab.querySelector('#terminal-add-dropdown');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.style.display = (dropdown.style.display === 'none' || !dropdown.style.display) ? 'block' : 'none';
+      });
+      dropdown.querySelectorAll('.terminal-add-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const targetRole = item.getAttribute('data-role');
+          dropdown.style.display = 'none';
+          if (currentProjectId) {
+            recordRecentProject(currentProjectId);
+            renderWorktreeSidebar();
+          }
+          this.createSession({ role: targetRole });
+        });
+      });
+      document.addEventListener('click', () => {
+        dropdown.style.display = 'none';
+      });
+      this.tabsBar.appendChild(btnAddTab);
+    }
+  }
+
+  async syncSessionsWithBackend(targetProjectId = null) {
+    const pid = targetProjectId || currentProjectId || 'default';
+    try {
+      const res = await apiFetch(`/api/terminal/sessions?project_id=${encodeURIComponent(pid)}`);
+      if (res.ok) {
+        const serverSessions = await res.json();
+        if (Array.isArray(serverSessions) && serverSessions.length > 0) {
+          for (const s of serverSessions) {
+            if (!this.sessions.has(s.session_id)) {
+              this.createSession({
+                id: s.session_id,
+                projectId: s.project_id || pid,
+                taskId: s.task_id,
+                sliceId: s.slice_id,
+                role: s.role || 'orchestrator',
+                name: s.name,
+                agentType: s.agent_type || 'bash',
+                agentName: s.agent_name,
+                cwd: s.cwd,
+                contextKey: `project:${pid}`
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Terminal] Falha sincronizando sessões persistidas do backend:', err);
+    }
   }
 }
 

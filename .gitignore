@@ -33,6 +33,7 @@ desktop.ini
 # Agent Cockpit runtime state (should NOT be committed)
 workflow_state.json
 states/*.json
+states/terminals/
 !states/.gitkeep
 
 # Packaged distributions (rebuilt by CI or install.bat)

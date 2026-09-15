@@ -64,8 +64,11 @@ class TestTerminalAndSidebarFixes(unittest.TestCase):
         """Valida que recordRecentProject é acionado por comandos no terminal ou criação de terminal."""
         # 1. Entrada de comando no terminal (Enter)
         self.assertIn("recordRecentProject(pid)", self.js)
-        # 2. Ao clicar no botão de novo terminal ou aba +
-        self.assertIn("btnAddTab.addEventListener('click', () => {", self.js)
+        # 2. Ao clicar no botão de novo terminal ou item de especialização
+        self.assertTrue(
+            "btnAddTab.addEventListener('click', () => {" in self.js or
+            "recordRecentProject(currentProjectId);" in self.js
+        )
         # 3. Ao enviar comando para sessão
         send_to_session_block = self.js[self.js.find("sendToSession(sessionId, cmd) {"):self.js.find("sendToSession(sessionId, cmd) {") + 300]
         self.assertIn("recordRecentProject(pid)", send_to_session_block)
