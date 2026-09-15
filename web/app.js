@@ -3166,11 +3166,21 @@ class TerminalWorkspaceManager {
   constructor() {
     this.sessions = new Map(); // id -> { id, name, agentType, cwd, term, fitAddon, socket, isConnected, elPane, elTab, resizeObserver }
     this.activeSessionId = null;
-    this.layout = localStorage.getItem('cockpit_terminal_layout') || 'tabs';
+    this.layout = localStorage.getItem('cockpit_terminal_layout') || 'dynamic';
     this.counter = 0;
     this.tabsBar = null;
     this.gridContainer = null;
     this.isInitialized = false;
+  }
+
+  applyDynamicSplit() {
+    if (!this.gridContainer) return;
+    const count = this.sessions.size;
+    const splitClass = `split-${Math.max(1, Math.min(count, 6))}`;
+    this.gridContainer.className = `terminal-workspace-grid layout-dynamic ${splitClass}`;
+    this.updateHeaderBadge();
+    this.fitAll();
+    setTimeout(() => this.fitAll(), 120);
   }
 
   getAgentIcon(agentType) {
@@ -3310,7 +3320,11 @@ class TerminalWorkspaceManager {
     });
 
     // Aplica layout configurado
-    this.setLayout(this.layout, false);
+    if (this.layout === 'dynamic') {
+      this.applyDynamicSplit();
+    } else {
+      this.setLayout(this.layout, false);
+    }
 
     // Cria a primeira sessão inicial se vazio
     if (this.sessions.size === 0) {
@@ -3587,7 +3601,11 @@ class TerminalWorkspaceManager {
 
     // Seleciona a sessão criada
     this.selectSession(id);
-    this.fitAll();
+    if (this.layout === 'dynamic') {
+      this.applyDynamicSplit();
+    } else {
+      this.fitAll();
+    }
 
     return session;
   }
@@ -3755,13 +3773,22 @@ class TerminalWorkspaceManager {
       }
     }
 
-    this.fitAll();
+    if (this.layout === 'dynamic') {
+      this.applyDynamicSplit();
+    } else {
+      this.fitAll();
+    }
   }
 
   setLayout(layout, autoSpawn = true) {
-    if (!['tabs', 'split', 'grid'].includes(layout)) layout = 'tabs';
+    if (!['dynamic', 'tabs', 'split', 'grid'].includes(layout)) layout = 'dynamic';
     this.layout = layout;
     localStorage.setItem('cockpit_terminal_layout', layout);
+
+    if (layout === 'dynamic') {
+      this.applyDynamicSplit();
+      return;
+    }
 
     // Atualiza botões
     const layoutPicker = document.getElementById('terminal-layout-picker');

@@ -4366,12 +4366,17 @@ body {
    ========================================================================= */
 
 .terminal-view-container {
-  padding: 24px;
+  padding: 8px 12px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 4px;
   height: 100%;
   box-sizing: border-box;
+}
+
+.terminal-view-container.terminal-workbench-minimalist {
+  padding: 6px 10px 10px 10px;
+  gap: 4px;
 }
 
 .terminal-view-header {
@@ -4379,6 +4384,13 @@ body {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+}
+
+.terminal-view-header.minimalist-header {
+  align-items: center;
+  min-height: 30px;
+  padding: 2px 2px;
+  gap: 8px;
 }
 
 .terminal-header-title-row {
@@ -4572,8 +4584,43 @@ body {
   flex: 1;
   min-height: 480px;
   display: grid;
-  gap: 8px;
+  gap: 4px;
   overflow: hidden;
+}
+
+/* Modo Split Dinâmico Automático (Issue #5) */
+.terminal-workspace-grid.layout-dynamic,
+.terminal-workspace-grid.layout-dynamic.split-1 {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.terminal-workspace-grid.layout-dynamic.split-2 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+}
+
+.terminal-workspace-grid.layout-dynamic.split-3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.terminal-workspace-grid.layout-dynamic.split-3 .terminal-pane:first-child {
+  grid-column: 1 / -1;
+}
+
+.terminal-workspace-grid.layout-dynamic.split-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.terminal-workspace-grid.layout-dynamic.split-5,
+.terminal-workspace-grid.layout-dynamic.split-6 {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1fr;
+}
+
+.terminal-workspace-grid.layout-dynamic .terminal-pane {
+  display: flex !important;
 }
 
 .terminal-workspace-grid.layout-tabs {

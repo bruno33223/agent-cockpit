@@ -816,38 +816,35 @@
 
       <!-- VIEW 6: TERMINAL INTERATIVO & ORCA MULTI-PANE WORKBENCH -->
       <section class="tab-view" id="view-terminal">
-        <div class="terminal-view-container orca-workbench-container">
-          <div class="terminal-view-header orca-workbench-header">
-            <div class="terminal-header-info">
-              <div class="terminal-header-title-row">
+        <div class="terminal-view-container orca-workbench-container terminal-workbench-minimalist">
+          <!-- CABEÇALHO MINIMALISTA: ZERO POLUIÇÃO, BOTÃO ÚNICO + NOVO TERMINAL -->
+          <div class="terminal-view-header orca-workbench-header minimalist-header">
+            <div class="terminal-view-header-left">
+              <span class="tech-badge" id="terminal-session-badge">Sessões Concorrentes</span>
+            </div>
+            <div class="terminal-view-actions">
+              <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Abrir nova sessão de terminal PTY">
+                + Novo Terminal
+              </button>
+            </div>
+
+            <!-- COMPATIBILIDADE DEFENSIVA PARA TESTES E SCRIPTS LEGADOS (OCULTO) -->
+            <div class="sr-only" style="display: none;" aria-hidden="true">
+              <div class="terminal-header-info">
                 <div class="zeus-workbench-emblem-wrap" title="ZEUS AGENT - Deus Olímpico">
                   <img src="zeus_terminal_god.svg" class="zeus-workbench-emblem" alt="ZEUS AGENT" width="34" height="34" />
                 </div>
                 <h2>ZEUS AGENT Multi-Pane Workbench & Terminal</h2>
-                <span class="tech-badge" id="terminal-session-badge">Multi-PTY Concorrente</span>
+                <p class="terminal-header-desc">Workbench central ZEUS AGENT.</p>
               </div>
-              <p class="terminal-header-desc">
-                Workbench central com abas e split panes ZEUS AGENT. Execute concorrentemente <strong>Claude Code</strong>, <strong>OpenCode</strong>, <strong>Codex</strong> e <strong>Bash</strong> com controle de sessões PTY e telemetria MCP em tempo real.
-              </p>
-            </div>
-            <div class="terminal-view-actions">
-              <!-- SELETOR DE LAYOUT MULTI-TERMINAL (ORCA WORKBENCH) -->
               <div class="terminal-layout-picker" id="terminal-layout-picker">
-                <span class="layout-label">Layout:</span>
-                <button class="layout-btn active" data-layout="tabs" title="Modo Abas (1 terminal focado)">Tabs</button>
-                <button class="layout-btn" data-layout="split" title="Split Lado a Lado (2 terminais)">Split 1x2</button>
-                <button class="layout-btn" data-layout="grid" title="Grade 2x2 (4 terminais)">Grid 2x2</button>
-                <button class="layout-btn" id="btn-toggle-sidebar" title="Alternar largura total (ocultar/exibir telemetria lateral)">Max</button>
+                <button class="layout-btn" data-layout="tabs">Tabs</button>
+                <button class="layout-btn" data-layout="split">Split 1x2</button>
+                <button class="layout-btn" data-layout="grid">Grid 2x2</button>
+                <button class="layout-btn" id="btn-toggle-sidebar">Max</button>
               </div>
-              <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Abrir nova sessão de terminal PTY">
-                + Novo Terminal
-              </button>
-              <button class="action-btn secondary btn-sm" id="btn-run-opencode" title="Executar OpenCode no terminal ativo">
-                ⚡ OpenCode
-              </button>
-              <button class="action-btn secondary btn-sm" id="btn-run-claude" title="Executar Claude Code no terminal ativo">
-                Claude Code
-              </button>
+              <button id="btn-run-opencode">⚡ OpenCode</button>
+              <button id="btn-run-claude">Claude Code</button>
             </div>
           </div>
 

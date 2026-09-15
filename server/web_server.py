@@ -1002,6 +1002,10 @@ DEFAULT_FS_IGNORE_FILES = {
 
 def _resolve_project_fs_root(project_id: Optional[str] = None) -> tuple:
     """Resolve o caminho raiz físico, nome e ID canônico do projeto especificado ou atual."""
+    base_cockpit_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if not project_id:
+        return base_cockpit_dir, "Agent Cockpit", "default"
+
     target_pid = db.resolve_project_id(project_id)
     root_path = db.get_project_root(target_pid)
     
@@ -1014,7 +1018,6 @@ def _resolve_project_fs_root(project_id: Optional[str] = None) -> tuple:
             root_path = idx_root
         project_name = proj_meta.get("name")
     
-    base_cockpit_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     if not root_path or not os.path.exists(root_path):
         root_path = base_cockpit_dir
 
