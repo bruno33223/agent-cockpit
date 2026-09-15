@@ -39,25 +39,19 @@ class TestOrcaTerminalWorkbench(unittest.TestCase):
         self.assertIn('orca-tab-strip', self.js_content)
         self.assertIn('orca-tab-icon', self.js_content)
         self.assertIn('orca-tab-title', self.js_content)
-        self.assertIn('orca-pane-subtitle', self.js_content)
-        self.assertIn('orca-sub-model', self.js_content)
-        self.assertIn('orca-sub-branch', self.js_content)
-        self.assertIn('orca-sub-cwd', self.js_content)
 
     def test_app_js_orca_pane_controls(self):
         self.assertIn('orca-pane-controls', self.js_content)
-        self.assertIn('orca-btn-split', self.js_content)
-        self.assertIn('orca-btn-clear', self.js_content)
-        self.assertIn('orca-btn-restart', self.js_content)
         self.assertIn('orca-btn-close', self.js_content)
+        # Issue #10: split, clear e restart removidos em prol de cabeçalho limpo com apenas botão fechar
+        self.assertNotIn('orca-btn-split', self.js_content)
+        self.assertNotIn('orca-btn-clear', self.js_content)
+        self.assertNotIn('orca-btn-restart', self.js_content)
 
     def test_app_js_orca_terminal_statusline(self):
-        self.assertIn('orca-terminal-statusline', self.js_content)
-        self.assertIn('orca-statusline-item', self.js_content)
-        self.assertIn('orca-statusline-perms', self.js_content)
+        # Issue #10: statusline redundante foi limpa, mantendo permissões nos helpers e telemetria live
         self.assertIn('bypass permissions on (shift+tab to cycle) - for agents', self.js_content)
-        self.assertIn('orca-status-mcp', self.js_content)
-        self.assertIn('MCP Live', self.js_content)
+        self.assertIn('MCP Live', self.html_content)
 
     def test_app_js_agent_type_switching(self):
         self.assertIn('orca-agent-select', self.js_content)

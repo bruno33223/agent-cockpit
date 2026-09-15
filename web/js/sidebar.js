@@ -29,11 +29,15 @@ export function initSidebar() {
   const isCollapsed = localStorage.getItem('cockpit_sidebar_collapsed') === 'true';
   if (isCollapsed) {
     sidebar.classList.add('collapsed');
+    sidebar.classList.add('sidebar-pinned-hidden');
+    document.body.classList.add('sidebar-pinned-hidden');
   }
 
   toggleBtn.addEventListener('click', () => {
     sidebar.classList.toggle('collapsed');
-    localStorage.setItem('cockpit_sidebar_collapsed', sidebar.classList.contains('collapsed'));
+    const isHidden = sidebar.classList.toggle('sidebar-pinned-hidden');
+    document.body.classList.toggle('sidebar-pinned-hidden', isHidden);
+    localStorage.setItem('cockpit_sidebar_collapsed', isHidden);
   });
 
   // Vincula tabs da navegação principal
@@ -338,6 +342,40 @@ export function initOrcaNavigationAndModals() {
       closeQuickSearch();
     }
   });
+
+  // 6. Modal Sobre o ZEUS AGENT (Issue #10)
+  const zeusBrand = document.getElementById('zeus-brand');
+  if (zeusBrand) {
+    zeusBrand.style.cursor = 'pointer';
+    zeusBrand.addEventListener('click', openAboutModal);
+  }
+
+  const btnCloseAbout = document.getElementById('btn-close-about-zeus');
+  if (btnCloseAbout) {
+    btnCloseAbout.addEventListener('click', closeAboutModal);
+  }
+
+  const btnAboutOk = document.getElementById('btn-about-zeus-ok');
+  if (btnAboutOk) {
+    btnAboutOk.addEventListener('click', closeAboutModal);
+  }
+
+  const modalAbout = document.getElementById('modal-about-zeus');
+  if (modalAbout) {
+    modalAbout.addEventListener('click', (e) => {
+      if (e.target === modalAbout) closeAboutModal();
+    });
+  }
+}
+
+export function openAboutModal() {
+  const modal = document.getElementById('modal-about-zeus');
+  if (modal) modal.style.display = 'flex';
+}
+
+export function closeAboutModal() {
+  const modal = document.getElementById('modal-about-zeus');
+  if (modal) modal.style.display = 'none';
 }
 
 export function openQuickSearch() {

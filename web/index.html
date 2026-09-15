@@ -857,17 +857,59 @@
         </div>
       </section>
 
-      <!-- VIEW 6: TERMINAL INTERATIVO & ORCA MULTI-PANE WORKBENCH -->
+      <!-- VIEW 6: TERMINAL INTERATIVO & ÁREA DE TRABALHO VIRTUAL (ISSUE #10) -->
       <section class="tab-view" id="view-terminal">
         <div class="terminal-view-container orca-workbench-container terminal-workbench-minimalist">
-          <!-- CABEÇALHO MINIMALISTA: ZERO POLUIÇÃO, BOTÃO ÚNICO + NOVO TERMINAL -->
+          <!-- CABEÇALHO LIMPO: CONFIGURAR GRID, ZOOM E NOVO ORQUESTRADOR -->
           <div class="terminal-view-header orca-workbench-header minimalist-header">
             <div class="terminal-view-header-left">
-              <span class="tech-badge" id="terminal-session-badge">Sessões Concorrentes</span>
+              <!-- Botão / Dropdown Configurar Grid -->
+              <div class="grid-config-wrap" id="grid-config-wrap">
+                <button class="action-btn secondary btn-sm" id="btn-config-grid" title="Configurar Layout do Grid">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                  <span>Configurar Grid ▾</span>
+                </button>
+                <div class="grid-config-dropdown" id="grid-config-dropdown" style="display: none;">
+                  <div class="grid-config-item active" data-grid-layout="grid">
+                    <span class="grid-item-icon">🔲</span>
+                    <span class="grid-item-text">Grade Dinâmica (Grid)</span>
+                  </div>
+                  <div class="grid-config-item" data-grid-layout="side-by-side">
+                    <span class="grid-item-icon">📑</span>
+                    <span class="grid-item-text">Lado a Lado (Colunas)</span>
+                  </div>
+                  <div class="grid-config-item" data-grid-layout="stacked">
+                    <span class="grid-item-icon">☰</span>
+                    <span class="grid-item-text">Lista Empilhada (Linhas)</span>
+                  </div>
+                  <div class="grid-config-item" data-grid-layout="free">
+                    <span class="grid-item-icon">🗺️</span>
+                    <span class="grid-item-text">Área de Trabalho Livre (Canvas)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Controles de Zoom da Área de Trabalho -->
+              <div class="terminal-zoom-controls">
+                <button class="zoom-btn" id="btn-zoom-out-term" title="Zoom Out (-)">-</button>
+                <button class="zoom-btn zoom-level-display" id="btn-zoom-reset-term" title="Redefinir Zoom (100%)">100%</button>
+                <button class="zoom-btn" id="btn-zoom-in-term" title="Zoom In (+)">+</button>
+              </div>
             </div>
+
             <div class="terminal-view-actions">
-              <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Abrir nova sessão de terminal PTY">
-                + Novo Terminal
+              <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Instanciar novo Orquestrador (+ Novo Terminal)">
+                <span class="sr-only">+ Novo Terminal</span>
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>+ Novo Orquestrador</span>
               </button>
             </div>
 
@@ -891,15 +933,15 @@
             </div>
           </div>
 
-          <!-- BARRA DE ABAS DE SESSÕES PTY -->
-          <div class="terminal-tabs-bar orca-tab-strip" id="terminal-tabs-bar">
-            <!-- Abas geradas dinamicamente via JS -->
+          <!-- ÁREA DE TRABALHO VIRTUAL / VIEWPORT COM SUPORTE A PAN & ZOOM -->
+          <div class="terminal-canvas-viewport" id="terminal-canvas-viewport">
+            <div class="terminal-workspace-grid layout-grid" id="terminal-workspace-grid">
+              <!-- Painéis de terminais gerados dinamicamente via JS -->
+            </div>
           </div>
 
-          <!-- GRID MULTI-TERMINAL DO WORKSPACE -->
-          <div class="terminal-workspace-grid layout-tabs" id="terminal-workspace-grid">
-            <!-- Painéis de terminais gerados dinamicamente via JS -->
-          </div>
+          <!-- Elemento mantido oculto para retrocompatibilidade com referências JS -->
+          <div class="terminal-tabs-bar sr-only" id="terminal-tabs-bar" style="display: none !important;"></div>
         </div>
       </section>
 
@@ -1250,6 +1292,12 @@
         </div>
       </div>
     </aside>
+    <!-- Gatilho flutuante para reabrir a barra lateral direita quando colapsada (Issue #10) -->
+    <button class="btn-reopen-right-sidebar" id="btn-reopen-right-sidebar" title="Reabrir Barra Lateral Direita" aria-label="Reabrir Barra Lateral Direita">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
   </div> <!-- /workspace-wrapper -->
 </div> <!-- /main-content -->
 </div> <!-- /app-layout -->
@@ -1394,6 +1442,60 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=3.0"></script>
+  <!-- MODAL SOBRE O ZEUS AGENT (ISSUE #10) -->
+  <div class="modal-backdrop" id="modal-about-zeus" style="display: none;">
+    <div class="modal-card about-zeus-card">
+      <div class="about-zeus-header">
+        <button class="modal-close-btn" id="btn-close-about-zeus" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="about-zeus-body">
+        <div class="about-zeus-icon-wrapper">
+          <svg id="zeusModalSvg" viewBox="0 0 500 500" width="110" height="110" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZEUS AGENT - Deus Olímpico">
+            <defs>
+              <linearGradient id="termGradAbout" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#34D399"/>
+                <stop offset="50%" stop-color="#00FF66"/>
+                <stop offset="100%" stop-color="#059669"/>
+              </linearGradient>
+            </defs>
+            <rect x="15" y="15" width="470" height="470" rx="40" fill="#040707" stroke="#00ff66" stroke-width="12"/>
+            <rect x="15" y="15" width="470" height="60" rx="40" fill="#09120e" stroke="#00ff66" stroke-width="6"/>
+            <circle cx="50" cy="45" r="14" fill="#EF4444"/>
+            <circle cx="95" cy="45" r="14" fill="#F59E0B"/>
+            <circle cx="140" cy="45" r="14" fill="#10B981"/>
+            <g stroke="#00ff66" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M190 125 C200 95, 230 85, 250 85 C270 85, 300 95, 310 125" fill="none" stroke-width="16"/>
+              <path d="M150 145 C170 105, 205 98, 225 105" fill="none" stroke-width="14"/>
+              <path d="M350 145 C330 105, 295 98, 275 105" fill="none" stroke-width="14"/>
+              <polygon points="250,90 244,115 256,115 242,142 262,118 250,118 256,90" fill="#FFFFFF"/>
+              <path d="M175 188 L232 202 L245 208" fill="none" stroke-width="16"/>
+              <path d="M325 188 L268 202 L255 208" fill="none" stroke-width="16"/>
+              <path d="M250 208 L244 265 L235 275 L250 278 L265 275 L256 265" fill="none" stroke-width="14"/>
+              <rect x="195" y="210" width="22" height="15" rx="3" fill="#FFFFFF"/>
+              <rect x="285" y="210" width="22" height="15" rx="3" fill="#FFFFFF"/>
+              <path d="M250 282 C235 280, 205 285, 175 315 C205 315, 235 298, 250 292 C265 298, 295 315, 325 315 C295 285, 265 280, 250 282 Z" fill="#05170d" stroke-width="14"/>
+              <path d="M145 255 C130 295, 140 340, 160 375 C180 410, 210 435, 250 445 C290 435, 320 410, 340 375 C360 340, 370 295, 355 255" fill="none" stroke-width="14"/>
+              <path d="M250 312 L250 370 L242 385 L258 405 L250 442" fill="none" stroke-width="18" stroke="#FFFFFF"/>
+            </g>
+          </svg>
+        </div>
+        <h2 class="about-zeus-title">ZEUS AGENT</h2>
+        <span class="about-zeus-version">v3.0.0 (Olympus)</span>
+        <p class="about-zeus-tagline">Sistema Operacional de Telemetria e Orquestração Multiagente Concorrente 3x3 com Isolamento por Worktrees e Avaliação Rigorosa Gauntlet.</p>
+        <div class="about-zeus-author-card">
+          <span class="about-author-label">Criado e Arquitetado por:</span>
+          <div class="about-author-info">
+            <span class="about-author-name">Bruno</span>
+            <a href="https://github.com/bruno33223" target="_blank" rel="noopener noreferrer" class="about-author-handle">@bruno33223</a>
+          </div>
+        </div>
+      </div>
+      <div class="about-zeus-footer">
+        <button class="action-btn primary btn-sm" id="btn-about-zeus-ok">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=3.1"></script>
 </body>
 </html>

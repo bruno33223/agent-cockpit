@@ -26,6 +26,7 @@ export class FileExplorerManager {
     this.projectNameDisplay = document.getElementById('right-sidebar-project-name');
     this.btnRefresh = document.getElementById('btn-refresh-right-sidebar');
     this.btnCollapse = document.getElementById('btn-collapse-right-sidebar');
+    this.btnReopen = document.getElementById('btn-reopen-right-sidebar');
 
     // Preview Drawer Elements
     this.previewDrawer = document.getElementById('file-preview-drawer');
@@ -89,10 +90,16 @@ export class FileExplorerManager {
       this.btnCollapse.addEventListener('click', () => {
         const wrapper = document.querySelector('.workspace-wrapper');
         if (wrapper) {
-          wrapper.classList.toggle('collapse-sidebar');
-          const isCollapsed = wrapper.classList.contains('collapse-sidebar');
-          this.btnCollapse.title = isCollapsed ? 'Expandir Barra Lateral' : 'Colapsar Barra Lateral';
-          this.btnCollapse.textContent = isCollapsed ? '⇤' : '⇥';
+          wrapper.classList.add('collapse-sidebar');
+        }
+      });
+    }
+
+    if (this.btnReopen) {
+      this.btnReopen.addEventListener('click', () => {
+        const wrapper = document.querySelector('.workspace-wrapper');
+        if (wrapper) {
+          wrapper.classList.remove('collapse-sidebar');
         }
       });
     }

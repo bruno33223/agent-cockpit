@@ -6813,3 +6813,460 @@ body {
   background: #0284c7;
 }
 
+/* ==========================================================================
+   ISSUE #10: REFINAMENTOS UX - ÁREA DE TRABALHO VIRTUAL, MODAL ZEUS & SIDEBARS
+   ========================================================================== */
+
+/* 1. Toggle Total da Barra Lateral Esquerda (.sidebar-pinned-hidden) */
+.app-sidebar.sidebar-pinned-hidden,
+body.sidebar-pinned-hidden #app-sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-right: none !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease !important;
+}
+
+body.sidebar-pinned-hidden .main-content {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+}
+
+/* 2. Botão Flutuante Persistente para Reabertura da Barra Lateral Direita */
+.btn-reopen-right-sidebar {
+  display: none;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 90;
+  width: 32px;
+  height: 48px;
+  background: var(--bg-surface, #18181b);
+  color: var(--text-muted, #a1a1aa);
+  border: 1px solid var(--border-color, #27272a);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-wrapper.collapse-sidebar .btn-reopen-right-sidebar {
+  display: flex !important;
+}
+
+.btn-reopen-right-sidebar:hover {
+  background: #27272a;
+  color: #00ff66;
+  border-color: #00ff66;
+  width: 36px;
+  box-shadow: -4px 0 20px rgba(0, 255, 102, 0.25);
+}
+
+/* 3. Modal "Sobre o ZEUS AGENT" */
+.about-zeus-card {
+  width: 480px;
+  max-width: 90vw;
+  background: #090e11;
+  border: 1px solid #1e3a2b;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 255, 102, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.about-zeus-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px 0;
+}
+
+.about-zeus-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 32px 24px;
+}
+
+.about-zeus-icon-wrapper {
+  margin-bottom: 16px;
+  filter: drop-shadow(0 0 18px rgba(0, 255, 102, 0.4));
+  animation: pulseZeus 3s infinite alternate ease-in-out;
+}
+
+@keyframes pulseZeus {
+  0% { transform: scale(1); filter: drop-shadow(0 0 14px rgba(0, 255, 102, 0.3)); }
+  100% { transform: scale(1.04); filter: drop-shadow(0 0 24px rgba(0, 255, 102, 0.6)); }
+}
+
+.about-zeus-title {
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #f4f4f5;
+  margin: 0 0 4px;
+}
+
+.about-zeus-version {
+  display: inline-block;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: #00ff66;
+  background: rgba(0, 255, 102, 0.1);
+  border: 1px solid rgba(0, 255, 102, 0.3);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  letter-spacing: 0.5px;
+}
+
+.about-zeus-tagline {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #94a3b8;
+  margin: 0 0 20px;
+}
+
+.about-zeus-author-card {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.about-author-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.about-author-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-author-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.about-author-handle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #00ff66;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.about-author-handle:hover {
+  text-decoration: underline;
+  color: #34d399;
+}
+
+.about-zeus-footer {
+  padding: 14px 20px;
+  background: rgba(4, 7, 7, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: center;
+}
+
+/* 4. Área de Trabalho Virtual (Canvas Infinito com Pan & Zoom) */
+.terminal-canvas-viewport {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: calc(100vh - 120px);
+  min-height: 480px;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #0f172a 0%, #080d1a 100%);
+  cursor: grab;
+}
+
+.terminal-canvas-viewport.is-panning {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.terminal-workspace-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  transition: transform 0.04s linear;
+  box-sizing: border-box;
+}
+
+/* Modos de Layout do Grid */
+.terminal-workspace-grid.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.terminal-workspace-grid.layout-side-by-side {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 16px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.terminal-workspace-grid.layout-side-by-side .terminal-pane {
+  width: 580px;
+  flex-shrink: 0;
+}
+
+.terminal-workspace-grid.layout-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  width: 100%;
+}
+
+.terminal-workspace-grid.layout-stacked .terminal-pane {
+  width: 100%;
+  height: 460px;
+  flex-shrink: 0;
+}
+
+.terminal-workspace-grid.layout-free {
+  width: 4000px;
+  height: 3000px;
+}
+
+.terminal-workspace-grid.layout-free .terminal-pane {
+  position: absolute;
+  min-width: 540px;
+  min-height: 420px;
+  resize: both;
+}
+
+/* 5. Controles de Layout e Zoom */
+.grid-config-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.grid-config-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  width: 260px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grid-config-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #d4d4d8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.grid-config-item:hover {
+  background: #27272a;
+  color: #ffffff;
+}
+
+.grid-config-item.active {
+  background: rgba(0, 255, 102, 0.12);
+  color: #00ff66;
+  font-weight: 600;
+}
+
+.terminal-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(24, 24, 27, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-left: 8px;
+}
+
+.zoom-btn {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f4f5;
+}
+
+.zoom-btn.zoom-level-display {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: #e4e4e7;
+  padding: 4px 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 6. Botão de Subagentes Vinculados no Cabeçalho do Orquestrador */
+.orchestrator-subagents-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-orchestrator-subagents {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: #60a5fa !important;
+  border: 1px solid rgba(59, 130, 246, 0.35) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 3px 9px !important;
+  border-radius: 5px !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-orchestrator-subagents:hover {
+  background: rgba(59, 130, 246, 0.28) !important;
+  border-color: #60a5fa !important;
+}
+
+.btn-orchestrator-subagents .subagents-count {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.orchestrator-subagents-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  width: 280px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subagents-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-spawn-subagent-quick {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-spawn-subagent-quick:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #34d399;
+}
+
+.subagents-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.subagent-dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 5px;
+}
+
+.subagent-item-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #e4e4e7;
+}
+
+.subagent-dot.connected {
+  color: #10b981;
+}
+
+.subagent-dot.disconnected {
+  color: #ef4444;
+}
+
+.subagents-empty-msg {
+  font-size: 11px;
+  color: #71717a;
+  text-align: center;
+  padding: 12px 0;
+  font-style: italic;
+}
+
+
