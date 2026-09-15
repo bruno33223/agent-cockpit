@@ -931,7 +931,7 @@ def post_opencode_sync():
 # =========================================================================
 
 @app.websocket("/ws/terminal")
-async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Query("term-1"), cwd: Optional[str] = Query(None), project_id: Optional[str] = Query(None)):
+async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Query("term-1"), cwd: Optional[str] = Query(None), project_id: Optional[str] = Query(None), task_id: Optional[str] = Query(None)):
     await websocket.accept()
     
     if not pty_session_manager:
@@ -939,13 +939,13 @@ async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Q
         await websocket.close()
         return
 
+    target_pid = project_id or db.get_current_project_id()
     # Determina diretório de trabalho do projeto ativo se não fornecido
     if not cwd:
-        target_pid = project_id or db.get_current_project_id()
         root_path, _, _ = _resolve_project_fs_root(target_pid)
         cwd = root_path if (root_path and os.path.isdir(root_path)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    session = pty_session_manager.get_or_create(session_id=session_id, cwd=cwd)
+    session = pty_session_manager.get_or_create(session_id=session_id, cwd=cwd, project_id=target_pid, task_id=task_id)
     history = session.attach(websocket)
     if history:
         await websocket.send_text(history)
@@ -976,9 +976,11 @@ async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Q
         session.detach(websocket)
 
 @app.get("/api/terminal/sessions")
-def get_terminal_sessions():
+def get_terminal_sessions(project_id: Optional[str] = None, task_id: Optional[str] = None):
     """Lista as sessões ativas de terminal PTY com PID, CWD e status."""
     if pty_session_manager:
+        if project_id or task_id:
+            return [s.to_dict() for s in pty_session_manager.get_sessions_by_context(project_id, task_id)]
         return pty_session_manager.list_sessions()
     return []
 

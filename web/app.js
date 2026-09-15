@@ -433,9 +433,6 @@ function renderWorktreeSidebar() {
         card.classList.add('active');
         activeSliceId = null;
         switchProject(proj.id);
-        if (proj.project_root && typeof sendTerminalCommand === 'function') {
-          sendTerminalCommand(`cd "${proj.project_root}"\n`);
-        }
       });
 
       pinnedList.appendChild(card);
@@ -499,8 +496,8 @@ function renderWorktreeSidebar() {
       const sliceWorktreePath = (activeProj && activeProj.project_root)
         ? `${activeProj.project_root}/.worktrees/${node.id}`
         : '';
-      if (sliceWorktreePath && typeof sendTerminalCommand === 'function') {
-        sendTerminalCommand(`cd "${sliceWorktreePath}" || cd "${activeProj.project_root}"\n`);
+      if (typeof terminalWorkspace !== 'undefined' && typeof terminalWorkspace.onSliceSwitched === 'function') {
+        terminalWorkspace.onSliceSwitched(node.id, sliceWorktreePath || (activeProj ? activeProj.project_root : ''));
       }
 
       if (typeof openDrawer === 'function') {
@@ -568,10 +565,8 @@ function renderWorktreeSidebar() {
     card.addEventListener('click', () => {
       document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
+      activeSliceId = null;
       switchProject(proj.id);
-      if (proj.project_root && typeof sendTerminalCommand === 'function') {
-        sendTerminalCommand(`cd "${proj.project_root}"\n`);
-      }
     });
 
     cardsList.appendChild(card);
@@ -3164,8 +3159,10 @@ function initSettingsEvents() {
 
 class TerminalWorkspaceManager {
   constructor() {
-    this.sessions = new Map(); // id -> { id, name, agentType, cwd, term, fitAddon, socket, isConnected, elPane, elTab, resizeObserver }
+    this.sessions = new Map(); // id -> { id, name, agentType, cwd, term, fitAddon, socket, isConnected, elPane, elTab, resizeObserver, contextKey, projectId, taskId }
+    this.contextSessions = new Map(); // contextKey -> Set of sessionIds
     this.activeSessionId = null;
+    this.activeContextKey = null;
     this.layout = localStorage.getItem('cockpit_terminal_layout') || 'dynamic';
     this.counter = 0;
     this.tabsBar = null;
@@ -3173,9 +3170,23 @@ class TerminalWorkspaceManager {
     this.isInitialized = false;
   }
 
+  getActiveContextSessions() {
+    if (!this.activeContextKey) {
+      return Array.from(this.sessions.values());
+    }
+    const sessionIds = this.contextSessions.get(this.activeContextKey);
+    if (!sessionIds) return [];
+    const list = [];
+    sessionIds.forEach(id => {
+      const s = this.sessions.get(id);
+      if (s) list.push(s);
+    });
+    return list;
+  }
+
   applyDynamicSplit() {
     if (!this.gridContainer) return;
-    const count = this.sessions.size;
+    const count = this.getActiveContextSessions().length;
     const splitClass = `split-${Math.max(1, Math.min(count, 6))}`;
     this.gridContainer.className = `terminal-workspace-grid layout-dynamic ${splitClass}`;
     this.updateHeaderBadge();
@@ -3326,10 +3337,9 @@ class TerminalWorkspaceManager {
       this.setLayout(this.layout, false);
     }
 
-    // Cria a primeira sessão inicial se vazio
-    if (this.sessions.size === 0) {
-      this.createSession({ name: 'Term 1' });
-    }
+    // Inicializa contexto do projeto ativo
+    const initialContext = currentProjectId ? `project:${currentProjectId}` : 'global';
+    this.switchContext(initialContext, this.getActiveProjectRoot(), true);
 
     checkOmniRouteStatus();
   }
@@ -3344,6 +3354,14 @@ class TerminalWorkspaceManager {
       if (state.config && state.config.project_root) return state.config.project_root;
     }
     return '';
+  }
+
+  getSliceCwd(sliceId, projectId = null) {
+    const pid = projectId || currentProjectId;
+    const proj = (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) ? knownProjects.find(p => p.id === pid) : null;
+    const root = proj && proj.project_root ? proj.project_root : this.getActiveProjectRoot();
+    if (!root) return '';
+    return `${root}/.worktrees/${sliceId}`;
   }
 
   formatCwd(cwd) {
@@ -3362,11 +3380,27 @@ class TerminalWorkspaceManager {
 
     this.counter++;
     const id = options.id || `term-${Date.now()}-${this.counter}`;
+    const contextKey = options.contextKey || this.activeContextKey || (currentProjectId ? `project:${currentProjectId}` : 'global');
+    let projectId = options.projectId;
+    let taskId = options.taskId;
+
+    if (!projectId) {
+      if (contextKey.startsWith('slice:')) {
+        const parts = contextKey.split(':');
+        projectId = parts[1];
+        taskId = taskId || parts[2];
+      } else if (contextKey.startsWith('project:')) {
+        projectId = contextKey.slice(8);
+      } else {
+        projectId = currentProjectId || null;
+      }
+    }
+
     const agentType = options.agentType || (options.name && options.name.toLowerCase().includes('claude') ? 'claude' : (options.name && options.name.toLowerCase().includes('opencode') ? 'opencode' : 'bash'));
     const name = options.name || this.getAgentDisplayName(agentType, this.counter);
-    const cwd = options.cwd || this.getActiveProjectRoot();
+    const cwd = options.cwd || (taskId ? this.getSliceCwd(taskId, projectId) : this.getActiveProjectRoot());
     const model = this.getCurrentModel();
-    const branchOrSlice = this.getCurrentSliceOrBranch();
+    const branchOrSlice = taskId ? `slice/${taskId}` : this.getCurrentSliceOrBranch();
     const relCwd = this.formatRelativeCwd(cwd);
     const iconHtml = this.getAgentIcon(agentType);
 
@@ -3502,6 +3536,9 @@ class TerminalWorkspaceManager {
       name,
       agentType,
       cwd,
+      contextKey,
+      projectId,
+      taskId,
       term,
       fitAddon,
       socket: null,
@@ -3511,6 +3548,16 @@ class TerminalWorkspaceManager {
       resizeObserver: null
     };
     this.sessions.set(id, session);
+
+    if (!this.contextSessions.has(contextKey)) {
+      this.contextSessions.set(contextKey, new Set());
+    }
+    this.contextSessions.get(contextKey).add(id);
+
+    // Ajusta visibilidade baseada no contexto ativo
+    const isVisible = (!this.activeContextKey || this.activeContextKey === contextKey);
+    elTab.style.display = isVisible ? '' : 'none';
+    elPane.style.display = isVisible ? '' : 'none';
 
     // 4. WebSocket Conexão
     this.connectSessionSocket(session);
@@ -3666,7 +3713,9 @@ class TerminalWorkspaceManager {
     const params = new URLSearchParams();
     params.set('session_id', session.id);
     if (session.cwd) params.set('cwd', session.cwd);
-    if (currentProjectId) params.set('project_id', currentProjectId);
+    const pid = session.projectId || currentProjectId;
+    if (pid) params.set('project_id', pid);
+    if (session.taskId) params.set('task_id', session.taskId);
 
     const url = `${proto}//${window.location.host}/ws/terminal?${params.toString()}`;
     const dot = session.elTab.querySelector('.term-tab-dot');
@@ -3716,19 +3765,24 @@ class TerminalWorkspaceManager {
     if (!this.sessions.has(id)) return;
     this.activeSessionId = id;
 
-    // Atualiza tabs e panes
-    this.sessions.forEach((s, sId) => {
-      const isActive = (sId === id);
+    const current = this.sessions.get(id);
+    if (current && current.contextKey) {
+      this.activeContextKey = current.contextKey;
+    }
+
+    // Atualiza tabs e panes pertencentes ao contexto ativo
+    const contextSessions = this.getActiveContextSessions();
+    contextSessions.forEach(s => {
+      const isActive = (s.id === id);
       s.elTab.classList.toggle('active', isActive);
       s.elPane.classList.toggle('active-pane', isActive);
     });
 
     this.updateHeaderBadge();
 
-    const activeSession = this.sessions.get(id);
-    if (activeSession && focus) {
+    if (current && focus) {
       setTimeout(() => {
-        activeSession.term.focus();
+        current.term.focus();
       }, 50);
     }
   }
@@ -3736,6 +3790,13 @@ class TerminalWorkspaceManager {
   closeSession(id) {
     const session = this.sessions.get(id);
     if (!session) return;
+
+    if (session.contextKey && this.contextSessions.has(session.contextKey)) {
+      this.contextSessions.get(session.contextKey).delete(id);
+      if (this.contextSessions.get(session.contextKey).size === 0) {
+        this.contextSessions.delete(session.contextKey);
+      }
+    }
 
     if (session.resizeObserver) {
       try { session.resizeObserver.disconnect(); } catch (e) {}
@@ -3763,13 +3824,13 @@ class TerminalWorkspaceManager {
 
     this.sessions.delete(id);
 
-    // Seleciona outra sessão se a atual foi fechada
+    // Seleciona outra sessão do mesmo contexto se a atual foi fechada
     if (this.activeSessionId === id) {
-      const remainingIds = Array.from(this.sessions.keys());
-      if (remainingIds.length > 0) {
-        this.selectSession(remainingIds[remainingIds.length - 1]);
+      const remainingContextSessions = this.getActiveContextSessions();
+      if (remainingContextSessions.length > 0) {
+        this.selectSession(remainingContextSessions[remainingContextSessions.length - 1].id);
       } else {
-        this.createSession({ name: 'Term 1' });
+        this.createSession({ contextKey: this.activeContextKey, name: 'Term 1' });
       }
     }
 
@@ -3805,12 +3866,13 @@ class TerminalWorkspaceManager {
 
     // Auto-cria sessões se necessário para Split ou Grid
     if (autoSpawn) {
-      if (layout === 'split' && this.sessions.size < 2) {
-        this.createSession({ name: 'Term 2' });
-      } else if (layout === 'grid' && this.sessions.size < 4) {
-        const needed = 4 - this.sessions.size;
+      const contextSessions = this.getActiveContextSessions();
+      if (layout === 'split' && contextSessions.length < 2) {
+        this.createSession({ contextKey: this.activeContextKey, name: 'Term 2' });
+      } else if (layout === 'grid' && contextSessions.length < 4) {
+        const needed = 4 - contextSessions.length;
         for (let i = 0; i < needed; i++) {
-          this.createSession({ name: `Term ${this.sessions.size + 1}` });
+          this.createSession({ contextKey: this.activeContextKey, name: `Term ${contextSessions.length + 1}` });
         }
       }
     }
@@ -3821,8 +3883,9 @@ class TerminalWorkspaceManager {
 
   fitAll() {
     setTimeout(() => {
-      this.sessions.forEach(session => {
-        if (session.elPane.offsetParent !== null && session.fitAddon && session.term) {
+      const visibleSessions = this.getActiveContextSessions();
+      visibleSessions.forEach(session => {
+        if (session.elPane && session.elPane.offsetParent !== null && session.fitAddon && session.term) {
           try {
             session.fitAddon.fit();
             if (session.socket && session.socket.readyState === WebSocket.OPEN) {
@@ -3856,19 +3919,20 @@ class TerminalWorkspaceManager {
   }
 
   sendToActive(cmd) {
-    if (!this.activeSessionId || !this.sessions.has(this.activeSessionId)) {
-      const keys = Array.from(this.sessions.keys());
-      if (keys.length > 0) {
-        this.activeSessionId = keys[0];
-      } else {
-        const newSess = this.createSession();
-        if (newSess) {
-          setTimeout(() => this.sendToSession(newSess.id, cmd), 600);
-        }
-        return;
+    const contextSessions = this.getActiveContextSessions();
+    if (contextSessions.length === 0) {
+      const newSess = this.createSession({ contextKey: this.activeContextKey });
+      if (newSess) {
+        setTimeout(() => this.sendToSession(newSess.id, cmd), 600);
       }
+      return;
     }
-    this.sendToSession(this.activeSessionId, cmd);
+    const current = this.activeSessionId ? this.sessions.get(this.activeSessionId) : null;
+    if (current && current.contextKey === this.activeContextKey) {
+      this.sendToSession(this.activeSessionId, cmd);
+    } else {
+      this.sendToSession(contextSessions[0].id, cmd);
+    }
   }
 
   updatePaneContexts() {
@@ -3896,30 +3960,63 @@ class TerminalWorkspaceManager {
     const badge = document.getElementById('terminal-session-badge');
     if (!badge) return;
 
-    const total = this.sessions.size;
+    const total = this.getActiveContextSessions().length;
     const active = this.activeSessionId ? this.sessions.get(this.activeSessionId) : null;
     const activeName = active ? active.name : 'Nenhum';
     const status = active && active.isConnected ? 'Conectado' : 'Pronto';
-    const layoutName = this.layout ? this.layout.toUpperCase() : 'TABS';
+    const layoutName = this.layout ? this.layout.toUpperCase() : 'DYNAMIC';
 
     badge.textContent = `${total} PTYs | ${activeName} (${status}) | Layout: ${layoutName}`;
   }
 
-  onProjectSwitched(newProjectId) {
-    const newRoot = this.getActiveProjectRoot();
-    this.sessions.forEach(session => {
-      session.cwd = newRoot;
-      const relCwd = this.formatRelativeCwd(session.cwd);
-      const subCwd = session.elPane ? session.elPane.querySelector('.orca-sub-cwd') : null;
-      if (subCwd) subCwd.textContent = relCwd;
-      if (session.isConnected && session.agentType === 'bash' && newRoot) {
-        if (session.socket && session.socket.readyState === WebSocket.OPEN) {
-          session.socket.send(`cd "${newRoot}"\r`);
-        }
-      }
+  switchContext(contextKey, defaultCwd = null, autoCreate = true) {
+    if (!contextKey) return;
+    this.activeContextKey = contextKey;
+
+    // Atualiza visibilidade no DOM sem desconectar processos nem fechar sockets
+    this.sessions.forEach(s => {
+      const belongs = (s.contextKey === contextKey);
+      if (s.elTab) s.elTab.style.display = belongs ? '' : 'none';
+      if (s.elPane) s.elPane.style.display = belongs ? '' : 'none';
     });
+
+    const contextSessions = this.getActiveContextSessions();
+    if (contextSessions.length > 0) {
+      const activeCurrent = this.activeSessionId ? this.sessions.get(this.activeSessionId) : null;
+      if (!activeCurrent || activeCurrent.contextKey !== contextKey) {
+        this.selectSession(contextSessions[0].id);
+      } else {
+        this.selectSession(this.activeSessionId);
+      }
+    } else if (autoCreate) {
+      const newSess = this.createSession({
+        contextKey,
+        cwd: defaultCwd || this.getActiveProjectRoot(),
+        name: 'Term 1'
+      });
+      if (newSess) {
+        this.selectSession(newSess.id);
+      }
+    }
+
+    if (this.layout === 'dynamic') {
+      this.applyDynamicSplit();
+    } else {
+      this.fitAll();
+    }
     this.updateHeaderBadge();
     this.updatePaneContexts();
+  }
+
+  onProjectSwitched(newProjectId) {
+    const newRoot = this.getActiveProjectRoot();
+    this.switchContext(`project:${newProjectId}`, newRoot, true);
+  }
+
+  onSliceSwitched(sliceId, sliceCwd = null) {
+    const projId = currentProjectId || 'default';
+    const cwd = sliceCwd || this.getSliceCwd(sliceId, projId);
+    this.switchContext(`slice:${projId}:${sliceId}`, cwd, true);
   }
 }
 

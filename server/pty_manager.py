@@ -19,8 +19,11 @@ from typing import Dict, List, Optional, Set, Any
 from fastapi import WebSocket, WebSocketDisconnect
 
 class PTYSession:
-    def __init__(self, session_id: str, cwd: str, env: Dict[str, str], cols: int = 80, rows: int = 24):
+    def __init__(self, session_id: str, cwd: str, env: Dict[str, str], cols: int = 80, rows: int = 24,
+                 project_id: Optional[str] = None, task_id: Optional[str] = None):
         self.session_id = session_id
+        self.project_id = project_id
+        self.task_id = task_id
         self.cwd = cwd if (cwd and os.path.isdir(cwd)) else os.getcwd()
         self.env = env
         self.cols = cols
@@ -132,6 +135,8 @@ class PTYSession:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "session_id": self.session_id,
+            "project_id": self.project_id,
+            "task_id": self.task_id,
             "cwd": self.cwd,
             "pid": self.pid,
             "cols": self.cols,
@@ -158,9 +163,14 @@ class PTYSessionManager:
         env["COLORTERM"] = "truecolor"
         return env
 
-    def get_or_create(self, session_id: str, cwd: Optional[str] = None, cols: int = 80, rows: int = 24) -> PTYSession:
+    def get_or_create(self, session_id: str, cwd: Optional[str] = None, cols: int = 80, rows: int = 24,
+                      project_id: Optional[str] = None, task_id: Optional[str] = None) -> PTYSession:
         session = self._sessions.get(session_id)
         if session and session.is_alive:
+            if project_id and not session.project_id:
+                session.project_id = project_id
+            if task_id and not session.task_id:
+                session.task_id = task_id
             return session
 
         if session and not session.is_alive:
@@ -168,9 +178,22 @@ class PTYSessionManager:
             del self._sessions[session_id]
 
         env = self._prepare_env()
-        new_session = PTYSession(session_id=session_id, cwd=cwd, env=env, cols=cols, rows=rows)
+        new_session = PTYSession(session_id=session_id, cwd=cwd, env=env, cols=cols, rows=rows,
+                                 project_id=project_id, task_id=task_id)
         self._sessions[session_id] = new_session
         return new_session
+
+    def get_sessions_by_context(self, project_id: Optional[str] = None, task_id: Optional[str] = None) -> List[PTYSession]:
+        result = []
+        for s in self._sessions.values():
+            if not s.is_alive:
+                continue
+            if project_id and s.project_id != project_id:
+                continue
+            if task_id and s.task_id != task_id:
+                continue
+            result.append(s)
+        return result
 
     def get_session(self, session_id: str) -> Optional[PTYSession]:
         return self._sessions.get(session_id)
