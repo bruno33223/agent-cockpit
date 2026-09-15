@@ -220,6 +220,21 @@ class StateStore:
         nodes = state_data.get("nodes", [])
         approved_count = len([n for n in nodes if n.get("kanban_status") == "APPROVED"])
         
+        active_pairs = len([
+            p for p in state_data.get("pairs_3x3", [])
+            if p.get("builder_status") in ("WORKING", "EXECUTING") or p.get("critic_status") in ("WORKING", "CRITIQUING")
+        ])
+        active_nodes = len([
+            n for n in nodes
+            if n.get("kanban_status") in ("EXECUTING", "CRITIQUING", "WORKING")
+        ])
+        active_agents = max(active_pairs, active_nodes)
+
+        waiting_user = bool(
+            state_data.get("human_gate_pending") or
+            any(n.get("kanban_status") in ("WAITING_REVIEW", "WAITING_USER", "HUMAN_GATE") for n in nodes)
+        )
+        
         index_data = self._read_index()
         projects = index_data.setdefault("projects", {})
         
@@ -231,6 +246,8 @@ class StateStore:
             "epic_status": state_data.get("epic", {}).get("status", "PLANNING"),
             "total_slices": len(nodes),
             "approved_slices": approved_count,
+            "active_agents": active_agents,
+            "waiting_user": waiting_user,
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")
         }
         self._save_index(index_data)
@@ -265,6 +282,8 @@ class StateStore:
             for pid, pmeta in projects.items():
                 meta_copy = dict(pmeta)
                 meta_copy["is_current"] = (pid == current_id)
+                meta_copy.setdefault("active_agents", 0)
+                meta_copy.setdefault("waiting_user", False)
                 result.append(meta_copy)
             
             result.sort(key=lambda x: (not x.get("is_current", False), x.get("updated_at", "")), reverse=True)

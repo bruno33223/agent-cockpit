@@ -177,7 +177,6 @@ async function switchProject(projectId) {
   if (!projectId) return;
   currentProjectId = projectId;
   localStorage.setItem('cockpit_project_id', currentProjectId);
-  recordRecentProject(currentProjectId);
 
   // Limpeza de estado residual de projeto anterior
   if (activeSliceId) {
@@ -353,6 +352,53 @@ window.toggleShowMoreProjects = function(event) {
   renderWorktreeSidebar();
 };
 
+function getProjectDotClass(proj) {
+  if (!proj) return 'idle';
+  // 1. Verde: concluído (todos os slices aprovados com sucesso)
+  if (proj.total_slices > 0 && proj.approved_slices === proj.total_slices) {
+    return 'done';
+  }
+
+  const isCurrent = (typeof state !== 'undefined' && state && (state.active_project_id === proj.id || currentProjectId === proj.id));
+
+  // 2. Laranja: aguardando validação ou ação do usuário
+  const isWaiting = Boolean(
+    proj.waiting_user ||
+    (isCurrent && (
+      state.human_gate_pending ||
+      (state.nodes && state.nodes.some(n => ['WAITING_REVIEW', 'WAITING_USER', 'HUMAN_GATE'].includes(n.kanban_status)))
+    ))
+  );
+  if (isWaiting) return 'waiting';
+
+  // 3. Azul: agentes trabalhando (em execução)
+  const isWorking = Boolean(
+    (proj.active_agents && proj.active_agents > 0) ||
+    (isCurrent && (
+      (state.nodes && state.nodes.some(n => ['EXECUTING', 'CRITIQUING', 'WORKING'].includes(n.kanban_status))) ||
+      (state.pairs_3x3 && state.pairs_3x3.some(p => p.builder_status === 'WORKING' || p.critic_status === 'WORKING'))
+    ))
+  );
+  if (isWorking) return 'working';
+
+  // 4. Cinza: inativo (sem agentes trabalhando)
+  return 'idle';
+}
+
+function getProjectDotTitle(dotClass) {
+  switch (dotClass) {
+    case 'working':
+      return 'Agentes trabalhando (Executando)';
+    case 'waiting':
+      return 'Aguardando validação ou ação do usuário';
+    case 'done':
+      return 'Concluído (Todas as fatias aprovadas)';
+    case 'idle':
+    default:
+      return 'Inativo (Nenhum agente em execução)';
+  }
+}
+
 function renderWorktreeSidebar() {
   const pinnedList = document.getElementById('worktree-pinned-list');
   const cardsList = document.getElementById('worktree-cards-list');
@@ -363,10 +409,6 @@ function renderWorktreeSidebar() {
   const btnShowMoreIcon = document.getElementById('btn-show-more-icon');
 
   if (!cardsList) return;
-
-  if (currentProjectId) {
-    recordRecentProject(currentProjectId);
-  }
 
   const pinnedIds = getPinnedProjectIds();
   const recentIds = getRecentProjectIds();
@@ -387,8 +429,8 @@ function renderWorktreeSidebar() {
       card.setAttribute('data-project-id', proj.id);
       card.setAttribute('tabindex', '0');
 
-      const isDone = (proj.total_slices > 0 && proj.approved_slices === proj.total_slices);
-      const dotClass = isDone ? 'done' : (proj.total_slices > 0 ? 'working' : 'idle');
+      const dotClass = getProjectDotClass(proj);
+      const dotTitle = getProjectDotTitle(dotClass);
       const repoTag = (proj.id || 'cockpit').toLowerCase().slice(0, 10);
       const slicesInfo = proj.total_slices > 0 ? `${proj.approved_slices}/${proj.total_slices}` : 'pinned';
 
@@ -401,7 +443,7 @@ function renderWorktreeSidebar() {
                 <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>
               </svg>
             </button>
-            <span class="agent-state-dot ${dotClass}" title="Status: Online / Conectado"></span>
+            <span class="agent-state-dot ${dotClass}" title="${escapeHtml(dotTitle)}"></span>
           </div>
         </div>
         <div class="worktree-meta-row">
@@ -455,8 +497,8 @@ function renderWorktreeSidebar() {
     card.setAttribute('data-project-id', proj.id);
     card.setAttribute('tabindex', '0');
 
-    const isDone = (proj.total_slices > 0 && proj.approved_slices === proj.total_slices);
-    const dotClass = isDone ? 'done' : (proj.total_slices > 0 ? 'working' : 'idle');
+    const dotClass = getProjectDotClass(proj);
+    const dotTitle = getProjectDotTitle(dotClass);
     const repoTag = (proj.id || 'proj').toLowerCase().slice(0, 10);
     const timeText = proj.total_slices > 0 ? `${proj.approved_slices}/${proj.total_slices}` : 'idle';
 
@@ -470,7 +512,7 @@ function renderWorktreeSidebar() {
               <path d="M5 17h14l-2-7V4h1V2H6v2h1v6l-2 7z"></path>
             </svg>
           </button>
-          <span class="agent-state-dot ${dotClass}" title="Workspace Concorrente"></span>
+          <span class="agent-state-dot ${dotClass}" title="${escapeHtml(dotTitle)}"></span>
         </div>
       </div>
       <div class="worktree-meta-row">
@@ -3217,6 +3259,10 @@ class TerminalWorkspaceManager {
     const btnNewTerm = document.getElementById('btn-new-terminal');
     if (btnNewTerm) {
       btnNewTerm.addEventListener('click', () => {
+        if (currentProjectId) {
+          recordRecentProject(currentProjectId);
+          renderWorktreeSidebar();
+        }
         this.createSession();
       });
     }
@@ -3457,7 +3503,13 @@ class TerminalWorkspaceManager {
       btnAddTab.className = 'term-tab-add orca-tab';
       btnAddTab.title = 'Abrir novo terminal';
       btnAddTab.innerHTML = '+ Novo';
-      btnAddTab.addEventListener('click', () => this.createSession());
+      btnAddTab.addEventListener('click', () => {
+        if (currentProjectId) {
+          recordRecentProject(currentProjectId);
+          renderWorktreeSidebar();
+        }
+        this.createSession();
+      });
       this.tabsBar.appendChild(btnAddTab);
     }
 
@@ -3504,6 +3556,12 @@ class TerminalWorkspaceManager {
     term.onData(data => {
       if (session.socket && session.socket.readyState === WebSocket.OPEN) {
         session.socket.send(data);
+      }
+      if (data && (data.includes('\r') || data.includes('\n'))) {
+        const pid = session.projectId || currentProjectId;
+        if (pid) {
+          recordRecentProject(pid);
+        }
       }
     });
 
@@ -3842,6 +3900,11 @@ class TerminalWorkspaceManager {
   sendToSession(sessionId, cmd) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+    const pid = session.projectId || currentProjectId;
+    if (pid) {
+      recordRecentProject(pid);
+      renderWorktreeSidebar();
+    }
     if (session.socket && session.socket.readyState === WebSocket.OPEN) {
       session.socket.send(cmd + '\r');
       session.term.focus();

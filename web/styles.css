@@ -5249,10 +5249,10 @@ body {
   pointer-events: none;
 }
 
-/* Variante: Executando / Working */
+/* Variante: Executando / Working (Azul com pulso) */
 .agent-state-dot.working {
-  background-color: #eab308;
-  box-shadow: 0 0 8px rgba(234, 179, 8, 0.6);
+  background-color: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
   animation: orca-agent-pulse 1.8s infinite ease-in-out;
 }
 
@@ -5260,17 +5260,17 @@ body {
   animation: orca-agent-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-/* Variante: Aprovado / Done */
+/* Variante: Aprovado / Done (Verde sólido) */
 .agent-state-dot.done {
-  background-color: var(--status-success);
-  box-shadow: 0 0 6px rgba(134, 239, 172, 0.45);
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.45);
 }
 
-/* Variante: Pergunta do Agente / Needs Attention / Waiting */
+/* Variante: Pergunta do Agente / Needs Attention / Waiting (Laranja piscando) */
 .agent-state-dot.permission,
 .agent-state-dot.waiting,
 .agent-state-dot.question {
-  background-color: var(--agent-question);
+  background-color: #f97316;
   box-shadow: 0 0 8px rgba(249, 115, 22, 0.65);
   animation: orca-agent-pulse 1.4s infinite ease-in-out;
 }
@@ -5289,9 +5289,10 @@ body {
   box-shadow: 0 0 6px rgba(255, 101, 104, 0.5);
 }
 
-/* Variante: Inativo / Idle */
+/* Variante: Inativo / Idle (Cinza estático sem piscar) */
 .agent-state-dot.idle {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: #52525b;
+  box-shadow: none;
 }
 
 @keyframes orca-agent-pulse {
