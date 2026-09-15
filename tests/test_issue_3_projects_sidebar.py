@@ -19,6 +19,12 @@ class TestIssue3ProjectsSidebar(unittest.TestCase):
             self.css = f.read()
         with open(JS_FILE, "r", encoding="utf-8") as f:
             self.js = f.read()
+        js_dir = os.path.join(BASE_DIR, "web", "js")
+        if os.path.isdir(js_dir):
+            for fname in sorted(os.listdir(js_dir)):
+                if fname.endswith(".js"):
+                    with open(os.path.join(js_dir, fname), "r", encoding="utf-8") as f:
+                        self.js += "\n" + f.read()
 
     def test_dropdown_removed_from_titlebar_html(self):
         """

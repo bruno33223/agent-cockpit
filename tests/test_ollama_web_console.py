@@ -17,6 +17,12 @@ class TestOllamaWebConsole(unittest.TestCase):
             cls.css = f.read()
         with open(JS_PATH, "r", encoding="utf-8") as f:
             cls.js = f.read()
+        js_dir = os.path.join(REPO_ROOT, "web", "js")
+        if os.path.isdir(js_dir):
+            for fname in sorted(os.listdir(js_dir)):
+                if fname.endswith(".js"):
+                    with open(os.path.join(js_dir, fname), "r", encoding="utf-8") as f:
+                        cls.js += "\n" + f.read()
 
     def test_local_worker_card_process_status_and_buttons(self):
         """Verifica a presença dos elementos no card do Local Worker: status do processo e botões de controle."""

@@ -9,6 +9,12 @@ class TestTerminalAndSidebarFixes(unittest.TestCase):
     def setUp(self):
         with open(APP_JS_PATH, "r", encoding="utf-8") as f:
             self.js = f.read()
+        js_dir = os.path.join(BASE_DIR, "web", "js")
+        if os.path.isdir(js_dir):
+            for fname in sorted(os.listdir(js_dir)):
+                if fname.endswith(".js"):
+                    with open(os.path.join(js_dir, fname), "r", encoding="utf-8") as f:
+                        self.js += "\n" + f.read()
         with open(STYLES_CSS_PATH, "r", encoding="utf-8") as f:
             self.css = f.read()
 

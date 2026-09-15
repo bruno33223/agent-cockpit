@@ -63,6 +63,7 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
 
     def setUp(self):
         # Garante estado padrão limpo antes de cada teste
+        db.switch_current_project("default")
         db.update_settings({
             "enable_local_ai": True,
             "delegate_styles_to_cloud": False,

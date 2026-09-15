@@ -19,6 +19,12 @@ class TestIssue5TerminalMinimalistSplit(unittest.TestCase):
             self.css_content = f.read()
         with open(self.js_path, "r", encoding="utf-8") as f:
             self.js_content = f.read()
+        js_dir = os.path.join(BASE_DIR, "web", "js")
+        if os.path.isdir(js_dir):
+            for fname in sorted(os.listdir(js_dir)):
+                if fname.endswith(".js"):
+                    with open(os.path.join(js_dir, fname), "r", encoding="utf-8") as f:
+                        self.js_content += "\n" + f.read()
 
     def test_minimalist_header_and_single_primary_new_terminal_button(self):
         """Critério 1 e 2: Zero cabeçalhos ou textos descritivos no topo dos terminais, mantendo botão '+ Novo Terminal'."""

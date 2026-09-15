@@ -20,6 +20,12 @@ class TestIssue6TerminalPTYPersistence(unittest.TestCase):
 
         with open(self.js_path, "r", encoding="utf-8") as f:
             self.js_content = f.read()
+        js_dir = os.path.join(BASE_DIR, "web", "js")
+        if os.path.isdir(js_dir):
+            for fname in sorted(os.listdir(js_dir)):
+                if fname.endswith(".js"):
+                    with open(os.path.join(js_dir, fname), "r", encoding="utf-8") as f:
+                        self.js_content += "\n" + f.read()
 
     def tearDown(self):
         self.manager.cleanup_all()

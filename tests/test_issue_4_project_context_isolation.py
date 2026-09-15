@@ -144,6 +144,12 @@ class TestIssue4ProjectContextIsolation(unittest.TestCase):
         app_js_path = os.path.join(_repo_root, "web", "app.js")
         with open(app_js_path, "r", encoding="utf-8") as f:
             content = f.read()
+        js_dir = os.path.join(_repo_root, "web", "js")
+        if os.path.isdir(js_dir):
+            for fname in sorted(os.listdir(js_dir)):
+                if fname.endswith(".js"):
+                    with open(os.path.join(js_dir, fname), "r", encoding="utf-8") as f:
+                        content += "\n" + f.read()
 
         # 1. switchProject deve disparar POST /api/projects/switch
         self.assertIn("'/api/projects/switch'", content)
