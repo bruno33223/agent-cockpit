@@ -241,19 +241,19 @@ class StateStore:
             return index_data.get("current_project_id", "default")
 
     def switch_current_project(self, project_id: str) -> str:
+        target_pid = self.resolve_project_id(project_id) if project_id else self.get_current_project_id()
         with self.lock:
             index_data = self._read_index()
-            if project_id in index_data.get("projects", {}) or os.path.exists(self._get_project_file(project_id)):
-                index_data["current_project_id"] = project_id
-                self._save_index(index_data)
-                
-                state = self.get_state(project_id)
-                self._sync_legacy_file(state)
+            index_data["current_project_id"] = target_pid
+            self._save_index(index_data)
+            
+            state = self.get_state(target_pid)
+            self._save_state(state, target_pid)
+            self._sync_legacy_file(state)
 
-                self._notify("PROJECT_SWITCHED", {"project_id": project_id}, project_id)
-                self._notify("STATE_FULL", state, project_id)
-                return project_id
-            return index_data.get("current_project_id", "default")
+            self._notify("PROJECT_SWITCHED", {"project_id": target_pid}, target_pid)
+            self._notify("STATE_FULL", state, target_pid)
+            return target_pid
 
     def list_projects(self) -> List[Dict[str, Any]]:
         with self.lock:
@@ -272,22 +272,36 @@ class StateStore:
 
     def resolve_project_id(self, project_id: Optional[str] = None, project_root: Optional[str] = None) -> str:
         if project_id:
+            index_data = self._read_index()
+            if project_id in index_data.get("projects", {}) or os.path.exists(self._get_project_file(project_id)):
+                return project_id
+            if "/" not in project_id and "\\" not in project_id:
+                return project_id
             return canonical_project_id(project_id)
         if project_root:
             return canonical_project_id(project_root)
         return self.get_current_project_id()
 
     def get_state(self, project_id: Optional[str] = None) -> Dict[str, Any]:
-        target_pid = project_id or self.get_current_project_id()
+        target_pid = self.resolve_project_id(project_id) if project_id else self.get_current_project_id()
         pfile = self._get_project_file(target_pid)
         with self.lock:
             if not os.path.exists(pfile):
-                return default_initial_state("Projeto Padrão")
-            try:
-                with open(pfile, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except Exception:
-                return default_initial_state("Projeto Padrão")
+                state = default_initial_state("Projeto Padrão")
+            else:
+                try:
+                    with open(pfile, 'r', encoding='utf-8') as f:
+                        state = json.load(f)
+                except Exception:
+                    state = default_initial_state("Projeto Padrão")
+            state["project_id"] = target_pid
+            state["active_project_id"] = target_pid
+            if not state.get("project_root"):
+                index_data = self._read_index()
+                pmeta = index_data.get("projects", {}).get(target_pid, {})
+                if pmeta.get("project_root"):
+                    state["project_root"] = pmeta.get("project_root")
+            return state
 
     def _save_state(self, state: Dict[str, Any], project_id: str):
         pfile = self._get_project_file(project_id)

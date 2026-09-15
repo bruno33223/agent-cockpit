@@ -398,6 +398,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 if action in ["SUBSCRIBE", "SUBSCRIBE_PROJECT"]:
                     new_pid = msg.get("project_id") or db.get_current_project_id()
                     manager.set_subscription(websocket, new_pid)
+                    if msg.get("switch_current", True):
+                        db.switch_current_project(new_pid)
                     await websocket.send_text(json.dumps({
                         "event": "STATE_FULL",
                         "payload": db.get_state(new_pid),
@@ -522,9 +524,14 @@ def get_health():
 def get_graph(root: str = None, project_id: Optional[str] = None):
     from code_graph import get_graph_elements_for_ui
     target_root = root
+    target_pid = project_id or db.get_current_project_id()
     if not target_root:
-        state = db.get_state(project_id)
-        target_root = state.get("project_root")
+        root_path, _, _ = _resolve_project_fs_root(target_pid)
+        if root_path and os.path.exists(root_path):
+            target_root = root_path
+        else:
+            state = db.get_state(target_pid)
+            target_root = state.get("project_root")
     if not target_root or not os.path.exists(target_root):
         parent = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         if os.path.basename(os.path.abspath(".")).lower() == "agent-cockpit" and os.path.exists(parent):
@@ -924,7 +931,7 @@ def post_opencode_sync():
 # =========================================================================
 
 @app.websocket("/ws/terminal")
-async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Query("term-1"), cwd: Optional[str] = Query(None)):
+async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Query("term-1"), cwd: Optional[str] = Query(None), project_id: Optional[str] = Query(None)):
     await websocket.accept()
     
     if not pty_session_manager:
@@ -934,9 +941,9 @@ async def websocket_terminal(websocket: WebSocket, session_id: Optional[str] = Q
 
     # Determina diretório de trabalho do projeto ativo se não fornecido
     if not cwd:
-        state = db.get_state(db.get_current_project_id())
-        project_root = state.get("config", {}).get("project_root")
-        cwd = project_root if (project_root and os.path.isdir(project_root)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        target_pid = project_id or db.get_current_project_id()
+        root_path, _, _ = _resolve_project_fs_root(target_pid)
+        cwd = root_path if (root_path and os.path.isdir(root_path)) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
     session = pty_session_manager.get_or_create(session_id=session_id, cwd=cwd)
     history = session.attach(websocket)

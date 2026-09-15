@@ -389,7 +389,12 @@ def resolve_context_project(args: dict) -> str:
     root = args.get("project_root") or args.get("root_path") or args.get("working_dir") or args.get("repo_root") or args.get("base_dir")
     if root:
         return db.resolve_project_id(project_root=root)
+    current_pid = db.get_current_project_id()
+    if current_pid:
+        return current_pid
     return db.resolve_project_id(project_root=os.getcwd())
+
+_resolve_target_project = resolve_context_project
 
 def handle_tool_call(name: str, args: dict) -> dict:
     target_pid = resolve_context_project(args)

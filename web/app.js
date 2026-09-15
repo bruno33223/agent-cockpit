@@ -174,40 +174,80 @@ function renderProjectSelectOptions() {
 }
 
 async function switchProject(projectId) {
-  if (!projectId || projectId === currentProjectId && state.nodes && state.nodes.length > 0) return;
+  if (!projectId) return;
   currentProjectId = projectId;
   localStorage.setItem('cockpit_project_id', currentProjectId);
+  recordRecentProject(currentProjectId);
 
+  // Limpeza de estado residual de projeto anterior
+  if (activeSliceId) {
+    const hasSlice = state && state.nodes && state.nodes.some(n => n.id === activeSliceId);
+    if (!hasSlice) {
+      activeSliceId = null;
+      if (typeof closeDrawer === 'function') closeDrawer();
+    }
+  }
+  if (typeof fileExplorerManager !== 'undefined') {
+    fileExplorerManager.selectedFilePath = null;
+    if (typeof fileExplorerManager.closeFilePreview === 'function') {
+      fileExplorerManager.closeFilePreview();
+    }
+  }
+
+  // 1. Sincronização via POST /api/projects/switch (garante CWD correto para MCP e ferramentas)
+  try {
+    const switchRes = await apiFetch('/api/projects/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: currentProjectId })
+    });
+    if (switchRes.ok) {
+      const switchData = await switchRes.json();
+      if (switchData.state) {
+        state = switchData.state;
+        state.active_project_id = currentProjectId;
+      }
+      if (switchData.projects) {
+        knownProjects = switchData.projects;
+      }
+    }
+  } catch (err) {
+    console.warn('[Projects] Falha ao sincronizar switch com backend:', err);
+  }
+
+  // 2. WebSocket Subscription
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       action: 'SUBSCRIBE_PROJECT',
-      project_id: currentProjectId
+      project_id: currentProjectId,
+      switch_current: true
     }));
   }
 
+  // 3. Garante estado completo e unificação de active_project_id
   try {
     const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
     if (res.ok) {
       state = await res.json();
-      renderAll();
-      loadHandoff();
-      initOrRefreshGraph();
-      loadLocalWorker();
-      if (typeof terminalWorkspace !== 'undefined') {
-        terminalWorkspace.onProjectSwitched(currentProjectId);
-      }
-      if (typeof fileExplorerManager !== 'undefined') {
-        fileExplorerManager.loadFileTree(currentProjectId);
-      }
+      state.active_project_id = currentProjectId;
     }
   } catch (err) {
     console.error('[Projects] Erro ao carregar estado do projeto:', err);
   }
+
+  // 4. Reatividade estrita por projeto em todos os subsistemas
+  renderAll();
+  loadHandoff();
+  initOrRefreshGraph();
+  loadLocalWorker();
+  if (typeof terminalWorkspace !== 'undefined') {
+    terminalWorkspace.onProjectSwitched(currentProjectId);
+  }
+  if (typeof fileExplorerManager !== 'undefined') {
+    fileExplorerManager.loadFileTree(currentProjectId, true);
+  }
   renderProjectSelectOptions();
   renderWorktreeSidebar();
-  if (typeof fileExplorerManager !== 'undefined') {
-    fileExplorerManager.loadFileTree(currentProjectId);
-  }
 }
 
 if (projectSelect) {
@@ -746,8 +786,10 @@ function initWebSocket() {
         renderProjectSelectOptions();
         renderWorktreeSidebar();
       } else if (data.event === 'STATE_FULL') {
-        if (!data.project_id || data.project_id === currentProjectId) {
-          state = data.payload;
+        const incomingPid = data.project_id || (data.payload && (data.payload.active_project_id || data.payload.project_id));
+        if (!incomingPid || incomingPid === currentProjectId) {
+          state = data.payload || {};
+          state.active_project_id = currentProjectId;
           renderAll();
           loadLocalWorker();
           if (typeof fileExplorerManager !== 'undefined') {
@@ -1256,6 +1298,7 @@ setInterval(async () => {
     const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
     if (res.ok) {
       const remoteState = await res.json();
+      remoteState.active_project_id = currentProjectId;
       if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
         state = remoteState;
         renderAll();
@@ -1268,7 +1311,14 @@ setInterval(async () => {
 
 // 5. INTERACTIVE CODE GRAPH (CANVAS 2D)
 function getActiveProjectRoot() {
-  return localStorage.getItem('cockpit_target_project') || (state && state.project_root) || '';
+  if (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) {
+    const activeProj = knownProjects.find(p => p.id === currentProjectId);
+    if (activeProj && activeProj.project_root) return activeProj.project_root;
+  }
+  if (typeof state !== 'undefined' && state && state.project_root) {
+    return state.project_root;
+  }
+  return localStorage.getItem('cockpit_target_project') || '';
 }
 
 function deselectGraphNode() {
@@ -1286,7 +1336,10 @@ function deselectGraphNode() {
 
 function initOrRefreshGraph(customRoot = null) {
   const targetRoot = (typeof customRoot === 'string' && customRoot.trim()) ? customRoot.trim() : getActiveProjectRoot();
-  const url = targetRoot ? `/api/graph?root=${encodeURIComponent(targetRoot)}` : '/api/graph';
+  const params = new URLSearchParams();
+  if (targetRoot) params.set('root', targetRoot);
+  if (currentProjectId) params.set('project_id', currentProjectId);
+  const url = `/api/graph?${params.toString()}`;
   apiFetch(url)
     .then(r => r.json())
     .then(data => {
@@ -3272,8 +3325,9 @@ class TerminalWorkspaceManager {
       const activeProj = knownProjects.find(p => p.id === currentProjectId);
       if (activeProj && activeProj.project_root) return activeProj.project_root;
     }
-    if (typeof state !== 'undefined' && state && state.config && state.config.project_root) {
-      return state.config.project_root;
+    if (typeof state !== 'undefined' && state) {
+      if (state.project_root) return state.project_root;
+      if (state.config && state.config.project_root) return state.config.project_root;
     }
     return '';
   }
@@ -3594,6 +3648,7 @@ class TerminalWorkspaceManager {
     const params = new URLSearchParams();
     params.set('session_id', session.id);
     if (session.cwd) params.set('cwd', session.cwd);
+    if (currentProjectId) params.set('project_id', currentProjectId);
 
     const url = `${proto}//${window.location.host}/ws/terminal?${params.toString()}`;
     const dot = session.elTab.querySelector('.term-tab-dot');
@@ -3824,6 +3879,18 @@ class TerminalWorkspaceManager {
   }
 
   onProjectSwitched(newProjectId) {
+    const newRoot = this.getActiveProjectRoot();
+    this.sessions.forEach(session => {
+      session.cwd = newRoot;
+      const relCwd = this.formatRelativeCwd(session.cwd);
+      const subCwd = session.elPane ? session.elPane.querySelector('.orca-sub-cwd') : null;
+      if (subCwd) subCwd.textContent = relCwd;
+      if (session.isConnected && session.agentType === 'bash' && newRoot) {
+        if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+          session.socket.send(`cd "${newRoot}"\r`);
+        }
+      }
+    });
     this.updateHeaderBadge();
     this.updatePaneContexts();
   }
@@ -4128,6 +4195,9 @@ class FileExplorerManager {
     }
 
     this.projectId = targetPid;
+    this.selectedFilePath = null;
+    this.closeFilePreview();
+
     if (this.container) {
       this.container.innerHTML = '<div class="file-tree-loading">Carregando arquivos do projeto...</div>';
     }
