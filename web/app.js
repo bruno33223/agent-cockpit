@@ -291,14 +291,14 @@ if (btnScanProjects) {
 function getPinnedProjectIds() {
   try {
     const raw = localStorage.getItem('cockpit_pinned_projects');
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
     console.warn('[Projects] Erro ao ler cockpit_pinned_projects:', e);
   }
-  return currentProjectId ? [currentProjectId] : ['default'];
+  return ['default'];
 }
 
 function savePinnedProjectIds(ids) {
@@ -376,15 +376,6 @@ function renderWorktreeSidebar() {
     pinnedList.innerHTML = '';
     const pinnedProjects = (knownProjects || []).filter(p => pinnedIds.includes(p.id));
 
-    if (pinnedProjects.length === 0 && currentProjectId) {
-      const fallback = (knownProjects || []).find(p => p.id === currentProjectId) || {
-        id: currentProjectId,
-        name: currentProjectId,
-        project_root: ''
-      };
-      pinnedProjects.push(fallback);
-    }
-
     if (pinnedCountBadge) {
       pinnedCountBadge.textContent = String(pinnedProjects.length);
     }
@@ -439,76 +430,11 @@ function renderWorktreeSidebar() {
     });
   }
 
-  // 2. Renderiza lista Projects / Recentes / In Progress
+  // 2. Renderiza lista Projects / Recentes (estritamente projetos, sem fatias)
   cardsList.innerHTML = '';
   let progressCount = 0;
 
-  // A. Fatias verticais do projeto ativo
-  const nodes = state.nodes || [];
-  nodes.forEach(node => {
-    progressCount++;
-    const card = document.createElement('div');
-    const isCardActive = (activeSliceId === node.id);
-    card.className = `worktree-card ${isCardActive ? 'active' : ''}`;
-    card.setAttribute('data-slice-id', node.id);
-    card.setAttribute('data-project-id', currentProjectId);
-    card.setAttribute('tabindex', '0');
-
-    let dotClass = 'idle';
-    if (node.kanban_status === 'EXECUTING') dotClass = 'working';
-    else if (node.kanban_status === 'CRITIQUING') dotClass = 'working';
-    else if (node.kanban_status === 'WAITING_REVIEW') dotClass = 'waiting';
-    else if (node.kanban_status === 'APPROVED') dotClass = 'done';
-    else if (['REJECTED', 'BLOCKED_NO_CREDIT', 'STALLED'].includes(node.kanban_status)) dotClass = 'blocked';
-
-    const repoTag = (currentProjectId || 'cockpit').toLowerCase().slice(0, 10);
-    const branchName = node.branch || `cockpit/${node.id}`;
-    const timeText = node.kanban_status === 'APPROVED' ? 'done' : (node.attempt > 1 ? `${node.attempt * 4}m` : 'now');
-
-    card.innerHTML = `
-      <div class="worktree-header">
-        <span class="worktree-title" title="${escapeHtml(node.title)}">${escapeHtml(node.id.toUpperCase())}: ${escapeHtml(node.title)}</span>
-        <div class="worktree-header-actions">
-          <span class="agent-state-dot ${dotClass}" title="Status: ${node.kanban_status}"></span>
-        </div>
-      </div>
-      <div class="worktree-meta-row">
-        <span class="worktree-repo-tag" title="${escapeHtml(repoTag)}">${escapeHtml(repoTag)}</span>
-        <span class="worktree-branch" title="${escapeHtml(branchName)}">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="6" y1="3" x2="6" y2="15"></line>
-            <circle cx="18" cy="6" r="3"></circle>
-            <circle cx="6" cy="18" r="3"></circle>
-            <path d="M18 9a9 9 0 0 1-9 9"></path>
-          </svg>
-          ${escapeHtml(branchName)}
-        </span>
-        <span class="worktree-time">${timeText}</span>
-      </div>
-    `;
-
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.worktree-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      activeSliceId = node.id;
-
-      const activeProj = (knownProjects && knownProjects.find(p => p.id === currentProjectId));
-      const sliceWorktreePath = (activeProj && activeProj.project_root)
-        ? `${activeProj.project_root}/.worktrees/${node.id}`
-        : '';
-      if (typeof terminalWorkspace !== 'undefined' && typeof terminalWorkspace.onSliceSwitched === 'function') {
-        terminalWorkspace.onSliceSwitched(node.id, sliceWorktreePath || (activeProj ? activeProj.project_root : ''));
-      }
-
-      if (typeof openDrawer === 'function') {
-        openDrawer(node.id);
-      }
-    });
-
-    cardsList.appendChild(card);
-  });
-
-  // B. Projetos não fixados ordenados por histórico recente
+  // Projetos não fixados ordenados por histórico recente
   const unpinnedProjects = (knownProjects || []).filter(p => !pinnedIds.includes(p.id));
   unpinnedProjects.sort((a, b) => {
     const idxA = recentIds.indexOf(a.id);
@@ -3371,10 +3297,21 @@ class TerminalWorkspaceManager {
   }
 
   createSession(options = {}) {
+    if (!this.tabsBar) {
+      this.tabsBar = document.getElementById('terminal-tabs-bar');
+    }
+    if (!this.gridContainer) {
+      this.gridContainer = document.getElementById('terminal-workspace-grid');
+    }
+
     if (typeof Terminal === 'undefined') {
       if (this.gridContainer) {
         this.gridContainer.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace;">Aguardando carregamento da biblioteca xterm.js...</div>';
       }
+      return null;
+    }
+
+    if (!this.tabsBar || !this.gridContainer) {
       return null;
     }
 
@@ -3557,6 +3494,7 @@ class TerminalWorkspaceManager {
     // Ajusta visibilidade baseada no contexto ativo
     const isVisible = (!this.activeContextKey || this.activeContextKey === contextKey);
     elTab.style.display = isVisible ? '' : 'none';
+    elPane.classList.toggle('context-hidden', !isVisible);
     elPane.style.display = isVisible ? '' : 'none';
 
     // 4. WebSocket Conexão
@@ -3973,11 +3911,17 @@ class TerminalWorkspaceManager {
     if (!contextKey) return;
     this.activeContextKey = contextKey;
 
+    if (!this.tabsBar) this.tabsBar = document.getElementById('terminal-tabs-bar');
+    if (!this.gridContainer) this.gridContainer = document.getElementById('terminal-workspace-grid');
+
     // Atualiza visibilidade no DOM sem desconectar processos nem fechar sockets
     this.sessions.forEach(s => {
       const belongs = (s.contextKey === contextKey);
       if (s.elTab) s.elTab.style.display = belongs ? '' : 'none';
-      if (s.elPane) s.elPane.style.display = belongs ? '' : 'none';
+      if (s.elPane) {
+        s.elPane.classList.toggle('context-hidden', !belongs);
+        s.elPane.style.display = belongs ? '' : 'none';
+      }
     });
 
     const contextSessions = this.getActiveContextSessions();
@@ -4628,6 +4572,7 @@ checkAutostartStatus();
 initLocalWorkerEvents();
 initSettingsEvents();
 initTerminalAndOmniEvents();
+terminalWorkspace.init();
 loadLocalWorker();
 loadSettings();
 loadOmniRouteSettings();
