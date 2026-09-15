@@ -5,6 +5,7 @@
 
 import { escapeHtml } from './ui_utils.js';
 import {
+  apiFetch,
   state,
   currentProjectId,
   knownProjects,
@@ -536,17 +537,61 @@ export function initAntigravitySettingsModal() {
 
   const btnTestOmni = document.getElementById('btn-ag-test-omniroute');
   if (btnTestOmni) {
-    btnTestOmni.addEventListener('click', () => {
-      const origTest = document.getElementById('btn-test-omniroute');
+    btnTestOmni.addEventListener('click', async () => {
+      const urlInput = document.getElementById('ag-omniroute-url');
       const feedback = document.getElementById('ag-omniroute-feedback');
-      if (origTest) {
-        origTest.click();
+      const targetUrl = urlInput ? urlInput.value.trim() : 'http://localhost:20128/v1';
+
+      btnTestOmni.disabled = true;
+      const originalText = btnTestOmni.textContent;
+      btnTestOmni.textContent = 'Testando...';
+
+      if (feedback) {
+        feedback.style.display = 'block';
+        feedback.className = 'ag-feedback-msg testing';
+        feedback.style.background = 'rgba(59, 130, 246, 0.12)';
+        feedback.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        feedback.style.color = '#60a5fa';
+        feedback.textContent = 'Testando conexão com OmniRoute...';
+      }
+
+      const startTime = performance.now();
+      try {
+        const query = targetUrl ? `?base_url=${encodeURIComponent(targetUrl)}` : '';
+        const res = await apiFetch(`/api/omniroute/status${query}`);
+        const data = await res.json();
+        const latency = Math.round(performance.now() - startTime);
+
         if (feedback) {
           feedback.style.display = 'block';
-          feedback.style.background = 'rgba(0, 255, 102, 0.1)';
-          feedback.style.color = '#00ff66';
-          feedback.textContent = 'Testando conexão com OmniRoute...';
+          if (data.online) {
+            const modelsCount = (data.models && Array.isArray(data.models)) ? data.models.length : 0;
+            const modelsPreview = modelsCount > 0 ? ` [${data.models.slice(0, 3).join(', ')}${modelsCount > 3 ? ` +${modelsCount - 3}` : ''}]` : '';
+            feedback.className = 'ag-feedback-msg success';
+            feedback.style.background = 'rgba(16, 185, 129, 0.12)';
+            feedback.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            feedback.style.color = '#34d399';
+            feedback.textContent = `✓ OmniRoute Conectado (${latency}ms) — ${modelsCount} modelo(s) detectado(s)${modelsPreview}`;
+          } else {
+            feedback.className = 'ag-feedback-msg error';
+            feedback.style.background = 'rgba(239, 68, 68, 0.12)';
+            feedback.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            feedback.style.color = '#f87171';
+            feedback.textContent = `✗ Falha na conexão: ${data.message || 'Serviço OmniRoute inacessível no endpoint especificado.'}`;
+          }
         }
+      } catch (err) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.className = 'ag-feedback-msg error';
+          feedback.style.background = 'rgba(239, 68, 68, 0.12)';
+          feedback.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+          feedback.style.color = '#f87171';
+          feedback.textContent = `✗ Erro de rede/requisição: ${err.message || 'Não foi possível contatar o servidor'}`;
+        }
+      } finally {
+        btnTestOmni.disabled = false;
+        btnTestOmni.textContent = originalText;
       }
     });
   }

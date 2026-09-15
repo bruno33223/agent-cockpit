@@ -80,6 +80,11 @@ class TestFileExplorerSidebar(unittest.TestCase):
             read_fs_file(path="non_existing_file_12345.xyz")
         self.assertEqual(ctx.exception.status_code, 404)
 
+    def test_backend_fs_read_restricted_files(self):
+        with self.assertRaises(HTTPException) as ctx:
+            read_fs_file(path=".git")
+        self.assertEqual(ctx.exception.status_code, 403)
+
     # 2. TESTES DE ESTRUTURA HTML (Orca Right Sidebar)
     def test_html_right_sidebar_structure(self):
         self.assertIn('class="workspace-sidebar"', self.html_content)
