@@ -8004,9 +8004,87 @@ body.sidebar-pinned-hidden .main-content {
 .ag-feedback-msg {
   font-family: var(--font-mono);
   font-size: 11px;
-  padding: 8px 12px;
+  line-height: 1.5;
+  padding: 10px 14px;
   border-radius: 6px;
   margin-top: 10px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  word-break: break-word;
+}
+
+.ag-feedback-msg.testing {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.ag-feedback-msg.success {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+
+.ag-feedback-msg.error {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+}
+
+/* Container de Conectores OmniRoute & Badges */
+.omniroute-connector-container,
+.ag-omniroute-connector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.omniroute-connector-container:hover,
+.ag-omniroute-connector:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.omniroute-badge,
+.ag-omniroute-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.omniroute-badge.online,
+.ag-omniroute-badge.online {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.omniroute-badge.offline,
+.ag-omniroute-badge.offline {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+.omniroute-badge.testing,
+.ag-omniroute-badge.testing {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
 }
 
 .ag-badge-value {
