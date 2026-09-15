@@ -421,6 +421,15 @@ export function initTerminalAndOmniEvents() {
             feedback.textContent = `OmniRoute OFFLINE em ${data.endpoint}. Verifique se o processo "omniroute" foi iniciado no terminal. (${data.message})`;
           }
         }
+        const agFeedback = document.getElementById('ag-omniroute-feedback');
+        if (agFeedback) {
+          agFeedback.style.display = 'block';
+          agFeedback.style.background = data.online ? 'rgba(0, 255, 102, 0.1)' : 'rgba(239, 68, 68, 0.15)';
+          agFeedback.style.color = data.online ? '#00ff66' : '#ef4444';
+          agFeedback.textContent = data.online
+            ? `OmniRoute ONLINE em ${data.endpoint}! Modelos: ${data.models ? data.models.slice(0, 4).join(', ') : ''}`
+            : `OmniRoute OFFLINE: ${data.message || 'Verifique se o processo está em execução'}`;
+        }
         checkOmniRouteStatus();
       } catch (err) {
         btnTestOmni.textContent = 'Testar Conexão OmniRoute';
@@ -429,10 +438,167 @@ export function initTerminalAndOmniEvents() {
           feedback.className = 'omniroute-feedback error';
           feedback.textContent = `Erro ao testar: ${err.message}`;
         }
+        const agFeedback = document.getElementById('ag-omniroute-feedback');
+        if (agFeedback) {
+          agFeedback.style.display = 'block';
+          agFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          agFeedback.style.color = '#ef4444';
+          agFeedback.textContent = `Erro de conexão: ${err.message}`;
+        }
       }
     });
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 12. ORCA RIGHT SIDEBAR & FILE EXPLORER MANAGER
+// =========================================================================
+// GOVERNANÇA REAL & OPENCODE (ISSUE #12)
+// =========================================================================
+
+export let currentGovernance = {
+  autostart_slices: false,
+  security_preset: 'standard',
+  human_gate_policy: 'always',
+  artifact_review_policy: 'strict'
+};
+
+export async function loadGovernanceSettings() {
+  try {
+    const res = await apiFetch(`/api/governance?project_id=${encodeURIComponent(currentProjectId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      currentGovernance = Object.assign(currentGovernance, data);
+      applyGovernanceToUI(currentGovernance);
+    }
+  } catch (err) {
+    console.warn('[Governance] Falha ao carregar governança:', err);
+  }
+}
+
+export function applyGovernanceToUI(gov) {
+  if (!gov) return;
+  const btnAutoOn = document.getElementById('ag-toggle-autostart-on');
+  const btnAutoOff = document.getElementById('ag-toggle-autostart-off');
+  if (btnAutoOn && btnAutoOff) {
+    btnAutoOn.classList.toggle('active', !!gov.autostart_slices);
+    btnAutoOff.classList.toggle('active', !gov.autostart_slices);
+  }
+
+  const secPreset = document.getElementById('ag-security-preset');
+  if (secPreset && gov.security_preset) {
+    secPreset.value = gov.security_preset;
+  }
+
+  const gatePolicy = document.getElementById('ag-gate-policy');
+  if (gatePolicy && gov.human_gate_policy) {
+    gatePolicy.value = gov.human_gate_policy;
+  }
+
+  const artifactPolicy = document.getElementById('ag-artifact-policy');
+  if (artifactPolicy && gov.artifact_review_policy) {
+    artifactPolicy.value = gov.artifact_review_policy;
+  }
+}
+
+export async function saveGovernanceSetting(updates) {
+  try {
+    const payload = Object.assign({ project_id: currentProjectId }, updates);
+    const res = await apiFetch('/api/governance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      currentGovernance = Object.assign(currentGovernance, data);
+      applyGovernanceToUI(currentGovernance);
+      console.log('[Governance] Configurações de governança atualizadas com sucesso.');
+    }
+  } catch (err) {
+    console.error('[Governance] Falha ao atualizar governança:', err);
+  }
+}
+
+export function initGovernanceEvents() {
+  const btnAutoOn = document.getElementById('ag-toggle-autostart-on');
+  const btnAutoOff = document.getElementById('ag-toggle-autostart-off');
+  if (btnAutoOn && btnAutoOff) {
+    btnAutoOn.addEventListener('click', () => {
+      btnAutoOn.classList.add('active');
+      btnAutoOff.classList.remove('active');
+      saveGovernanceSetting({ autostart_slices: true });
+    });
+    btnAutoOff.addEventListener('click', () => {
+      btnAutoOff.classList.add('active');
+      btnAutoOn.classList.remove('active');
+      saveGovernanceSetting({ autostart_slices: false });
+    });
+  }
+
+  const secPreset = document.getElementById('ag-security-preset');
+  if (secPreset) {
+    secPreset.addEventListener('change', () => {
+      saveGovernanceSetting({ security_preset: secPreset.value });
+    });
+  }
+
+  const gatePolicy = document.getElementById('ag-gate-policy');
+  if (gatePolicy) {
+    gatePolicy.addEventListener('change', () => {
+      saveGovernanceSetting({ human_gate_policy: gatePolicy.value });
+    });
+  }
+
+  const artifactPolicy = document.getElementById('ag-artifact-policy');
+  if (artifactPolicy) {
+    artifactPolicy.addEventListener('change', () => {
+      saveGovernanceSetting({ artifact_review_policy: artifactPolicy.value });
+    });
+  }
+}
+
+// =========================================================================
+// SISTEMA DE TEMAS & TIPOGRAFIA REATIVA (ISSUE #13)
+// =========================================================================
+
+export function initThemeAndFontSettings() {
+  const savedTheme = localStorage.getItem('ag_theme') || 'dark';
+  const savedScale = localStorage.getItem('ag_font_scale') || '1';
+
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  document.documentElement.style.setProperty('--app-font-scale', savedScale);
+
+  const themeSelect = document.getElementById('ag-theme-select');
+  if (themeSelect) {
+    themeSelect.value = savedTheme;
+    themeSelect.addEventListener('change', () => {
+      const selected = themeSelect.value;
+      document.documentElement.setAttribute('data-theme', selected);
+      localStorage.setItem('ag_theme', selected);
+    });
+  }
+
+  const fontSelect = document.getElementById('ag-font-size-select');
+  if (fontSelect) {
+    fontSelect.value = savedScale;
+    fontSelect.addEventListener('change', () => {
+      const selected = fontSelect.value;
+      document.documentElement.style.setProperty('--app-font-scale', selected);
+      localStorage.setItem('ag_font_scale', selected);
+    });
+  }
+}
+
+// Auto-inicializa governança e temas
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initThemeAndFontSettings();
+      initGovernanceEvents();
+      loadGovernanceSettings();
+    });
+  } else {
+    initThemeAndFontSettings();
+    initGovernanceEvents();
+    loadGovernanceSettings();
+  }
+}

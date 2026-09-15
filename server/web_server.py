@@ -647,6 +647,27 @@ def post_settings_endpoint(payload: SettingsPayload):
     updates = {k: v for k, v in data.items() if v is not None and k != "project_id"}
     return db.update_settings(updates, project_id=payload.project_id)
 
+class GovernancePayload(BaseModel):
+    autostart_slices: Optional[bool] = None
+    security_preset: Optional[str] = None
+    human_gate_policy: Optional[str] = None
+    artifact_review_policy: Optional[str] = None
+    project_id: Optional[str] = None
+
+@app.get("/api/governance")
+def get_governance_endpoint(project_id: Optional[str] = None):
+    """Retorna as configurações de governança (Autostart de Fatias, Security Preset, Human Gate, Artifact Review)."""
+    return db.get_governance_settings(project_id=project_id)
+
+@app.post("/api/governance")
+def post_governance_endpoint(payload: GovernancePayload):
+    """Atualiza as configurações de governança e notifica clientes conectados."""
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    updates = {k: v for k, v in data.items() if v is not None and k != "project_id"}
+    res = db.update_governance_settings(updates, project_id=payload.project_id)
+    manager.broadcast_sync("GOVERNANCE_SETTINGS_UPDATED", res)
+    return res
+
 # ROTAS DO LOCAL WORKER (Fatia 3)
 try:
     from workers.local_llm_client import LocalLLMClient

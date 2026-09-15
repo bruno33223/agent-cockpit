@@ -603,6 +603,17 @@ def handle_tool_call(name: str, args: dict) -> dict:
     elif name == "check_human_gate":
         gate_name = args.get("gate_name", "gate_ship_approved")
         status = db.get_gate_status(gate_name, project_id=target_pid)
+        gov = db.get_governance_settings(project_id=target_pid)
+        policy = gov.get("human_gate_policy", "manual")
+        if policy == "auto" and not status.get("approved"):
+            state = db.get_state(target_pid)
+            nodes = state.get("nodes", [])
+            gauntlet_log = state.get("gauntlet_log", [])
+            if nodes and all(n.get("kanban_status") in ("APPROVED", "DONE") for n in nodes):
+                if gauntlet_log and all(g.get("verdict") in ("APROVADO", "APPROVED") for g in gauntlet_log):
+                    status["approved"] = True
+                    status["auto_approved"] = True
+                    status["message"] = "Aprovação concedida automaticamente pela política Gauntlet."
         return {"content": [{"type": "text", "text": json.dumps(status, indent=2, ensure_ascii=False)}]}
 
     elif name == "context_pruner":

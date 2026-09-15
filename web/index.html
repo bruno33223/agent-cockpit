@@ -16,8 +16,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.js"></script>
 </head>
 <body>
-  <!-- 1. TITLEBAR SUPERIOR ZEUS AGENT (.orca-titlebar / .titlebar) -->
-  <header class="orca-titlebar titlebar" id="orca-titlebar">
+  <!-- 1. TITLEBAR SUPERIOR ZEUS AGENT (.orca-titlebar / .titlebar / .topbar) -->
+  <header class="orca-titlebar titlebar topbar" id="orca-titlebar">
     <div class="orca-titlebar-left titlebar-left">
       <!-- Botão Hambúrguer Topbar para Alternar Menu Lateral -->
       <button class="btn-topbar-sidebar-toggle" id="btn-topbar-sidebar-toggle" title="Alternar Menu Lateral (Ctrl+B)" aria-label="Alternar Menu Lateral">
@@ -1794,9 +1794,9 @@
                   <span class="ag-setting-desc">Exigir feedback do usuário ao criar ou modificar planos de implementação.</span>
                 </div>
                 <div class="ag-setting-control">
-                  <select class="ag-select-styled">
-                    <option selected>Always Ask</option>
-                    <option>Auto Proceed</option>
+                  <select class="ag-select-styled" id="ag-artifact-policy">
+                    <option value="strict" selected>Always Ask (Rigoroso)</option>
+                    <option value="lenient">Auto Proceed (Permissivo)</option>
                   </select>
                 </div>
               </div>
@@ -1843,30 +1843,31 @@
           </div>
           <div class="ag-panel-content">
             <div class="ag-setting-section">
-              <span class="ag-section-title">Theme & Effects</span>
+              <span class="ag-section-title">Visual & Theme</span>
               <div class="ag-setting-row">
                 <div class="ag-setting-info">
                   <span class="ag-setting-label">Color Theme</span>
-                  <span class="ag-setting-desc">Paleta de cores e estilo visual do Agent Cockpit.</span>
+                  <span class="ag-setting-desc">Paleta de cores do sistema (Escuro, Claro, Clássico, Papel Antigo).</span>
                 </div>
                 <div class="ag-setting-control">
-                  <select class="ag-select-styled">
-                    <option selected>Cyberpunk Dark (Orca Neon)</option>
-                    <option>Phosphor Green CRT</option>
-                    <option>High Contrast Pitch</option>
+                  <select class="ag-select-styled" id="ag-theme-select">
+                    <option value="dark" selected>Escuro (Dark - Padrão)</option>
+                    <option value="light">Claro (Light)</option>
+                    <option value="classic">Clássico (Terminal)</option>
+                    <option value="sepia">Papel Antigo (Sépia)</option>
                   </select>
                 </div>
               </div>
               <div class="ag-setting-row">
                 <div class="ag-setting-info">
-                  <span class="ag-setting-label">Neon Glow & Bloom</span>
-                  <span class="ag-setting-desc">Efeitos visuais de iluminação no logo Zeus e status LEDs.</span>
+                  <span class="ag-setting-label">Tamanho da Fonte</span>
+                  <span class="ag-setting-desc">Escala tipográfica global da interface do cockpit.</span>
                 </div>
                 <div class="ag-setting-control">
-                  <select class="ag-select-styled">
-                    <option selected>Ativado (Vibrante)</option>
-                    <option>Suave</option>
-                    <option>Desativado</option>
+                  <select class="ag-select-styled" id="ag-font-size-select">
+                    <option value="0.9">Pequeno (90%)</option>
+                    <option value="1" selected>Médio / Padrão (100%)</option>
+                    <option value="1.15">Grande (115%)</option>
                   </select>
                 </div>
               </div>

@@ -137,6 +137,12 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
             "enable_local_ai": False,
             "delegate_styles_to_cloud": True
         },
+        "governance_settings": {
+            "autostart_slices": False,
+            "security_preset": "standard",
+            "human_gate_policy": "manual",
+            "artifact_review_policy": "strict"
+        },
         "project_root": project_root
     }
 
@@ -607,6 +613,38 @@ class StateStore:
                 "approved_by": gates.get("approved_by"),
                 "project_id": target_pid
             }
+
+    def get_governance_settings(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            gov = state.get("governance_settings")
+            if not gov:
+                gov = {
+                    "autostart_slices": False,
+                    "security_preset": "standard",
+                    "human_gate_policy": "manual",
+                    "artifact_review_policy": "strict"
+                }
+                state["governance_settings"] = gov
+                self._save_state(state, target_pid)
+            return dict(gov)
+
+    def update_governance_settings(self, updates: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            gov = state.setdefault("governance_settings", {
+                "autostart_slices": False,
+                "security_preset": "standard",
+                "human_gate_policy": "manual",
+                "artifact_review_policy": "strict"
+            })
+            gov.update(updates)
+            self._save_state(state, target_pid)
+        self._notify("GOVERNANCE_SETTINGS_UPDATED", gov, target_pid)
+        self._notify("STATE_FULL", state, target_pid)
+        return dict(gov)
 
     def set_last_handoff(self, handoff_meta: Dict[str, Any], project_id: Optional[str] = None):
         target_pid = self.resolve_project_id(project_id)
