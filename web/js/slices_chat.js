@@ -42,6 +42,23 @@ let drawerCriteriaContent = null;
 let drawerGauntletContent = null;
 let drawerTabs = null;
 
+// Variáveis para Abas de Slices e Chat Dedicado (Issue #7)
+export let activeSliceTabId = 'global';
+export function setActiveSliceTabId(id) { activeSliceTabId = id; }
+export function getActiveSliceTabId() { return activeSliceTabId; }
+
+let sliceTabsNav = null;
+let slicePaneGlobal = null;
+let slicePaneDetail = null;
+let sliceDetailHeader = null;
+let sliceGovFleetCard = null;
+let sliceGovSpecCard = null;
+let sliceGovGauntletCard = null;
+let sliceChatTargetBadge = null;
+let sliceChatMessages = null;
+let sliceChatForm = null;
+let sliceChatInput = null;
+
 function resolveSlicesElements() {
   epicTitle = document.getElementById('epic-title');
   overviewEpicGoal = document.getElementById('overview-epic-goal');
@@ -75,17 +92,34 @@ function resolveSlicesElements() {
   drawerCriteriaContent = document.getElementById('drawer-criteria-content');
   drawerGauntletContent = document.getElementById('drawer-gauntlet-content');
   drawerTabs = document.querySelectorAll('.drawer-tab');
+
+  // Issue #7: Abas de Slices e Chat Dedicado
+  sliceTabsNav = document.getElementById('slice-tabs-nav');
+  slicePaneGlobal = document.getElementById('slice-pane-global');
+  slicePaneDetail = document.getElementById('slice-pane-detail');
+  sliceDetailHeader = document.getElementById('slice-detail-header');
+  sliceGovFleetCard = document.getElementById('slice-gov-fleet-card');
+  sliceGovSpecCard = document.getElementById('slice-gov-spec-card');
+  sliceGovGauntletCard = document.getElementById('slice-gov-gauntlet-card');
+  sliceChatTargetBadge = document.getElementById('slice-chat-target-badge');
+  sliceChatMessages = document.getElementById('slice-chat-messages');
+  sliceChatForm = document.getElementById('slice-chat-form');
+  sliceChatInput = document.getElementById('slice-chat-input');
 }
 
 export function renderAll() {
   resolveSlicesElements();
   renderHeaderAndKPIs();
+  renderSliceTabs();
   renderNodes();
   renderPairs();
   renderFinalGate();
   renderChatMessages();
   renderGauntletFull();
   renderWorktreeSidebar();
+  if (activeSliceTabId !== 'global') {
+    renderDedicatedSliceView(activeSliceTabId);
+  }
   if (activeSliceId) updateDrawerContent();
   if (typeof window.fileExplorerManager !== 'undefined' && window.fileExplorerManager) {
     window.fileExplorerManager.updateProjectHeader();
@@ -453,6 +487,319 @@ export function updateDrawerContent() {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Issue #7: Abas Horizontais de Slices e Interface de Governança & Chat Dedicado
+// -----------------------------------------------------------------------------
+
+export function renderSliceTabs() {
+  if (!sliceTabsNav) resolveSlicesElements();
+  if (!sliceTabsNav) return;
+
+  const nodes = state.nodes || [];
+  sliceTabsNav.innerHTML = '';
+
+  // 1. Aba Visão Global & Kanban
+  const btnGlobal = document.createElement('button');
+  btnGlobal.className = `slice-tab-btn ${activeSliceTabId === 'global' ? 'active' : ''}`;
+  btnGlobal.setAttribute('data-slice-tab', 'global');
+  btnGlobal.innerHTML = `
+    <span class="slice-tab-icon">🌐</span>
+    <span class="slice-tab-name">Visão Global & Kanban</span>
+    <span class="slice-tab-badge-count">${nodes.length}</span>
+  `;
+  btnGlobal.addEventListener('click', () => switchSliceTab('global'));
+  sliceTabsNav.appendChild(btnGlobal);
+
+  // 2. Abas das Fatias Verticais
+  nodes.forEach((node) => {
+    const btn = document.createElement('button');
+    const isAct = activeSliceTabId === node.id;
+    const status = node.kanban_status || 'BACKLOG';
+    let dotCol = '#64748b';
+    let icon = '📦';
+
+    if (status === 'APPROVED') {
+      dotCol = '#22c55e';
+      icon = '✓';
+    } else if (status === 'EXECUTING') {
+      dotCol = '#38bdf8';
+      icon = '⚡';
+    } else if (status === 'CRITIQUING') {
+      dotCol = '#a855f7';
+      icon = '🔬';
+    } else if (status === 'REJECTED') {
+      dotCol = '#ef4444';
+      icon = '✕';
+    }
+
+    const tddStage = node.tdd_stage || 'INIT';
+    const tddTag = tddStage === 'GREEN_CONFIRMED' ? 'GREEN' : (tddStage === 'RED_CONFIRMED' ? 'RED' : '');
+
+    btn.className = `slice-tab-btn ${isAct ? 'active' : ''}`;
+    btn.setAttribute('data-slice-tab', node.id);
+    btn.innerHTML = `
+      <span class="slice-tab-dot" style="background: ${dotCol}"></span>
+      <span class="slice-tab-icon">${icon}</span>
+      <span class="slice-tab-name">${escapeHtml(node.title || node.id)}</span>
+      ${tddTag ? `<span class="slice-tab-tdd-mini ${tddTag.toLowerCase()}">${tddTag}</span>` : ''}
+    `;
+    btn.addEventListener('click', () => switchSliceTab(node.id));
+    sliceTabsNav.appendChild(btn);
+  });
+}
+
+export function switchSliceTab(tabId) {
+  if (!sliceTabsNav) resolveSlicesElements();
+  activeSliceTabId = tabId;
+
+  // Atualiza classes ativas nos botões
+  if (sliceTabsNav) {
+    sliceTabsNav.querySelectorAll('.slice-tab-btn').forEach(btn => {
+      const match = btn.getAttribute('data-slice-tab') === tabId;
+      btn.classList.toggle('active', match);
+    });
+  }
+
+  // Alterna containers
+  if (tabId === 'global') {
+    if (slicePaneGlobal) {
+      slicePaneGlobal.style.display = 'block';
+      slicePaneGlobal.classList.add('active');
+    }
+    if (slicePaneDetail) {
+      slicePaneDetail.style.display = 'none';
+      slicePaneDetail.classList.remove('active');
+    }
+  } else {
+    if (slicePaneGlobal) {
+      slicePaneGlobal.style.display = 'none';
+      slicePaneGlobal.classList.remove('active');
+    }
+    if (slicePaneDetail) {
+      slicePaneDetail.style.display = 'block';
+      slicePaneDetail.classList.add('active');
+    }
+    renderDedicatedSliceView(tabId);
+  }
+}
+
+export function renderDedicatedSliceView(sliceId) {
+  if (!slicePaneDetail) resolveSlicesElements();
+  const node = (state.nodes || []).find(n => n.id === sliceId);
+  if (!node) {
+    switchSliceTab('global');
+    return;
+  }
+
+  // 1. Cabeçalho Detalhado da Fatia
+  if (sliceDetailHeader) {
+    const status = node.kanban_status || 'BACKLOG';
+    const statusText = status === 'APPROVED' ? 'Aprovado' :
+                       status === 'EXECUTING' ? 'Em Execução (Builder)' :
+                       status === 'CRITIQUING' ? 'Em Auditoria (Critic)' :
+                       status === 'REJECTED' ? 'Rejeitado (Corrigindo)' : 'Backlog';
+
+    const tddBadge = node.tdd_stage === 'GREEN_CONFIRMED'
+      ? '<span class="tdd-badge tdd-green">TDD GREEN ✓</span>'
+      : (node.tdd_stage === 'RED_CONFIRMED'
+        ? '<span class="tdd-badge tdd-red">TDD RED ✕</span>'
+        : '<span class="tdd-badge tdd-idle">TDD INIT</span>');
+
+    sliceDetailHeader.innerHTML = `
+      <div class="slice-header-left">
+        <span class="slice-id-badge">${escapeHtml(node.id.toUpperCase())}</span>
+        <h2 class="slice-header-title">${escapeHtml(node.title)}</h2>
+        <div class="slice-header-badges">
+          ${tddBadge}
+          <span class="slice-status-pill status-${status.toLowerCase()}">${statusText}</span>
+          <span class="slice-attempt-badge">Tentativa ${node.attempt || 1}</span>
+        </div>
+      </div>
+      <div class="slice-header-actions">
+        <button class="btn-slice-terminal" id="btn-open-slice-term-${node.id}" title="Abrir terminal isolado para esta fatia">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+          Abrir Subagente no Terminal
+        </button>
+      </div>
+    `;
+
+    const btnTerm = document.getElementById(`btn-open-slice-term-${node.id}`);
+    if (btnTerm) {
+      btnTerm.addEventListener('click', () => {
+        if (window.terminalWorkspace) {
+          window.terminalWorkspace.createSession({
+            role: 'subagent',
+            sliceId: node.id,
+            name: `🔬 Subagente ${node.id.toUpperCase()}`
+          });
+        }
+        if (typeof window.switchTab === 'function') {
+          window.switchTab('nav-tab-terminal');
+        }
+      });
+    }
+  }
+
+  // 2. Card do Par 3x3 Alocado
+  if (sliceGovFleetCard) {
+    const pairs = state.pairs_3x3 || [];
+    const sliceIndex = (state.nodes || []).findIndex(n => n.id === sliceId);
+    let pair = pairs.find(p => p.current_slice_id === sliceId);
+    if (!pair && sliceIndex >= 0 && sliceIndex < pairs.length) {
+      pair = pairs[sliceIndex];
+    }
+    if (!pair) {
+      pair = {
+        name: `Par Vinculado: ${node.id.toUpperCase()}`,
+        builder_status: 'IDLE',
+        critic_status: 'IDLE',
+        last_heartbeat: 'Aguardando despacho'
+      };
+    }
+
+    const bClass = getAgentStatusClass(pair.builder_status);
+    const cClass = getAgentStatusClass(pair.critic_status);
+
+    sliceGovFleetCard.innerHTML = `
+      <div class="gov-card-header">
+        <span class="gov-card-title">Frota 3x3 Alocada</span>
+        <span class="gov-card-badge">${escapeHtml(pair.name)}</span>
+      </div>
+      <div class="gov-pair-body">
+        <div class="gov-agent-box">
+          <div class="gov-agent-header">
+            <span class="gov-agent-role">⚡ Builder (Executor)</span>
+            <span class="gov-agent-state ${bClass}">${pair.builder_status || 'IDLE'}</span>
+          </div>
+          <p class="gov-agent-desc">Desenvolve testes TDD e código de produção na worktree dedicada.</p>
+        </div>
+        <div class="gov-agent-box">
+          <div class="gov-agent-header">
+            <span class="gov-agent-role">🔬 Harsh Critic (Revisor)</span>
+            <span class="gov-agent-state ${cClass}">${pair.critic_status || 'IDLE'}</span>
+          </div>
+          <p class="gov-agent-desc">Audita critérios de aceite e emite vereditos no Gauntlet Loop.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  // 3. Card de Especificação & Critérios
+  if (sliceGovSpecCard) {
+    sliceGovSpecCard.innerHTML = `
+      <div class="gov-card-header">
+        <span class="gov-card-title">Especificação & Critérios de Aceite</span>
+        <span class="gov-card-badge spec">Spec-Driven</span>
+      </div>
+      <div class="gov-spec-body">
+        <div class="gov-spec-section">
+          <div class="gov-spec-section-title">Master Blueprint</div>
+          <div class="gov-spec-text">${escapeHtml(node.spec_md || 'Nenhuma especificação gravada para esta fatia.')}</div>
+        </div>
+        <div class="gov-spec-section">
+          <div class="gov-spec-section-title">Critérios de Aceite (Quality Gate)</div>
+          <div class="gov-spec-text criteria">${escapeHtml(node.acceptance_criteria || 'Nenhum critério registrado.')}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 4. Card do Gauntlet Loop da Fatia
+  if (sliceGovGauntletCard) {
+    const nodeLogs = (state.gauntlet_log || []).filter(l => l.slice_id === sliceId);
+    let logHtml = '';
+
+    if (nodeLogs.length === 0) {
+      logHtml = '<div class="gov-empty-text">Nenhuma auditoria registrada no Gauntlet Loop para esta fatia até o momento.</div>';
+    } else {
+      nodeLogs.forEach(log => {
+        const isApproved = log.verdict === 'APROVADO';
+        const m = log.review_metrics || { critical: 0, important: 0, minor: 0 };
+        const hasFindings = (m.critical || 0) + (m.important || 0) + (m.minor || 0) > 0;
+        const badges = hasFindings ? `
+          <div class="gov-metrics-row">
+            ${m.critical > 0 ? `<span class="metric-pill critical">CRITICAL: ${m.critical}</span>` : ''}
+            ${m.important > 0 ? `<span class="metric-pill important">IMPORTANT: ${m.important}</span>` : ''}
+            ${m.minor > 0 ? `<span class="metric-pill minor">MINOR: ${m.minor}</span>` : ''}
+          </div>
+        ` : '';
+
+        logHtml += `
+          <div class="gov-log-item ${isApproved ? 'aprovado' : 'rejeitado'}">
+            <div class="gov-log-header">
+              <span class="gov-verdict-tag ${isApproved ? 'aprovado' : 'rejeitado'}">${log.verdict} — Tentativa ${log.attempt}</span>
+              <span class="gov-log-time">${log.timestamp || ''}</span>
+            </div>
+            ${badges}
+            <div class="gov-log-reason">${escapeHtml(log.reason || '')}</div>
+          </div>
+        `;
+      });
+    }
+
+    sliceGovGauntletCard.innerHTML = `
+      <div class="gov-card-header">
+        <span class="gov-card-title">Auditorias do Gauntlet Loop</span>
+        <span class="gov-card-badge gauntlet">${nodeLogs.length} ${nodeLogs.length === 1 ? 'Auditoria' : 'Auditorias'}</span>
+      </div>
+      <div class="gov-gauntlet-body">
+        ${logHtml}
+      </div>
+    `;
+  }
+
+  // 5. Chat Dedicado da Fatia
+  if (sliceChatTargetBadge) {
+    sliceChatTargetBadge.textContent = node.title || sliceId.toUpperCase();
+  }
+
+  renderDedicatedSliceChatMessages(sliceId);
+}
+
+export function renderDedicatedSliceChatMessages(sliceId) {
+  if (!sliceChatMessages) resolveSlicesElements();
+  if (!sliceChatMessages) return;
+
+  sliceChatMessages.innerHTML = '';
+  const allMessages = state.steering_messages || [];
+  const messages = allMessages.filter(m => m.slice_id === sliceId || (!m.slice_id && m.id === 'msg-0'));
+
+  if (messages.length === 0) {
+    sliceChatMessages.innerHTML = `
+      <div class="slice-chat-empty">
+        <div class="slice-chat-empty-icon">💬</div>
+        <div class="slice-chat-empty-title">Canal Dedicado da Fatia</div>
+        <div class="slice-chat-empty-desc">Envie orientações de arquitetura, contratos e diretrizes diretamente para o Executor e Revisor desta fatia.</div>
+      </div>
+    `;
+    return;
+  }
+
+  messages.forEach(msg => {
+    const bubble = document.createElement('div');
+    const isUser = msg.sender === 'USER';
+    const sender = msg.sender || 'ORCHESTRATOR';
+    const senderLabel = isUser ? '👤 Você' :
+                        sender === 'BUILDER' ? '⚡ Executor (Builder)' :
+                        sender === 'CRITIC' ? '🔬 Revisor (Critic)' : '👑 Orquestrador';
+
+    bubble.className = `slice-chat-bubble ${isUser ? 'user' : 'agent'}`;
+    bubble.innerHTML = `
+      <div class="bubble-meta">
+        <span class="bubble-sender">${senderLabel}</span>
+        <span class="bubble-time">${msg.timestamp || ''}</span>
+      </div>
+      <div class="bubble-text">${escapeHtml(msg.text)}</div>
+    `;
+    sliceChatMessages.appendChild(bubble);
+  });
+
+  sliceChatMessages.scrollTop = sliceChatMessages.scrollHeight;
+}
+
 export function initSlicesChatEvents() {
   resolveSlicesElements();
 
@@ -493,6 +840,37 @@ export function initSlicesChatEvents() {
         });
       }
       if (chatInput) chatInput.value = '';
+    });
+  }
+
+  // Issue #7: Formulário do Chat Dedicado da Fatia
+  if (sliceChatForm) {
+    sliceChatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = sliceChatInput ? sliceChatInput.value.trim() : '';
+      if (!text) return;
+
+      const targetSlice = activeSliceTabId !== 'global' ? activeSliceTabId : null;
+
+      if (window.cockpitSocket && window.cockpitSocket.readyState === WebSocket.OPEN) {
+        window.cockpitSocket.send(JSON.stringify({
+          action: 'USER_STEERING',
+          text,
+          slice_id: targetSlice,
+          project_id: currentProjectId
+        }));
+      } else {
+        apiFetch('/api/steering', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            slice_id: targetSlice,
+            project_id: currentProjectId
+          })
+        });
+      }
+      if (sliceChatInput) sliceChatInput.value = '';
     });
   }
 

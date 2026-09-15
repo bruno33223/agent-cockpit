@@ -85,19 +85,23 @@ TOOLS_DEFINITIONS = [
     },
     {
         "name": "fetch_user_steering",
-        "description": "Recupera todas as mensagens, direcionamentos e comentários que o usuário enviou pelo chat do dashboard.",
+        "description": "Recupera todas as mensagens, direcionamentos e comentários que o usuário enviou pelo chat do dashboard, opcionalmente filtrados por fatia vertical (slice_id).",
         "inputSchema": {
             "type": "object",
-            "properties": {}
+            "properties": {
+                "slice_id": {"type": "string", "description": "ID da fatia vertical (ex: 'slice-1') para recuperar direcionamento específico da fatia"}
+            }
         }
     },
     {
         "name": "post_orchestrator_message",
-        "description": "Envia uma mensagem de status, resposta ou pedido de autorização do Orquestrador diretamente para o chat do dashboard.",
+        "description": "Envia uma mensagem de status, resposta ou pedido de autorização do Orquestrador/Agente/Revisor diretamente para o chat do dashboard (geral ou dedicado à fatia).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "message": {"type": "string", "description": "Texto da mensagem enviada pelo Orquestrador."}
+                "message": {"type": "string", "description": "Texto da mensagem enviada pelo Orquestrador ou Agente."},
+                "slice_id": {"type": "string", "description": "ID da fatia vertical (ex: 'slice-1') para postar no chat dedicado da fatia. Se omitido, posta no canal global."},
+                "sender": {"type": "string", "description": "Identificação do emissor ('ORCHESTRATOR', 'BUILDER', 'CRITIC'). Padrão: 'ORCHESTRATOR'"}
             },
             "required": ["message"]
         }
@@ -469,15 +473,20 @@ def handle_tool_call(name: str, args: dict) -> dict:
         return {"content": [{"type": "text", "text": f"Veredito [{res.get('verdict')}] registrado no Gauntlet Log para {args.get('slice_id')} (Tentativa {args.get('attempt')}, workspace: '{target_pid}')."}]}
 
     elif name == "fetch_user_steering":
-        messages = db.fetch_unconsumed_steering(project_id=target_pid)
+        slice_id = args.get("slice_id")
+        messages = db.fetch_unconsumed_steering(project_id=target_pid, slice_id=slice_id)
         if not messages:
-            return {"content": [{"type": "text", "text": "Nenhum novo direcionamento ou mensagem do usuário no momento."}]}
+            target_scope = f"fatia '{slice_id}'" if slice_id else "projeto geral"
+            return {"content": [{"type": "text", "text": f"Nenhum novo direcionamento ou mensagem do usuário no momento ({target_scope})."}]}
         formatted = "\n".join([f"[{m['timestamp']}] Usuário: {m['text']}" for m in messages])
         return {"content": [{"type": "text", "text": f"Mensagens recebidas do usuário ({target_pid}):\n{formatted}"}]}
 
     elif name == "post_orchestrator_message":
-        db.post_orchestrator_message(args.get("message", ""), project_id=target_pid)
-        return {"content": [{"type": "text", "text": f"Mensagem postada no chat do Cockpit ({target_pid}) com sucesso."}]}
+        slice_id = args.get("slice_id")
+        sender = args.get("sender", "ORCHESTRATOR")
+        db.post_orchestrator_message(args.get("message", ""), project_id=target_pid, slice_id=slice_id, sender=sender)
+        target_scope = f"na fatia '{slice_id}'" if slice_id else "no chat do Cockpit"
+        return {"content": [{"type": "text", "text": f"Mensagem postada {target_scope} ({target_pid}) com sucesso."}]}
 
     elif name == "get_cockpit_state":
         state = db.get_state(project_id=target_pid)

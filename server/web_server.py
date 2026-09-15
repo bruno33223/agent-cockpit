@@ -408,8 +408,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 elif action == "USER_STEERING":
                     text = msg.get("text", "")
+                    slice_id = msg.get("slice_id")
                     if text.strip():
-                        db.add_user_steering(text.strip(), project_id=target_pid)
+                        db.add_user_steering(text.strip(), project_id=target_pid, slice_id=slice_id)
 
                 elif action == "RESET_STATE":
                     db.reset_state(project_id=target_pid)
@@ -499,13 +500,19 @@ def get_state(project_id: Optional[str] = None):
 class SteeringPayload(BaseModel):
     text: str
     project_id: Optional[str] = None
+    slice_id: Optional[str] = None
 
 @app.post("/api/steering")
 def post_steering(payload: SteeringPayload):
     if not payload.text.strip():
         return {"error": "Texto não pode ser vazio"}
-    msg = db.add_user_steering(payload.text.strip(), project_id=payload.project_id)
+    msg = db.add_user_steering(payload.text.strip(), project_id=payload.project_id, slice_id=payload.slice_id)
     return {"status": "ok", "message": msg}
+
+@app.get("/api/steering/messages")
+def get_steering_messages(project_id: Optional[str] = None, slice_id: Optional[str] = None):
+    messages = db.get_slice_steering_messages(project_id=project_id, slice_id=slice_id)
+    return {"status": "ok", "messages": messages, "project_id": project_id, "slice_id": slice_id}
 
 class ResetPayload(BaseModel):
     project_id: Optional[str] = None

@@ -464,8 +464,9 @@ class StateStore:
         self._notify("STATE_FULL", state, target_pid)
         return entry
 
-    def add_user_steering(self, text: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+    def add_user_steering(self, text: str, project_id: Optional[str] = None, slice_id: Optional[str] = None) -> Dict[str, Any]:
         target_pid = self.resolve_project_id(project_id)
+        clean_slice = slice_id if slice_id and str(slice_id).strip() != "" and str(slice_id).lower() != "global" else None
         with self.lock:
             state = self.get_state(target_pid)
             msg = {
@@ -473,7 +474,8 @@ class StateStore:
                 "sender": "USER",
                 "text": text,
                 "timestamp": time.strftime("%H:%M:%S"),
-                "consumed": False
+                "consumed": False,
+                "slice_id": clean_slice
             }
             state.setdefault("steering_messages", []).append(msg)
             self._save_state(state, target_pid)
@@ -481,33 +483,57 @@ class StateStore:
         self._notify("STATE_FULL", state, target_pid)
         return msg
 
-    def fetch_unconsumed_steering(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def fetch_unconsumed_steering(self, project_id: Optional[str] = None, slice_id: Optional[str] = None) -> List[Dict[str, Any]]:
         target_pid = self.resolve_project_id(project_id)
+        clean_slice = slice_id if slice_id and str(slice_id).strip() != "" and str(slice_id).lower() != "global" else None
         with self.lock:
             state = self.get_state(target_pid)
-            unconsumed = [m for m in state.get("steering_messages", []) if not m.get("consumed", False)]
+            all_msgs = state.get("steering_messages", [])
+            unconsumed = []
+            for m in all_msgs:
+                if m.get("consumed", False):
+                    continue
+                m_slice = m.get("slice_id")
+                if clean_slice is not None:
+                    if m_slice == clean_slice or m_slice is None:
+                        unconsumed.append(m)
+                else:
+                    unconsumed.append(m)
+
             for m in unconsumed:
                 m["consumed"] = True
             if unconsumed:
                 self._save_state(state, target_pid)
         return unconsumed
 
-    def post_orchestrator_message(self, text: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+    def post_orchestrator_message(self, text: str, project_id: Optional[str] = None, slice_id: Optional[str] = None, sender: str = "ORCHESTRATOR") -> Dict[str, Any]:
         target_pid = self.resolve_project_id(project_id)
+        clean_slice = slice_id if slice_id and str(slice_id).strip() != "" and str(slice_id).lower() != "global" else None
         with self.lock:
             state = self.get_state(target_pid)
             msg = {
                 "id": f"msg-{len(state.get('steering_messages', [])) + 1}",
-                "sender": "ORCHESTRATOR",
+                "sender": sender or "ORCHESTRATOR",
                 "text": text,
                 "timestamp": time.strftime("%H:%M:%S"),
-                "consumed": True
+                "consumed": True,
+                "slice_id": clean_slice
             }
             state.setdefault("steering_messages", []).append(msg)
             self._save_state(state, target_pid)
         self._notify("ORCHESTRATOR_MESSAGE", msg, target_pid)
         self._notify("STATE_FULL", state, target_pid)
         return msg
+
+    def get_slice_steering_messages(self, project_id: Optional[str] = None, slice_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        target_pid = self.resolve_project_id(project_id)
+        clean_slice = slice_id if slice_id and str(slice_id).strip() != "" and str(slice_id).lower() != "global" else None
+        with self.lock:
+            state = self.get_state(target_pid)
+            all_msgs = state.get("steering_messages", [])
+            if clean_slice is not None:
+                return [m for m in all_msgs if m.get("slice_id") == clean_slice]
+            return [m for m in all_msgs if m.get("slice_id") is None]
 
     def get_metrics(self, project_id: Optional[str] = None) -> Dict[str, Any]:
         target_pid = self.resolve_project_id(project_id)

@@ -60,7 +60,14 @@ import {
   renderChatMessages,
   renderGauntletFull,
   updateDrawerContent,
-  initSlicesChatEvents
+  initSlicesChatEvents,
+  activeSliceTabId,
+  setActiveSliceTabId,
+  getActiveSliceTabId,
+  renderSliceTabs,
+  switchSliceTab,
+  renderDedicatedSliceView,
+  renderDedicatedSliceChatMessages
 } from './js/slices_chat.js';
 import {
   initOrRefreshGraph,
@@ -187,6 +194,13 @@ Object.assign(window, {
   renderGauntletFull,
   updateDrawerContent,
   initSlicesChatEvents,
+  activeSliceTabId,
+  setActiveSliceTabId,
+  getActiveSliceTabId,
+  renderSliceTabs,
+  switchSliceTab,
+  renderDedicatedSliceView,
+  renderDedicatedSliceChatMessages,
 
   // Codebase Graph
   initOrRefreshGraph,

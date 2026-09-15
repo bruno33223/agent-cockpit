@@ -355,41 +355,84 @@
         </div>
       </section>
 
-      <!-- VIEW 2: FLOWCHART & MICRO-KANBAN -->
+      <!-- VIEW 2: FLOWCHART, SLICE TABS & MICRO-KANBAN (ISSUE #7) -->
       <section class="tab-view" id="view-flow">
         <div class="flow-container">
-          <div class="flow-toolbar">
-            <div class="toolbar-title-group">
-              <h2>Fluxograma de Fatias Verticais</h2>
-              <span class="toolbar-desc">Cada nó opera como um micro-kanban de ciclo fechado (Builder ➔ Critic ➔ Aprovado)</span>
+          <!-- NAVEGAÇÃO HORIZONTAL DE ABAS DE SLICES -->
+          <div class="slice-tabs-nav" id="slice-tabs-nav">
+            <button class="slice-tab-btn active" data-slice-tab="global">
+              <span class="slice-tab-icon">🌐</span>
+              <span class="slice-tab-name">Visão Global & Kanban</span>
+            </button>
+          </div>
+
+          <!-- CONTAINER 1: VISÃO GLOBAL (FLOWCHART & KANBAN ATUAL) -->
+          <div class="slice-tab-pane slice-tab-pane-global active" id="slice-pane-global">
+            <div class="flow-toolbar">
+              <div class="toolbar-title-group">
+                <h2>Fluxograma de Fatias Verticais</h2>
+                <span class="toolbar-desc">Cada nó opera como um micro-kanban de ciclo fechado (Builder ➔ Critic ➔ Aprovado)</span>
+              </div>
+              <div class="kanban-legend">
+                <span class="leg-item"><span class="leg-color backlog"></span> Backlog</span>
+                <span class="leg-item"><span class="leg-color executing"></span> Builder</span>
+                <span class="leg-item"><span class="leg-color reviewing"></span> Critic</span>
+                <span class="leg-item"><span class="leg-color rejected"></span> Rejeitado</span>
+                <span class="leg-item"><span class="leg-color approved"></span> Aprovado</span>
+              </div>
             </div>
-            <div class="kanban-legend">
-              <span class="leg-item"><span class="leg-color backlog"></span> Backlog</span>
-              <span class="leg-item"><span class="leg-color executing"></span> Builder</span>
-              <span class="leg-item"><span class="leg-color reviewing"></span> Critic</span>
-              <span class="leg-item"><span class="leg-color rejected"></span> Rejeitado</span>
-              <span class="leg-item"><span class="leg-color approved"></span> Aprovado</span>
+
+            <!-- FLOW NODES CANVAS -->
+            <div class="nodes-canvas" id="nodes-canvas"></div>
+
+            <!-- FINAL GATEKEEPER CARD -->
+            <div class="gatekeeper-card">
+              <div class="gatekeeper-header">
+                <div class="gatekeeper-icon">🛡️</div>
+                <div class="gatekeeper-info">
+                  <h3>Gate de Integração Final (Orquestrador)</h3>
+                  <p>Auditoria global de coesão, contratos e integração ponta a ponta</p>
+                </div>
+                <span class="gatekeeper-badge pending" id="gate-status">EM ANDAMENTO</span>
+              </div>
+              <div class="gatekeeper-progress-row">
+                <div class="progress-track">
+                  <div class="progress-fill" id="global-progress-fill" style="width: 0%"></div>
+                </div>
+                <span class="progress-label" id="approved-slices-count">0 / 3</span>
+              </div>
             </div>
           </div>
 
-          <!-- FLOW NODES CANVAS -->
-          <div class="nodes-canvas" id="nodes-canvas"></div>
-
-          <!-- FINAL GATEKEEPER CARD -->
-          <div class="gatekeeper-card">
-            <div class="gatekeeper-header">
-              <div class="gatekeeper-icon">🛡️</div>
-              <div class="gatekeeper-info">
-                <h3>Gate de Integração Final (Orquestrador)</h3>
-                <p>Auditoria global de coesão, contratos e integração ponta a ponta</p>
-              </div>
-              <span class="gatekeeper-badge pending" id="gate-status">EM ANDAMENTO</span>
+          <!-- CONTAINER 2: VISÃO DEDICADA DA FATIA SELECIONADA -->
+          <div class="slice-tab-pane slice-tab-pane-detail" id="slice-pane-detail" style="display: none;">
+            <div class="slice-detail-header" id="slice-detail-header">
+              <!-- Renderizado dinamicamente via renderDedicatedSliceView() -->
             </div>
-            <div class="gatekeeper-progress-row">
-              <div class="progress-track">
-                <div class="progress-fill" id="global-progress-fill" style="width: 0%"></div>
+            <div class="slice-detail-grid">
+              <!-- Coluna Esquerda: Governança, Frota 3x3, Blueprint & Gauntlet da Fatia -->
+              <div class="slice-detail-col-gov">
+                <div class="slice-gov-card fleet-card" id="slice-gov-fleet-card"></div>
+                <div class="slice-gov-card spec-card" id="slice-gov-spec-card"></div>
+                <div class="slice-gov-card gauntlet-card" id="slice-gov-gauntlet-card"></div>
               </div>
-              <span class="progress-label" id="approved-slices-count">0 / 3</span>
+              <!-- Coluna Direita: Chat Dedicado da Fatia -->
+              <div class="slice-detail-col-chat">
+                <div class="slice-chat-container">
+                  <div class="slice-chat-header">
+                    <div class="slice-chat-title">
+                      <span class="slice-chat-icon">💬</span>
+                      <span>Chat de Direcionamento Humano (Human Steering)</span>
+                    </div>
+                    <span class="slice-chat-badge" id="slice-chat-target-badge">Fatia</span>
+                  </div>
+                  <div class="slice-chat-feed" id="slice-chat-messages"></div>
+                  <form class="slice-chat-form" id="slice-chat-form">
+                    <input type="text" id="slice-chat-input" class="slice-chat-input" placeholder="Instruir os agentes desta fatia..." autocomplete="off">
+                    <button type="submit" class="slice-chat-send-btn">Enviar à Fatia</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
         </div>
