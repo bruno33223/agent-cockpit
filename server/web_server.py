@@ -1296,7 +1296,7 @@ def read_fs_file(
         except ValueError:
             raise HTTPException(status_code=403, detail="Caminho inválido.")
 
-    if not os.path.exists(target_file) or not os.path.isfile(target_file):
+    if not os.path.exists(target_file):
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
 
     file_name = os.path.basename(target_file)
@@ -1307,6 +1307,9 @@ def read_fs_file(
         or file_name == ".git"
     ):
         raise HTTPException(status_code=403, detail="Acesso negado: arquivo ou recurso restrito.")
+
+    if not os.path.isfile(target_file):
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
     try:
         rel_path = os.path.relpath(target_file, root_path).replace("\\", "/")
     except ValueError:
