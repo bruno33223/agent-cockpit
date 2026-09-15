@@ -55,5 +55,7 @@ cockpit-agent/
 _references/
 .worktrees/
 worktrees/
+scratch/
+
 
 

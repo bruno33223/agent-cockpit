@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="zeusTerminalSvg" viewBox="0 0 500 500" class="w-full h-full" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZEUS AGENT - Terminal Bash God Icon">
+    <defs>
+        <!-- Phosphor Gradient Main -->
+        <linearGradient id="termGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#34D399"/>
+            <stop offset="50%" stop-color="#00FF66"/>
+            <stop offset="100%" stop-color="#059669"/>
+        </linearGradient>
+
+        <!-- Bright Highlight for Eyes & Lightning -->
+        <linearGradient id="hotSparks" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#FFFFFF"/>
+            <stop offset="70%" stop-color="#6EE7B7"/>
+            <stop offset="100%" stop-color="#00FF66"/>
+        </linearGradient>
+
+        <filter id="terminalGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5" result="blur"/>
+            <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- ================= 01. TERMINAL WINDOW FRAME ================= -->
+    <!-- Terminal Outer Shell -->
+    <rect x="15" y="15" width="470" height="470" rx="20" fill="#040707" stroke="var(--primary-glow, #00ff66)" stroke-width="2.5" stroke-opacity="0.8"/>
+    
+    <!-- Terminal Window Header Bar -->
+    <rect x="15" y="15" width="470" height="46" rx="20" fill="#09120e" stroke="var(--primary-glow, #00ff66)" stroke-width="1.5" stroke-opacity="0.3"/>
+    <line x1="15" y1="61" x2="485" y2="61" stroke="var(--primary-glow, #00ff66)" stroke-width="2" stroke-opacity="0.6"/>
+
+    <!-- Window Action Controls (Classic CLI circles) -->
+    <circle cx="42" cy="38" r="6" fill="#EF4444" opacity="0.85"/>
+    <circle cx="62" cy="38" r="6" fill="#F59E0B" opacity="0.85"/>
+    <circle cx="82" cy="38" r="6" fill="#10B981" opacity="0.85"/>
+
+    <!-- Header Bash Title & Status -->
+    <text x="110" y="43" font-family="'Fira Code', monospace" font-size="12" font-weight="600" fill="var(--primary-glow, #00ff66)" letter-spacing="1">
+        zeus@agent:~# ./godmode --daemon
+    </text>
+    
+    <text x="445" y="43" text-anchor="end" font-family="'Fira Code', monospace" font-size="11" fill="var(--primary-glow, #00ff66)" opacity="0.6">[CLI:OK]</text>
+
+    <!-- ================= 02. BACKGROUND BASH PROMPT / SYNTAX MATRIX ================= -->
+    <g font-family="'Fira Code', monospace" font-size="10" fill="var(--primary-glow, #00ff66)" opacity="0.16">
+        <text x="35" y="90">$ sudo init olympus-core.sh</text>
+        <text x="35" y="110">[SYS] 12 Olympus Threads Allocated</text>
+        <text x="35" y="130">&gt;&gt;&gt; AST.bind("lightning_strike")</text>
+        <text x="35" y="445">return &amp;&amp; eval $(zeus --godspeed)</text>
+        <text x="35" y="465">root@zeus-agent:~# █</text>
+        
+        <text x="465" y="90" text-anchor="end">&lt;agentic:ai&gt;</text>
+        <text x="465" y="110" text-anchor="end">0x7F_THUNDER</text>
+        <text x="465" y="445" text-anchor="end">PID: 0001</text>
+        <text x="465" y="465" text-anchor="end">EXIT 0</text>
+    </g>
+
+    <!-- Subtle Terminal CRT Grid lines -->
+    <g stroke="var(--primary-glow, #00ff66)" stroke-width="0.5" opacity="0.1">
+        <line x1="15" y1="150" x2="485" y2="150" stroke-dasharray="4 8"/>
+        <line x1="15" y1="250" x2="485" y2="250" stroke-dasharray="4 8"/>
+        <line x1="15" y1="350" x2="485" y2="350" stroke-dasharray="4 8"/>
+        <line x1="250" y1="61" x2="250" y2="485" stroke-dasharray="4 8"/>
+    </g>
+
+    <!-- ================= 03. ZEUS DIVINE HEAD (BASH/TERMINAL STYLE) ================= -->
+    <g filter="url(#terminalGlowFilter)" stroke="var(--primary-glow, #00ff66)" stroke-linecap="round" stroke-linejoin="round">
+
+        <!-- [A] ZEUS HAIR & OLYMPIAN CROWN -->
+        <!-- Top Hair Waves / Lightning Locks -->
+        <path d="M190 125 C200 95, 230 85, 250 85 C270 85, 300 95, 310 125" fill="none" stroke-width="4"/>
+        <path d="M150 145 C170 105, 205 98, 225 105" fill="none" stroke-width="3"/>
+        <path d="M350 145 C330 105, 295 98, 275 105" fill="none" stroke-width="3"/>
+        
+        <!-- Curly Locks / Terminal Tildes & Chevrons in Hair -->
+        <path d="M135 180 C125 150, 140 130, 165 130 C180 130, 185 140, 175 160 C165 180, 140 185, 130 215" fill="none" stroke-width="3.5"/>
+        <path d="M365 180 C375 150, 360 130, 335 130 C320 130, 315 140, 325 160 C335 180, 360 185, 370 215" fill="none" stroke-width="3.5"/>
+        
+        <!-- Outer Temple curls -->
+        <path d="M120 220 C110 240, 125 260, 145 255" fill="none" stroke-width="3"/>
+        <path d="M380 220 C390 240, 375 260, 355 255" fill="none" stroke-width="3"/>
+
+        <!-- Central Lightning Tiara / Bash Symbol '>_' integrated on Forehead -->
+        <polygon points="250,90 244,115 256,115 242,142 262,118 250,118 256,90" fill="url(#hotSparks)" stroke="none"/>
+        
+        <!-- [B] ZEUS FOREHEAD, PROMINENT BROW & GREEK NOSE -->
+        <!-- Intense Stern Eyebrows (Terminal Angle Sliders) -->
+        <path d="M175 188 L232 202 L245 208" fill="none" stroke-width="4.5"/>
+        <path d="M325 188 L268 202 L255 208" fill="none" stroke-width="4.5"/>
+        
+        <!-- Classical Sculpted Greek Nose Bridge -->
+        <path d="M250 208 L244 265 L235 275 L250 278 L265 275 L256 265" fill="none" stroke-width="3"/>
+
+        <!-- [C] ZEUS INTENSE PIERCING EYES (Terminal Block Cursors) -->
+        <!-- Left Eye Socket & Terminal Cursor Eye -->
+        <path d="M182 215 C195 208, 220 208, 230 216 C220 224, 195 224, 182 215 Z" fill="#040f09" stroke-width="2.5"/>
+        <rect x="200" y="212" width="10" height="7" rx="1.5" fill="url(#hotSparks)" stroke="none"/>
+        <!-- Code syntax brackets around left eye -->
+        <path d="M175 210 L170 216 L175 222" fill="none" stroke-width="2"/>
+
+        <!-- Right Eye Socket & Terminal Cursor Eye -->
+        <path d="M318 215 C305 208, 280 208, 270 216 C280 224, 305 224, 318 215 Z" fill="#040f09" stroke-width="2.5"/>
+        <rect x="290" y="212" width="10" height="7" rx="1.5" fill="url(#hotSparks)" stroke="none"/>
+        <!-- Code syntax brackets around right eye -->
+        <path d="M325 210 L330 216 L325 222" fill="none" stroke-width="2"/>
+
+        <!-- Facial Contour & Cheekbones with code indent lines -->
+        <path d="M152 230 L168 260" fill="none" stroke-width="2.5" stroke-dasharray="6 4"/>
+        <path d="M348 230 L332 260" fill="none" stroke-width="2.5" stroke-dasharray="6 4"/>
+
+        <!-- [D] ZEUS PROUD MUSTACHE (Curved CLI Waves) -->
+        <path d="M250 282 C235 280, 205 285, 175 315 C205 315, 235 298, 250 292 C265 298, 295 315, 325 315 C295 285, 265 280, 250 282 Z" fill="#05170d" stroke-width="3.5"/>
+        <!-- Mustache center split accent -->
+        <line x1="250" y1="282" x2="250" y2="293" stroke-width="2.5"/>
+
+        <!-- Mouth hint underneath mustache -->
+        <line x1="240" y1="304" x2="260" y2="304" stroke-width="3"/>
+
+        <!-- [E] ZEUS EPIC FLOWING BEARD -->
+        <!-- Beard Outer Shape Silhouette -->
+        <path d="M145 255 
+                 C130 295, 140 340, 160 375
+                 C180 410, 210 435, 250 445
+                 C290 435, 320 410, 340 375
+                 C360 340, 370 295, 355 255" fill="none" stroke-width="3" stroke-dasharray="12 4"/>
+
+        <!-- Flowing Beard Strands Made of Code Logic & Lightning Strands -->
+        <!-- Central Beard Waterfall (Main Power Core) -->
+        <path d="M250 312 L250 370 L242 385 L258 405 L250 442" fill="none" stroke-width="4" stroke="url(#hotSparks)"/>
+        
+        <!-- Left Beard Cascade (Curly Braces & Prompt Arrows) -->
+        <path d="M225 315 C215 340, 210 380, 230 420" fill="none" stroke-width="3"/>
+        <path d="M195 318 C180 345, 185 375, 210 405" fill="none" stroke-width="2.8"/>
+        <path d="M168 310 C155 335, 160 365, 185 390" fill="none" stroke-width="2.5"/>
+
+        <!-- Right Beard Cascade (Lightning Infused) -->
+        <path d="M275 315 C285 340, 290 380, 270 420" fill="none" stroke-width="3"/>
+        <path d="M305 318 C320 345, 315 375, 290 405" fill="none" stroke-width="2.8"/>
+        <path d="M332 310 C345 335, 340 365, 315 390" fill="none" stroke-width="2.5"/>
+
+        <!-- Beard Curls Terminal Syntax Glyphs (Brackets embedded in the beard) -->
+        <!-- Left side brackets -->
+        <text x="180" y="345" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="var(--primary-glow, #00ff66)" stroke="none">{</text>
+        <text x="195" y="375" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="var(--primary-glow, #00ff66)" stroke="none">&gt;</text>
+        <text x="212" y="405" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="var(--primary-glow, #00ff66)" stroke="none">~</text>
+
+        <!-- Right side brackets -->
+        <text x="305" y="345" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="var(--primary-glow, #00ff66)" stroke="none">}</text>
+        <text x="290" y="375" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="var(--primary-glow, #00ff66)" stroke="none">&lt;</text>
+        <text x="272" y="405" font-family="'Fira Code', monospace" font-size="16" font-weight="700" fill="var(--primary-glow, #00ff66)" stroke="none">~</text>
+
+        <!-- Central Lightning Fork slicing through Zeus' Beard tip -->
+        <polygon points="250,390 243,410 252,410 244,435 258,414 249,414 254,390" fill="url(#hotSparks)" stroke="none"/>
+    </g>
+
+    <!-- ================= 04. BOTTOM CLI PROMPT STATUS ================= -->
+    <!-- Blinking Terminal Prompt inside the icon -->
+    <g font-family="'Fira Code', monospace" font-size="13" font-weight="700" fill="var(--primary-glow, #00ff66)">
+        <text x="250" y="468" text-anchor="middle" letter-spacing="3">
+            [ ZEUS_AGENT_CLI ]
+        </text>
+    </g>
+</svg>

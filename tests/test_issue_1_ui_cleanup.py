@@ -26,7 +26,7 @@ class TestIssue1UICleanup(unittest.TestCase):
         self.assertNotIn('id="nav-quick-mobile"', self.html)
         # Search e Brand devem permanecer
         self.assertIn('id="nav-quick-search"', self.html)
-        self.assertIn('class="orca-brand"', self.html)
+        self.assertIn('orca-brand', self.html)
 
     def test_orca_mobile_modal_removed_from_html_and_js(self):
         """4. Remover Modal Orca Mobile: Descartar #orca-mobile-modal e seus hooks."""

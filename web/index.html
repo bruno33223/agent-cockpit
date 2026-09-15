@@ -20,7 +20,7 @@
   <header class="orca-titlebar titlebar" id="orca-titlebar">
     <div class="orca-titlebar-left titlebar-left">
       <!-- Marca do app: ZEUS AGENT com Ícone do Deus Olímpico Zeus -->
-      <div class="orca-brand zeus-brand" title="ZEUS AGENT" id="zeus-brand">
+      <div class="orca-brand" id="zeus-brand" title="ZEUS AGENT">
         <span class="orca-brand-logo zeus-brand-logo" id="zeus-brand-logo">
           <svg id="zeusTerminalSvgBrand" viewBox="0 0 500 500" width="22" height="22" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZEUS AGENT - Deus Olímpico">
             <defs>
@@ -100,145 +100,147 @@
   <div class="app-layout">
     <!-- BARRA LATERAL ESQUERDA ESTILO ORCA (.sidebar / .orca-worktree-sidebar) -->
     <aside class="app-sidebar sidebar orca-worktree-sidebar" id="app-sidebar">
-      <!-- CABEÇALHO "WORKSPACES" COM BOTÃO (+) -->
-      <div class="sidebar-workspaces-header">
-        <div class="sidebar-workspaces-title-group">
-          <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" title="Expandir / Recolher Menu" aria-label="Alternar Menu">
-            <svg class="hamburger-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <span class="sidebar-workspaces-title">WORKSPACES</span>
-        </div>
-        <button class="btn-sidebar-new-worktree" id="btn-sidebar-new-worktree" title="Criar Nova Worktree / Sessão" aria-label="Nova Worktree">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
+      <!-- CABEÇALHO SUPERIOR DA SIDEBAR (TOGGLE & TITULO) -->
+      <div class="sidebar-top-header">
+        <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" title="Expandir / Recolher Menu" aria-label="Alternar Menu">
+          <svg class="hamburger-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
+        <span class="sidebar-top-title">AGENT COCKPIT VIEWS</span>
       </div>
 
       <!-- CORPO ROLÁVEL DA SIDEBAR -->
       <div class="sidebar-scrollable-body">
-        <!-- SEÇÃO "PINNED" COLAPSÁVEL (.worktree-section-pinned) -->
-        <div class="worktree-section worktree-section-pinned" id="section-pinned">
-          <div class="worktree-section-header" data-target="worktree-pinned-list">
-            <span class="worktree-section-toggle">▾</span>
-            <span class="worktree-section-label">Pinned</span>
-            <span class="worktree-section-count" id="pinned-count">1</span>
+        <!-- 1. MENU DE NAVEGAÇÃO DE VIEWS NO TOPO -->
+        <nav class="sidebar-nav" id="sidebar-views-nav">
+          <button class="nav-tab active" data-view="view-overview" data-tooltip="Visão Geral">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="9"></rect>
+              <rect x="14" y="3" width="7" height="5"></rect>
+              <rect x="14" y="12" width="7" height="9"></rect>
+              <rect x="3" y="16" width="7" height="5"></rect>
+            </svg>
+            <span class="tab-label">Visão Geral</span>
+          </button>
+          <button class="nav-tab" data-view="view-flow" data-tooltip="Fluxo & Kanban">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span class="tab-label">Fluxo & Kanban</span>
+          </button>
+          <button class="nav-tab" data-view="view-graph" id="nav-tab-graph" data-tooltip="Code Graph">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            <span class="tab-label">Code Graph</span>
+          </button>
+          <button class="nav-tab" data-view="view-gauntlet" data-tooltip="Gauntlet Log">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            <span class="tab-label">Gauntlet Log</span>
+          </button>
+          <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff" data-tooltip="Handoff">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
+            <span class="tab-label">Handoff</span>
+          </button>
+          <button class="nav-tab" data-view="view-worker" id="nav-tab-worker" data-tooltip="Local Worker & Ollama">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+              <rect x="9" y="9" width="6" height="6"></rect>
+              <line x1="9" y1="1" x2="9" y2="4"></line>
+              <line x1="15" y1="1" x2="15" y2="4"></line>
+              <line x1="9" y1="20" x2="9" y2="23"></line>
+              <line x1="15" y1="20" x2="15" y2="23"></line>
+              <line x1="20" y1="9" x2="23" y2="9"></line>
+              <line x1="20" y1="14" x2="23" y2="14"></line>
+              <line x1="1" y1="9" x2="4" y2="9"></line>
+              <line x1="1" y1="14" x2="4" y2="14"></line>
+            </svg>
+            <span class="tab-label">Local Worker</span>
+          </button>
+          <button class="nav-tab" data-view="view-terminal" id="nav-tab-terminal" data-tooltip="Terminal & OpenCode">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg>
+            <span class="tab-label">Terminal / OpenCode</span>
+          </button>
+          <button class="nav-tab" data-view="view-settings" id="nav-tab-settings" data-tooltip="Configurações">
+            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span class="tab-label">Configurações</span>
+          </button>
+        </nav>
+
+        <!-- 2. SEÇÃO WORKSPACES UNIFICADA (LOGO ABAIXO DO MENU DE VIEWS) -->
+        <div class="sidebar-workspaces-section" id="sidebar-workspaces-section">
+          <!-- CABEÇALHO DA SEÇÃO WORKSPACES COM BOTÃO (+) -->
+          <div class="sidebar-workspaces-header">
+            <div class="sidebar-workspaces-title-group">
+              <span class="sidebar-workspaces-title">WORKSPACES</span>
+            </div>
+            <button class="btn-sidebar-new-worktree" id="btn-sidebar-new-worktree" title="Criar Nova Worktree / Sessão" aria-label="Nova Worktree">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
           </div>
-          <div class="worktree-sidebar-list worktree-pinned-list" id="worktree-pinned-list">
-            <div class="worktree-card active" id="pinned-main-card" data-project-id="default" tabindex="0">
-              <div class="worktree-header">
-                <span class="worktree-title" id="pinned-worktree-title">agent-cockpit</span>
-                <span class="agent-state-dot done" title="Status: Online / Conectado"></span>
-              </div>
-              <div class="worktree-meta-row">
-                <span class="worktree-repo-tag" id="pinned-repo-tag">cockpit</span>
-                <span class="worktree-branch">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="6" y1="3" x2="6" y2="15"></line>
-                    <circle cx="18" cy="6" r="3"></circle>
-                    <circle cx="6" cy="18" r="3"></circle>
-                    <path d="M18 9a9 9 0 0 1-9 9"></path>
-                  </svg>
-                  main
-                </span>
-                <span class="worktree-time">pinned</span>
+
+          <!-- SEÇÃO "PINNED" COLAPSÁVEL (.worktree-section-pinned) -->
+          <div class="worktree-section worktree-section-pinned" id="section-pinned">
+            <div class="worktree-section-header" data-target="worktree-pinned-list">
+              <span class="worktree-section-toggle">▾</span>
+              <span class="worktree-section-label">Pinned</span>
+              <span class="worktree-section-count" id="pinned-count">1</span>
+            </div>
+            <div class="worktree-sidebar-list worktree-pinned-list" id="worktree-pinned-list">
+              <div class="worktree-card active" id="pinned-main-card" data-project-id="default" tabindex="0">
+                <div class="worktree-header">
+                  <span class="worktree-title" id="pinned-worktree-title">agent-cockpit</span>
+                  <span class="agent-state-dot done" title="Status: Online / Conectado"></span>
+                </div>
+                <div class="worktree-meta-row">
+                  <span class="worktree-repo-tag" id="pinned-repo-tag">cockpit</span>
+                  <span class="worktree-branch">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="6" y1="3" x2="6" y2="15"></line>
+                      <circle cx="18" cy="6" r="3"></circle>
+                      <circle cx="6" cy="18" r="3"></circle>
+                      <path d="M18 9a9 9 0 0 1-9 9"></path>
+                    </svg>
+                    main
+                  </span>
+                  <span class="worktree-time">pinned</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- SEÇÃO "IN PROGRESS" COLAPSÁVEL (.worktree-section-progress) -->
-        <div class="worktree-section worktree-section-progress" id="section-progress">
-          <div class="worktree-section-header" data-target="worktree-cards-list">
-            <span class="worktree-section-toggle">▾</span>
-            <span class="worktree-section-label">In progress</span>
-            <span class="worktree-section-count" id="worktree-progress-count">0</span>
+          <!-- SEÇÃO "IN PROGRESS" COLAPSÁVEL (.worktree-section-progress) -->
+          <div class="worktree-section worktree-section-progress" id="section-progress">
+            <div class="worktree-section-header" data-target="worktree-cards-list">
+              <span class="worktree-section-toggle">▾</span>
+              <span class="worktree-section-label">In progress</span>
+              <span class="worktree-section-count" id="worktree-progress-count">0</span>
+            </div>
+            <div class="worktree-sidebar-list" id="worktree-cards-list">
+              <!-- Renderizado dinamicamente via renderWorktreeSidebar() -->
+            </div>
           </div>
-          <div class="worktree-sidebar-list" id="worktree-cards-list">
-            <!-- Renderizado dinamicamente via renderWorktreeSidebar() -->
-          </div>
-        </div>
-
-        <!-- SEÇÃO VIEWS / COCKPIT TABS -->
-        <div class="worktree-section worktree-section-views" id="section-views">
-          <div class="worktree-section-header" data-target="sidebar-views-nav">
-            <span class="worktree-section-toggle">▾</span>
-            <span class="worktree-section-label">Views</span>
-          </div>
-          <nav class="sidebar-nav" id="sidebar-views-nav">
-            <button class="nav-tab active" data-view="view-overview" data-tooltip="Visão Geral">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="9"></rect>
-                <rect x="14" y="3" width="7" height="5"></rect>
-                <rect x="14" y="12" width="7" height="9"></rect>
-                <rect x="3" y="16" width="7" height="5"></rect>
-              </svg>
-              <span class="tab-label">Visão Geral</span>
-            </button>
-            <button class="nav-tab" data-view="view-flow" data-tooltip="Fluxo & Kanban">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-              </svg>
-              <span class="tab-label">Fluxo & Kanban</span>
-            </button>
-            <button class="nav-tab" data-view="view-graph" id="nav-tab-graph" data-tooltip="Code Graph">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="18" cy="5" r="3"></circle>
-                <circle cx="6" cy="12" r="3"></circle>
-                <circle cx="18" cy="19" r="3"></circle>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-              </svg>
-              <span class="tab-label">Code Graph</span>
-            </button>
-            <button class="nav-tab" data-view="view-gauntlet" data-tooltip="Gauntlet Log">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              </svg>
-              <span class="tab-label">Gauntlet Log</span>
-            </button>
-            <button class="nav-tab" data-view="view-handoff" id="nav-tab-handoff" data-tooltip="Handoff">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-              </svg>
-              <span class="tab-label">Handoff</span>
-            </button>
-            <button class="nav-tab" data-view="view-worker" id="nav-tab-worker" data-tooltip="Local Worker & Ollama">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                <rect x="9" y="9" width="6" height="6"></rect>
-                <line x1="9" y1="1" x2="9" y2="4"></line>
-                <line x1="15" y1="1" x2="15" y2="4"></line>
-                <line x1="9" y1="20" x2="9" y2="23"></line>
-                <line x1="15" y1="20" x2="15" y2="23"></line>
-                <line x1="20" y1="9" x2="23" y2="9"></line>
-                <line x1="20" y1="14" x2="23" y2="14"></line>
-                <line x1="1" y1="9" x2="4" y2="9"></line>
-                <line x1="1" y1="14" x2="4" y2="14"></line>
-              </svg>
-              <span class="tab-label">Local Worker</span>
-            </button>
-            <button class="nav-tab" data-view="view-terminal" id="nav-tab-terminal" data-tooltip="Terminal & OpenCode">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 17 10 11 4 5"></polyline>
-                <line x1="12" y1="19" x2="20" y2="19"></line>
-              </svg>
-              <span class="tab-label">Terminal / OpenCode</span>
-            </button>
-            <button class="nav-tab" data-view="view-settings" id="nav-tab-settings" data-tooltip="Configurações">
-              <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-              <span class="tab-label">Configurações</span>
-            </button>
-          </nav>
         </div>
       </div>
 
