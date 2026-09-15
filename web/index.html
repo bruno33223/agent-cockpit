@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AGENT COCKPIT - Telemetria & Orquestração Multiagente</title>
+  <title>ZEUS AGENT - Telemetria & Orquestração Multiagente</title>
+  <link rel="icon" type="image/svg+xml" href="zeus_terminal_god.svg">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,57 +16,59 @@
   <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.js"></script>
 </head>
 <body>
-  <!-- 1. TITLEBAR SUPERIOR ESTILO ORCA (.orca-titlebar / .titlebar) -->
+  <!-- 1. TITLEBAR SUPERIOR ZEUS AGENT (.orca-titlebar / .titlebar) -->
   <header class="orca-titlebar titlebar" id="orca-titlebar">
     <div class="orca-titlebar-left titlebar-left">
-      <!-- Traffic lights estilo macOS -->
-      <div class="mac-traffic-lights" aria-label="Controles da Janela">
-        <span class="mac-dot close" title="Fechar Janela"></span>
-        <span class="mac-dot minimize" title="Minimizar Janela"></span>
-        <span class="mac-dot maximize" title="Maximizar Janela"></span>
+      <!-- Marca do app: ZEUS AGENT com Ícone do Deus Olímpico Zeus -->
+      <div class="orca-brand zeus-brand" title="ZEUS AGENT" id="zeus-brand">
+        <span class="orca-brand-logo zeus-brand-logo" id="zeus-brand-logo">
+          <svg id="zeusTerminalSvgBrand" viewBox="0 0 500 500" width="22" height="22" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZEUS AGENT - Deus Olímpico">
+            <defs>
+              <linearGradient id="termGradBrand" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#34D399"/>
+                <stop offset="50%" stop-color="#00FF66"/>
+                <stop offset="100%" stop-color="#059669"/>
+              </linearGradient>
+              <linearGradient id="hotSparksBrand" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#FFFFFF"/>
+                <stop offset="70%" stop-color="#6EE7B7"/>
+                <stop offset="100%" stop-color="#00FF66"/>
+              </linearGradient>
+            </defs>
+            <rect x="15" y="15" width="470" height="470" rx="40" fill="#040707" stroke="#00ff66" stroke-width="12"/>
+            <rect x="15" y="15" width="470" height="60" rx="40" fill="#09120e" stroke="#00ff66" stroke-width="6"/>
+            <circle cx="50" cy="45" r="14" fill="#EF4444"/>
+            <circle cx="95" cy="45" r="14" fill="#F59E0B"/>
+            <circle cx="140" cy="45" r="14" fill="#10B981"/>
+            <g stroke="#00ff66" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M190 125 C200 95, 230 85, 250 85 C270 85, 300 95, 310 125" fill="none" stroke-width="16"/>
+              <path d="M150 145 C170 105, 205 98, 225 105" fill="none" stroke-width="14"/>
+              <path d="M350 145 C330 105, 295 98, 275 105" fill="none" stroke-width="14"/>
+              <polygon points="250,90 244,115 256,115 242,142 262,118 250,118 256,90" fill="#FFFFFF"/>
+              <path d="M175 188 L232 202 L245 208" fill="none" stroke-width="16"/>
+              <path d="M325 188 L268 202 L255 208" fill="none" stroke-width="16"/>
+              <path d="M250 208 L244 265 L235 275 L250 278 L265 275 L256 265" fill="none" stroke-width="14"/>
+              <rect x="195" y="210" width="22" height="15" rx="3" fill="#FFFFFF"/>
+              <rect x="285" y="210" width="22" height="15" rx="3" fill="#FFFFFF"/>
+              <path d="M250 282 C235 280, 205 285, 175 315 C205 315, 235 298, 250 292 C265 298, 295 315, 325 315 C295 285, 265 280, 250 282 Z" fill="#05170d" stroke-width="14"/>
+              <path d="M145 255 C130 295, 140 340, 160 375 C180 410, 210 435, 250 445 C290 435, 320 410, 340 375 C360 340, 370 295, 355 255" fill="none" stroke-width="14"/>
+              <path d="M250 312 L250 370 L242 385 L258 405 L250 442" fill="none" stroke-width="18" stroke="#FFFFFF"/>
+            </g>
+          </svg>
+        </span>
+        <span class="orca-brand-title zeus-brand-title">ZEUS AGENT</span>
+        <span class="orca-brand-badge zeus-brand-badge">OLYMPUS</span>
       </div>
 
-      <!-- Marca do app (.orca-brand com ícone 🐋 e título "Orca Cockpit") -->
-      <div class="orca-brand" title="Orca Cockpit">
-        <span class="orca-brand-logo">🐋</span>
-        <span class="orca-brand-title">Orca Cockpit</span>
-        <span class="orca-brand-badge">AGENT</span>
-      </div>
-
-      <!-- Navegação rápida (.orca-quick-nav) -->
-      <nav class="orca-quick-nav" aria-label="Navegação Rápida Orca">
-        <button class="orca-quick-nav-search" id="nav-quick-search" title="Busca Rápida (Ctrl+K)">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <span>Search</span>
-          <kbd class="orca-kbd">Ctrl+K</kbd>
-        </button>
-
-        <button class="orca-quick-nav-btn active" id="nav-quick-tasks" title="Tarefas & Kanban">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 11l3 3L22 4"></path>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-          </svg>
-          <span>Tasks</span>
-        </button>
-
-        <button class="orca-quick-nav-btn" id="nav-quick-automations" title="Automações & Blueprints">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-          <span>Automations</span>
-        </button>
-
-        <button class="orca-quick-nav-btn" id="nav-quick-mobile" title="Orca Mobile Companion">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-            <line x1="12" y1="18" x2="12.01" y2="18"></line>
-          </svg>
-          <span>Orca Mobile</span>
-        </button>
-      </nav>
+      <!-- Atalho de Busca Rápida (Ctrl+K) -->
+      <button class="orca-quick-nav-search" id="nav-quick-search" title="Busca Rápida (Ctrl+K)">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Search</span>
+        <kbd class="orca-kbd">Ctrl+K</kbd>
+      </button>
     </div>
 
     <div class="orca-titlebar-right topbar-right">
@@ -89,11 +92,6 @@
           <option value="">Carregando...</option>
         </select>
         <button id="btn-topbar-pull-modal" class="lw-pull-btn" title="Baixar novos modelos">⬇</button>
-      </div>
-
-      <div class="conn-pill" id="ws-status">
-        <span class="pulse-led online"></span>
-        <span class="conn-text" id="ws-status-text">WS Conectando...</span>
       </div>
     </div>
   </header>
@@ -261,17 +259,6 @@
           </svg>
           <span class="tab-label gate-text">Gate: Pendente</span>
         </button>
-
-        <!-- Barra de uso / cota de recursos estilo Orca (.sidebar-usage-meter) -->
-        <div class="sidebar-usage-meter" title="Uso de recursos e cota semanal">
-          <div class="usage-meter-header">
-            <span class="usage-meter-label">USAGE</span>
-            <span class="usage-meter-text">78% 5h 94% wk</span>
-          </div>
-          <div class="usage-meter-bar">
-            <div class="usage-meter-fill" style="width: 78%;"></div>
-          </div>
-        </div>
 
         <!-- Botão de configurações (#nav-footer-settings) e meta -->
         <div class="sidebar-footer-row">
@@ -830,11 +817,14 @@
           <div class="terminal-view-header orca-workbench-header">
             <div class="terminal-header-info">
               <div class="terminal-header-title-row">
-                <h2>Orca Multi-Pane Workbench & Agent Terminal</h2>
+                <div class="zeus-workbench-emblem-wrap" title="ZEUS AGENT - Deus Olímpico">
+                  <img src="zeus_terminal_god.svg" class="zeus-workbench-emblem" alt="ZEUS AGENT" width="34" height="34" />
+                </div>
+                <h2>ZEUS AGENT Multi-Pane Workbench & Terminal</h2>
                 <span class="tech-badge" id="terminal-session-badge">Multi-PTY Concorrente</span>
               </div>
               <p class="terminal-header-desc">
-                Workbench central com abas e split panes estilo Orca (stablyai/orca). Execute concorrentemente <strong>Claude Code</strong>, <strong>OpenCode</strong>, <strong>Codex</strong> e <strong>Bash</strong> com controle de sessões PTY e telemetria MCP em tempo real.
+                Workbench central com abas e split panes ZEUS AGENT. Execute concorrentemente <strong>Claude Code</strong>, <strong>OpenCode</strong>, <strong>Codex</strong> e <strong>Bash</strong> com controle de sessões PTY e telemetria MCP em tempo real.
               </p>
             </div>
             <div class="terminal-view-actions">
@@ -1341,196 +1331,6 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- MODAL ORCA MOBILE COMPANION (#orca-mobile-modal) -->
-  <div class="orca-mobile-overlay" id="orca-mobile-modal" style="display: none;">
-    <div class="orca-phone-frame orca-mobile-card">
-      <!-- Status bar do smartphone -->
-      <div class="orca-phone-statusbar">
-        <span class="orca-phone-clock" id="orca-phone-time">3:53</span>
-        <div class="orca-phone-status-icons">
-          <!-- Ícone vibrate/bell -->
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-          </svg>
-          <!-- Ícone Wi-Fi -->
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-            <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 4c3.48 0 6.64 1.35 9 3.55L12 19.4 3 11.55C5.36 9.35 8.52 8 12 8z"/>
-          </svg>
-          <!-- Ícone Sinal 4G/5G -->
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <rect x="2" y="16" width="3" height="5" rx="1"/>
-            <rect x="7" y="12" width="3" height="9" rx="1"/>
-            <rect x="12" y="8" width="3" height="13" rx="1"/>
-            <rect x="17" y="4" width="3" height="17" rx="1"/>
-          </svg>
-          <!-- Ícone Bateria 100% -->
-          <div class="orca-phone-battery">
-            <span class="orca-phone-battery-pct">100</span>
-            <div class="orca-phone-battery-icon">
-              <div class="orca-phone-battery-fill"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- App Header dentro do telefone -->
-      <div class="orca-phone-header">
-        <div class="orca-phone-brand">
-          <svg class="orca-phone-logo" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M2 14c4 0 5-5 9-5s5 5 9 5c1 0 2-.5 2-1s-1-4-5-6-6-2-8-1-5 4-7 7z"/>
-            <circle cx="6" cy="11" r="1" fill="currentColor"/>
-          </svg>
-          <span class="orca-phone-app-title">Orca</span>
-        </div>
-        <div class="orca-phone-header-actions">
-          <button class="orca-phone-action-btn" title="Configurações">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-          </button>
-          <button class="orca-phone-close-btn orca-mobile-close" id="btn-close-mobile-modal" aria-label="Fechar Modal">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Welcome back -->
-      <h2 class="orca-phone-welcome">Welcome back</h2>
-
-      <!-- 3 Stat cards em grade -->
-      <div class="orca-phone-stats-grid">
-        <div class="orca-phone-stat-card">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="10" rx="2"></rect>
-            <circle cx="12" cy="5" r="2"></circle>
-            <path d="M12 7v4"></path>
-            <line x1="8" y1="16" x2="8" y2="16"></line>
-            <line x1="16" y1="16" x2="16" y2="16"></line>
-          </svg>
-          <span class="orca-phone-stat-value">5,065</span>
-          <span class="orca-phone-stat-label">Agents spawned</span>
-        </div>
-        <div class="orca-phone-stat-card">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          <span class="orca-phone-stat-value">26d 10h</span>
-          <span class="orca-phone-stat-label">Agent time</span>
-        </div>
-        <div class="orca-phone-stat-card">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="6" cy="18" r="3"></circle>
-            <circle cx="6" cy="6" r="3"></circle>
-            <circle cx="18" cy="6" r="3"></circle>
-            <line x1="6" y1="9" x2="6" y2="15"></line>
-            <path d="M18 9a9 9 0 0 1-9 9"></path>
-          </svg>
-          <span class="orca-phone-stat-value">359</span>
-          <span class="orca-phone-stat-label">PRs created</span>
-        </div>
-      </div>
-
-      <!-- DESKTOPS -->
-      <div class="orca-phone-section-label">DESKTOPS</div>
-      <div class="orca-phone-card-item">
-        <div class="orca-phone-card-left">
-          <div class="orca-phone-card-icon desktop">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-          </div>
-          <div class="orca-phone-card-texts">
-            <div class="orca-phone-card-title">Host 1</div>
-            <div class="orca-phone-card-sub" id="orca-mobile-status-value">
-              <span class="orca-status-dot-inline green"></span> Connected · 200 worktrees · 47 active
-            </div>
-          </div>
-        </div>
-        <svg class="orca-phone-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      </div>
-
-      <!-- RESUME -->
-      <div class="orca-phone-section-label">RESUME</div>
-      <div class="orca-phone-card-item">
-        <div class="orca-phone-card-left">
-          <div class="orca-phone-card-icon terminal">
-            <span class="orca-prompt-sym">&gt;_</span>
-          </div>
-          <div class="orca-phone-card-texts">
-            <div class="orca-phone-card-title" id="orca-mobile-resume-title">notes-feat</div>
-            <div class="orca-phone-card-sub">
-              <span class="orca-status-dot-inline orange"></span> orca · <span id="orca-mobile-resume-branch">refs/heads/Jinwoo-H/notes-feat</span>
-            </div>
-          </div>
-        </div>
-        <svg class="orca-phone-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      </div>
-
-      <!-- ACCOUNT USAGE -->
-      <div class="orca-phone-section-label">ACCOUNT USAGE</div>
-      <div class="orca-phone-card-item account-usage-card">
-        <div class="orca-phone-user-row">
-          <div class="orca-phone-avatar">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-          </div>
-          <span class="orca-phone-email">bruno@agent-cockpit</span>
-        </div>
-        <div class="orca-phone-usage-bars">
-          <div class="orca-phone-usage-bar-row">
-            <span class="orca-phone-usage-time">5h</span>
-            <div class="orca-phone-bar-track">
-              <div class="orca-phone-bar-fill" style="width: 99%;"></div>
-            </div>
-            <span class="orca-phone-usage-pct">99%</span>
-          </div>
-          <div class="orca-phone-usage-bar-row">
-            <span class="orca-phone-usage-time">7d</span>
-            <div class="orca-phone-bar-track">
-              <div class="orca-phone-bar-fill" style="width: 100%;"></div>
-            </div>
-            <span class="orca-phone-usage-pct">100%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- QUICK ACTIONS -->
-      <div class="orca-phone-section-label">QUICK ACTIONS</div>
-      <div class="orca-phone-actions-grid">
-        <button class="orca-phone-btn orca-mobile-btn primary" id="btn-mobile-sync-now">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-            <line x1="12" y1="18" x2="12" y2="18"></line>
-          </svg>
-          <span>Pair Desktop</span>
-        </button>
-        <button class="orca-phone-btn orca-mobile-btn secondary" id="btn-mobile-dismiss">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          <span>New Worktree</span>
-        </button>
-      </div>
-
-      <!-- Home gesture bar no rodapé -->
-      <div class="orca-phone-home-indicator"></div>
     </div>
   </div>
 

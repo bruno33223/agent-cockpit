@@ -106,16 +106,6 @@ window.switchTab = function(viewId) {
     v.classList.toggle('active', v.id === viewId);
   });
 
-  // Sincroniza estado ativo nos botões da Quick-Nav Orca
-  const navQuickTasks = document.getElementById('nav-quick-tasks');
-  const navQuickAutomations = document.getElementById('nav-quick-automations');
-  if (navQuickTasks) {
-    navQuickTasks.classList.toggle('active', viewId === 'view-overview' || viewId === 'view-flow');
-  }
-  if (navQuickAutomations) {
-    navQuickAutomations.classList.toggle('active', viewId === 'view-handoff');
-  }
-
   if (viewId === 'view-graph') {
     initOrRefreshGraph();
   } else if (viewId === 'view-handoff') {
@@ -437,25 +427,7 @@ function initOrcaNavigationAndModals() {
   }
 
   // 3. Quick-Nav Buttons
-  const navQuickTasks = document.getElementById('nav-quick-tasks');
-  if (navQuickTasks) {
-    navQuickTasks.addEventListener('click', () => {
-      switchTab('view-overview');
-    });
-  }
-
-  const navQuickAutomations = document.getElementById('nav-quick-automations');
-  if (navQuickAutomations) {
-    navQuickAutomations.addEventListener('click', () => {
-      switchTab('view-handoff');
-    });
-  }
-
-  const navQuickMobile = document.getElementById('nav-quick-mobile');
-  if (navQuickMobile) {
-    navQuickMobile.addEventListener('click', openOrcaMobileModal);
-  }
-
+  // 3. Quick-Nav & Search
   const navQuickSearch = document.getElementById('nav-quick-search');
   if (navQuickSearch) {
     navQuickSearch.addEventListener('click', openQuickSearch);
@@ -468,30 +440,7 @@ function initOrcaNavigationAndModals() {
     });
   }
 
-  // 4. Modal Orca Mobile Companion (#orca-mobile-modal)
-  const mobileModal = document.getElementById('orca-mobile-modal');
-  const btnCloseMobile = document.getElementById('btn-close-mobile-modal');
-  const btnDismissMobile = document.getElementById('btn-mobile-dismiss');
-  const btnSyncMobile = document.getElementById('btn-mobile-sync-now');
-
-  if (btnCloseMobile) btnCloseMobile.addEventListener('click', closeOrcaMobileModal);
-  if (btnDismissMobile) btnDismissMobile.addEventListener('click', closeOrcaMobileModal);
-  if (mobileModal) {
-    mobileModal.addEventListener('click', (e) => {
-      if (e.target === mobileModal) closeOrcaMobileModal();
-    });
-  }
-  if (btnSyncMobile) {
-    btnSyncMobile.addEventListener('click', () => {
-      btnSyncMobile.textContent = 'Sincronizado! ✓';
-      setTimeout(() => {
-        btnSyncMobile.textContent = 'Sincronizar Celular';
-        closeOrcaMobileModal();
-      }, 900);
-    });
-  }
-
-  // 5. Modal de Busca Rápida (Command Palette)
+  // 4. Modal de Busca Rápida (Command Palette)
   const quickSearchModal = document.getElementById('orca-quick-search-modal');
   const quickSearchInput = document.getElementById('quick-search-input');
 
@@ -506,54 +455,15 @@ function initOrcaNavigationAndModals() {
     });
   }
 
-  // 6. Atalho Global de Teclado (Ctrl+K / Cmd+K / Esc)
+  // 5. Atalho Global de Teclado (Ctrl+K / Cmd+K / Esc)
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       openQuickSearch();
     } else if (e.key === 'Escape') {
       closeQuickSearch();
-      closeOrcaMobileModal();
     }
   });
-}
-
-function openOrcaMobileModal() {
-  const modal = document.getElementById('orca-mobile-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-
-  // Atualiza relógio do smartphone com a hora local atual
-  const phoneClock = document.getElementById('orca-phone-time');
-  if (phoneClock) {
-    const now = new Date();
-    phoneClock.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  // Atualiza status do Host
-  const statusVal = document.getElementById('orca-mobile-status-value');
-  if (statusVal) {
-    const pairsCount = state.pairs_3x3 ? state.pairs_3x3.length : 3;
-    const projectCount = state.projects ? state.projects.length : 1;
-    statusVal.innerHTML = `<span class="orca-status-dot-inline green"></span> Connected · ${projectCount} worktree${projectCount > 1 ? 's' : ''} · ${pairsCount} pares ativos`;
-  }
-
-  // Atualiza seção Resume com a fatia ou projeto ativo
-  const resumeTitle = document.getElementById('orca-mobile-resume-title');
-  const resumeBranch = document.getElementById('orca-mobile-resume-branch');
-  if (resumeTitle && state.active_slice) {
-    resumeTitle.textContent = state.active_slice;
-  } else if (resumeTitle && state.active_project_id) {
-    resumeTitle.textContent = state.active_project_id;
-  }
-  if (resumeBranch && state.active_project_id) {
-    resumeBranch.textContent = `refs/heads/main · ${state.active_project_id}`;
-  }
-}
-
-function closeOrcaMobileModal() {
-  const modal = document.getElementById('orca-mobile-modal');
-  if (modal) modal.style.display = 'none';
 }
 
 function openQuickSearch() {
@@ -586,7 +496,6 @@ function renderQuickSearchResults(query) {
   items.push({ label: 'Terminal / OpenCode Runner', badge: 'TOOL', action: () => switchTab('view-terminal') });
   items.push({ label: 'Local Worker & Ollama Manager', badge: 'AI', action: () => switchTab('view-worker') });
   items.push({ label: 'Configurações do Cockpit', badge: 'SETTINGS', action: () => switchTab('view-settings') });
-  items.push({ label: 'Orca Mobile Companion', badge: 'MOBILE', action: () => openOrcaMobileModal() });
 
   // Fatias verticais
   (state.nodes || []).forEach(n => {
@@ -639,8 +548,8 @@ function renderQuickSearchResults(query) {
 
 // 2. WEBSOCKET
 function initWebSocket() {
-  wsStatusText.textContent = 'WS Conectando...';
-  const led = wsStatusPill.querySelector('.pulse-led');
+  if (wsStatusText) wsStatusText.textContent = 'WS Conectando...';
+  const led = wsStatusPill ? wsStatusPill.querySelector('.pulse-led') : null;
   if (led) led.className = 'pulse-led offline';
 
   try {
@@ -653,7 +562,7 @@ function initWebSocket() {
 
   socket.onopen = () => {
     if (led) led.className = 'pulse-led online';
-    wsStatusText.textContent = 'WS Online';
+    if (wsStatusText) wsStatusText.textContent = 'WS Online';
     
     // Subscrição no canal do projeto ativo
     socket.send(JSON.stringify({
@@ -805,7 +714,7 @@ function initWebSocket() {
 
   socket.onclose = () => {
     if (led) led.className = 'pulse-led offline';
-    wsStatusText.textContent = 'WS Desconectado';
+    if (wsStatusText) wsStatusText.textContent = 'WS Desconectado';
     setTimeout(initWebSocket, 2000);
   };
 

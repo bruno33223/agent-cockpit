@@ -157,9 +157,9 @@ body {
 .btn-sidebar-toggle {
   background: transparent;
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  width: 34px;
-  height: 34px;
+  border-radius: 5px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,9 +314,10 @@ body {
 .sidebar-action-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 6px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 5px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
@@ -328,6 +329,7 @@ body {
   white-space: nowrap;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .sidebar-action-btn:hover {
@@ -602,11 +604,37 @@ body {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  padding: 6px 12px;
+  height: 30px;
+  padding: 0 10px;
   border-radius: 5px;
   border: 1px solid var(--border-subtle);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
   transition: all 0.15s ease;
+}
+
+.action-btn.btn-sm {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 10px;
+  border-radius: 4px;
+}
+
+.action-btn.primary {
+  background-color: var(--cyan-bright);
+  color: #090d16;
+  border-color: var(--cyan-bright);
+}
+.action-btn.primary:hover {
+  background-color: #67e8f9;
+  border-color: #67e8f9;
+  color: #090d16;
 }
 
 .action-btn.secondary {
@@ -825,13 +853,15 @@ body {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 5px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 .hero-action-btn:hover {
@@ -4711,81 +4741,6 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Controles de janela estilo macOS */
-.mac-traffic-lights {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding-right: 6px;
-  -webkit-app-region: no-drag;
-}
-
-.mac-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
-  position: relative;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25);
-}
-
-.mac-dot:hover {
-  transform: scale(1.1);
-  filter: brightness(1.1);
-}
-
-.mac-dot:active {
-  transform: scale(0.95);
-  filter: brightness(0.9);
-}
-
-.mac-dot.close {
-  background-color: #ff5f56;
-  border-color: #e0443e;
-}
-
-.mac-dot.minimize {
-  background-color: #ffbd2e;
-  border-color: #dea123;
-}
-
-.mac-dot.maximize {
-  background-color: #27c93f;
-  border-color: #1aab29;
-}
-
-/* Símbolos dos botões que surgem no hover do cluster */
-.mac-traffic-lights:hover .mac-dot.close::before {
-  content: "×";
-  font-size: 11px;
-  font-weight: 700;
-  color: #4c0000;
-  line-height: 1;
-  transform: translateY(-0.5px);
-}
-
-.mac-traffic-lights:hover .mac-dot.minimize::before {
-  content: "–";
-  font-size: 10px;
-  font-weight: 700;
-  color: #5a3d00;
-  line-height: 1;
-  transform: translateY(-0.5px);
-}
-
-.mac-traffic-lights:hover .mac-dot.maximize::before {
-  content: "+";
-  font-size: 10px;
-  font-weight: 700;
-  color: #004d13;
-  line-height: 1;
-  transform: translateY(-0.5px);
-}
 
 /* Título e Identidade da Marca (.orca-brand) */
 .orca-brand {
@@ -4896,15 +4851,16 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 26px;
-  padding: 0 8px 0 10px;
+  height: 28px;
+  padding: 0 10px;
   background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 5px;
   color: var(--muted-foreground);
   font-family: var(--font-sans);
   font-size: 12px;
   cursor: pointer;
+  box-sizing: border-box;
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   -webkit-app-region: no-drag;
 }
@@ -5629,436 +5585,6 @@ body {
   opacity: 0.85;
 }
 
-/* ── 5. JANELA / MODAL DO MOBILE COMPANION (MOCKUP SMARTPHONE ORCA) ───────── */
-.orca-mobile-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background-color: rgba(0, 0, 0, 0.82);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  animation: orca-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.orca-phone-frame.orca-mobile-card {
-  position: relative;
-  width: 380px;
-  max-width: 96vw;
-  max-height: 94vh;
-  background-color: #0c0c0e;
-  border: 4px solid #27272a;
-  border-radius: 44px;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 0 0 2px #18181b;
-  padding: 16px 18px 14px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  color: #f4f4f5;
-  animation: orca-scale-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.orca-phone-frame.orca-mobile-card::-webkit-scrollbar {
-  display: none;
-}
-
-/* Status bar do smartphone */
-.orca-phone-statusbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 6px 12px 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #e4e4e7;
-}
-
-.orca-phone-clock {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Geist', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: #f4f4f5;
-}
-
-.orca-phone-status-icons {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #d4d4d8;
-}
-
-.orca-phone-battery {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.orca-phone-battery-pct {
-  font-size: 11px;
-  font-weight: 600;
-  color: #e4e4e7;
-}
-
-.orca-phone-battery-icon {
-  width: 20px;
-  height: 11px;
-  border: 1.5px solid #d4d4d8;
-  border-radius: 3px;
-  padding: 1px;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.orca-phone-battery-icon::after {
-  content: '';
-  position: absolute;
-  right: -3px;
-  width: 1.5px;
-  height: 4px;
-  background-color: #d4d4d8;
-  border-radius: 0 1px 1px 0;
-}
-
-.orca-phone-battery-fill {
-  width: 100%;
-  height: 100%;
-  background-color: var(--status-success);
-  border-radius: 1px;
-}
-
-/* App Header interno */
-.orca-phone-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 2px 12px 2px;
-}
-
-.orca-phone-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.orca-phone-logo {
-  color: #fafafa;
-}
-
-.orca-phone-app-title {
-  font-family: var(--font-sans);
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.02em;
-}
-
-.orca-phone-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.orca-phone-action-btn,
-.orca-phone-close-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.orca-phone-action-btn:hover,
-.orca-phone-close-btn:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: var(--foreground);
-}
-
-/* Welcome heading */
-.orca-phone-welcome {
-  font-family: var(--font-sans);
-  font-size: 22px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.02em;
-  margin: 0 0 14px 2px;
-}
-
-/* Stat cards em grade */
-.orca-phone-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.orca-phone-stat-card {
-  background-color: #18181b;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-md);
-  padding: 10px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: #a1a1aa;
-}
-
-.orca-phone-stat-value {
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.02em;
-}
-
-.orca-phone-stat-label {
-  font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 500;
-  color: #71717a;
-  white-space: nowrap;
-}
-
-/* Section labels */
-.orca-phone-section-label {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #71717a;
-  margin: 0 0 6px 2px;
-}
-
-/* Cards interativos de desktops e resume */
-.orca-phone-card-item {
-  background-color: #18181b;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.orca-phone-card-item:hover {
-  background-color: #202024;
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.orca-phone-card-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.orca-phone-card-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background-color: rgba(255, 255, 255, 0.05);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #d4d4d8;
-  flex-shrink: 0;
-}
-
-.orca-prompt-sym {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 700;
-  color: #d4d4d8;
-}
-
-.orca-phone-card-texts {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.orca-phone-card-title {
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  color: #fafafa;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.orca-phone-card-sub {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  color: #a1a1aa;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.orca-status-dot-inline {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-.orca-status-dot-inline.green {
-  background-color: var(--status-success);
-  box-shadow: 0 0 6px rgba(134, 239, 172, 0.4);
-}
-
-.orca-status-dot-inline.orange {
-  background-color: var(--agent-question);
-  box-shadow: 0 0 6px rgba(249, 115, 22, 0.4);
-}
-
-.orca-phone-chevron {
-  color: #52525b;
-  flex-shrink: 0;
-}
-
-/* Account usage card */
-.orca-phone-card-item.account-usage-card {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  cursor: default;
-}
-
-.orca-phone-user-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.orca-phone-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background-color: rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #d4d4d8;
-}
-
-.orca-phone-email {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: #e4e4e7;
-}
-
-.orca-phone-usage-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.orca-phone-usage-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-}
-
-.orca-phone-usage-time {
-  color: #a1a1aa;
-  width: 18px;
-  font-size: 10px;
-}
-
-.orca-phone-bar-track {
-  flex: 1;
-  height: 5px;
-  background-color: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.orca-phone-bar-fill {
-  height: 100%;
-  background-color: var(--status-success);
-  border-radius: 999px;
-}
-
-.orca-phone-usage-pct {
-  color: #a1a1aa;
-  font-size: 10px;
-  width: 28px;
-  text-align: right;
-}
-
-/* Quick Actions buttons */
-.orca-phone-actions-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.orca-phone-btn.orca-mobile-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 38px;
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background-color: #18181b;
-  color: #f4f4f5;
-}
-
-.orca-phone-btn.orca-mobile-btn:hover {
-  background-color: #242428;
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.orca-phone-btn.orca-mobile-btn.primary {
-  background-color: #26262a;
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.orca-phone-btn.orca-mobile-btn.primary:hover {
-  background-color: #323238;
-}
-
-/* Home gesture bar */
-.orca-phone-home-indicator {
-  width: 120px;
-  height: 4px;
-  background-color: rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-  margin: 14px auto 2px auto;
-}
-
 @keyframes orca-fade-in {
   from {
     opacity: 0;
@@ -6211,56 +5737,7 @@ body {
   display: none;
 }
 
-/* USAGE METER NO RODAPÉ DA SIDEBAR */
-.sidebar-usage-meter {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  background-color: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-subtle);
-  margin: 4px 0 2px 0;
-}
 
-.app-sidebar.collapsed .sidebar-usage-meter {
-  display: none;
-}
-
-.usage-meter-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted-foreground);
-}
-
-.usage-meter-label {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--foreground);
-}
-
-.usage-meter-text {
-  opacity: 0.9;
-  color: var(--cyan-bright);
-}
-
-.usage-meter-bar {
-  height: 4px;
-  width: 100%;
-  border-radius: 2px;
-  background-color: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.usage-meter-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #38bdf8, #818cf8);
-  transition: width 0.3s ease;
-}
 
 .sidebar-footer-row {
   display: flex;
