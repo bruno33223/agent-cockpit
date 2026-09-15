@@ -954,6 +954,26 @@ def post_opencode_sync():
         return opencode_manager.sync_opencode_config()
     return {"status": "error", "message": "Módulo opencode_manager não disponível"}
 
+@app.get("/api/omniroute/connectors")
+def get_omniroute_connectors(base_url: Optional[str] = None):
+    """Retorna os conectores e provedores detectados no OmniRoute."""
+    if opencode_manager:
+        connectors = opencode_manager.detect_omniroute_connectors(base_url)
+        return {
+            "online": True if connectors else False,
+            "connectors": connectors,
+            "count": len(connectors)
+        }
+    return {"online": False, "connectors": [], "count": 0, "message": "Módulo opencode_manager não disponível"}
+
+@app.get("/api/opencode/credentials")
+def get_opencode_credentials():
+    """Retorna as credenciais e configurações detectadas do OpenCode."""
+    if opencode_manager:
+        return opencode_manager.detect_opencode_credentials()
+    return {"omniroute_url": None, "api_key": None, "model": None, "sources": []}
+
+
 # =========================================================================
 # WEBSOCKET: TERMINAL PTY MULTI-SESSÃO (XTERM.JS RUNNER / ALETHE STYLE)
 # =========================================================================
