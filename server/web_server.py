@@ -1453,3 +1453,137 @@ def read_fs_file(
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 if os.path.exists(WEB_DIR):
     app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+
+# =========================================================================
+# UTILITÁRIOS DE VERIFICAÇÃO DE PORTA E CONFLITO (NATIVE SOCKET BIND)
+# =========================================================================
+
+def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    """
+    Verifica se a porta está em uso utilizando bind nativo via socket com SO_REUSEADDR.
+    Retorna True se a porta estiver ocupada / em uso, ou False se estiver livre para bind.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+            return False
+        except (OSError, socket.error):
+            return True
+
+def handle_port_conflict(port: int = 8765, host: str = "127.0.0.1", force: bool = False) -> bool:
+    """
+    Verifica se a porta está ocupada de forma robusta e segura.
+    - Utiliza verificação nativa de socket bind (SO_REUSEADDR) em Python,
+      sem confiar cegamente em saída de lsof ou falhas de permissão.
+    - Se for o próprio Agent Cockpit (instância zumbi/anterior): encerra e libera a porta.
+    - Se for processo alheio: não encerra (a menos que force=True) e reporta aviso.
+    - Antes de declarar a porta como livre, valida via socket bind nativo.
+    Retorna True se a porta está livre para uso, False caso contrário.
+    """
+    import subprocess
+
+    # Verificação inicial: se socket bind tem sucesso imediato, porta livre!
+    if not is_port_in_use(port=port, host=host):
+        return True
+
+    # A porta está ocupada. Tenta inspecionar processos em escuta
+    current_pid = os.getpid()
+    listening_pids = set()
+
+    if sys.platform == "win32":
+        try:
+            out = subprocess.check_output(f'netstat -ano | findstr :{port}', shell=True, text=True, stderr=subprocess.DEVNULL)
+            for line in out.strip().splitlines():
+                parts = line.split()
+                if len(parts) >= 5 and "LISTENING" in parts:
+                    try:
+                        p = int(parts[-1])
+                        if p != current_pid:
+                            listening_pids.add(p)
+                    except ValueError:
+                        pass
+        except Exception:
+            pass
+    else:
+        try:
+            out = subprocess.check_output(f"lsof -ti :{port}", shell=True, text=True, stderr=subprocess.DEVNULL)
+            for line in out.strip().splitlines():
+                try:
+                    p = int(line)
+                    if p != current_pid:
+                        listening_pids.add(p)
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+
+    def _inspect_process(pid: int):
+        name = "desconhecido"
+        cmdline = ""
+        if sys.platform == "win32":
+            try:
+                tl = subprocess.check_output(f'tasklist /FI "PID eq {pid}" /FO CSV /NH', shell=True, text=True, stderr=subprocess.DEVNULL)
+                for line in tl.strip().splitlines():
+                    if line.startswith('"'):
+                        name = line.split('"')[1]
+                        break
+            except Exception:
+                pass
+            try:
+                ps_cmd = f'powershell -NoProfile -Command "(Get-CimInstance Win32_Process | Where-Object ProcessId -eq {pid}).CommandLine"'
+                cmdline = subprocess.check_output(ps_cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip()
+            except Exception:
+                pass
+        else:
+            try:
+                p_out = subprocess.check_output(["ps", "-p", str(pid), "-o", "comm=,args="], text=True, stderr=subprocess.DEVNULL).strip()
+                if p_out:
+                    parts = p_out.split(None, 1)
+                    name = parts[0]
+                    cmdline = parts[1] if len(parts) > 1 else ""
+            except Exception:
+                pass
+        return name, cmdline
+
+    def _is_cockpit_proc(name: str, cmdline: str) -> bool:
+        combined = f"{name} {cmdline}".lower()
+        cockpit_keywords = ["run_cockpit", "web_server:app", "agent-cockpit", "start_cockpit", "server.web_server"]
+        return any(k in combined for k in cockpit_keywords)
+
+    # Se não foi possível listar os PIDs (ex: lsof falhou por permissões),
+    # mas o socket bind comprovou que a porta está ocupada:
+    # NUNCA declarar como livre!
+    if not listening_pids:
+        if is_port_in_use(port=port, host=host):
+            print("=" * 70)
+            print(f"[!] AVISO DE CONFLITO: A porta {port} está ocupada no host {host}, mas não foi possível listar o PID.")
+            print(f"[*] Pode ser necessário privilégio de root/administrador ou outro serviço do sistema.")
+            print("=" * 70)
+            return False
+        return True
+
+    # Inspeciona cada processo ouvindo na porta
+    for pid in listening_pids:
+        name, cmdline = _inspect_process(pid)
+        is_ours = _is_cockpit_proc(name, cmdline)
+
+        if is_ours or force:
+            print(f"[*] Instância anterior do Agent Cockpit detectada (PID {pid}: {name}). Encerrando para reiniciar...")
+            if sys.platform == "win32":
+                subprocess.run(f"taskkill /F /PID {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.run(f"kill -9 {pid}", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
+        else:
+            print("=" * 70)
+            print(f"[!] AVISO DE SEGURANÇA: A porta {port} já está em uso por outro aplicativo!")
+            print(f"[*] Processo detectado: {name} (PID: {pid})")
+            if cmdline:
+                print(f"[*] Linha de comando:   {cmdline}")
+            print(f"[*] Por segurança, este processo NÃO pertence ao Cockpit e NÃO foi finalizado.")
+            print("=" * 70)
+            return False
+
+    # Verificação final via socket bind antes de declarar a porta como livre
+    return not is_port_in_use(port=port, host=host)
