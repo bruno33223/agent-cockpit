@@ -62,19 +62,19 @@ class TestIssue2SidebarReorder(unittest.TestCase):
             "A navegação das VIEWS deve estar posicionada antes da seção In Progress de Workspaces"
         )
 
-    def test_all_eight_view_buttons_present(self):
+    def test_all_view_buttons_present_and_terminal_primary(self):
         """
-        Requisito 1: Devem existir os 8 botões de navegação das VIEWS:
-        Visão Geral, Fluxo/Kanban, Code Graph, Gauntlet Log, Handoff, Local Worker, Terminal, Configurações.
+        Navegação das VIEWS:
+        Terminal (Primária), Fluxo/Kanban, Code Graph, Gauntlet Log, Handoff, Local Worker, Configurações.
+        A aba 'Visão Geral' foi descontinuada e o Terminal é a aba primária padrão.
         """
         required_views = [
-            'view-overview',
+            'view-terminal',
             'view-flow',
             'view-graph',
             'view-gauntlet',
             'view-handoff',
             'view-worker',
-            'view-terminal',
             'view-settings',
         ]
         sidebar_nav_match = re.search(r'<nav[^>]*id=["\']sidebar-views-nav["\'][^>]*>(.*?)</nav>', self.html, re.DOTALL)
@@ -87,6 +87,14 @@ class TestIssue2SidebarReorder(unittest.TestCase):
                 nav_content,
                 f"Botão para a view '{view}' deve estar dentro de #sidebar-views-nav"
             )
+
+        # Garante que a aba 'view-overview' não existe mais
+        self.assertNotIn('data-view="view-overview"', nav_content)
+
+        # Garante que a primeira aba ativa é o Terminal
+        first_btn_match = re.search(r'<button[^>]*class=["\'][^"\']*nav-tab[^"\']*active[^"\']*["\'][^>]*data-view=["\']([^"\']+)["\']', nav_content)
+        self.assertIsNotNone(first_btn_match, "Primeiro botão ativo não encontrado")
+        self.assertEqual(first_btn_match.group(1), 'view-terminal', "A aba primária ativa deve ser 'view-terminal'")
 
     def test_workspaces_section_controls(self):
         """

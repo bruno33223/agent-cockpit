@@ -631,6 +631,15 @@ export class TerminalWorkspaceManager {
       });
     }
 
+    const modalActiveTerm = document.getElementById('modal-active-terminals');
+    if (modalActiveTerm) {
+      modalActiveTerm.addEventListener('click', (e) => {
+        if (e.target === modalActiveTerm) {
+          this.closeActiveTerminalsModal();
+        }
+      });
+    }
+
     // Redimensionamento global da janela
     window.addEventListener('resize', () => {
       this.fitAll();

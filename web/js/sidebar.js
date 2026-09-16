@@ -638,13 +638,12 @@ export function renderQuickSearchResults(query) {
   resultsContainer.innerHTML = '';
 
   const items = [];
-  // Views principais
-  items.push({ label: 'Visão Geral do Cockpit', badge: 'VIEW', action: () => switchTab('view-overview') });
+  // Views principais (Terminal é primário)
+  items.push({ label: 'Terminal / OpenCode Runner', badge: 'PRIMARY', action: () => switchTab('view-terminal') });
   items.push({ label: 'Fluxo & Kanban das Fatias', badge: 'VIEW', action: () => switchTab('view-flow') });
   items.push({ label: 'Codebase Knowledge Graph', badge: 'VIEW', action: () => switchTab('view-graph') });
   items.push({ label: 'Gauntlet Verdicts Log', badge: 'VIEW', action: () => switchTab('view-gauntlet') });
   items.push({ label: 'Handoff & Master Blueprint', badge: 'VIEW', action: () => switchTab('view-handoff') });
-  items.push({ label: 'Terminal / OpenCode Runner', badge: 'TOOL', action: () => switchTab('view-terminal') });
   items.push({ label: 'Local Worker & Ollama Manager', badge: 'AI', action: () => switchTab('view-worker') });
   items.push({ label: 'Configurações do Cockpit', badge: 'SETTINGS', action: () => openSettingsModal() });
 

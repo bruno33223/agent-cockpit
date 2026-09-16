@@ -294,6 +294,12 @@ async function bootstrapCockpit() {
     fileExplorerManager.loadFileTree(currentProjectId);
   }
 
+  // Terminal é a view primária padrão do Cockpit: ajusta terminais imediatamente
+  if (typeof terminalWorkspace !== 'undefined' && terminalWorkspace) {
+    terminalWorkspace.fitAll();
+    setTimeout(() => terminalWorkspace.fitAll(), 150);
+  }
+
   console.log('[Agent Cockpit] Inicialização modular concluída com sucesso.');
 }
 

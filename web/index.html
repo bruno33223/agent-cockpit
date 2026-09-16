@@ -112,14 +112,12 @@
       <div class="sidebar-scrollable-body">
         <!-- 1. MENU DE NAVEGAÇÃO DE VIEWS NO TOPO -->
         <nav class="sidebar-nav" id="sidebar-views-nav">
-          <button class="nav-tab active" data-view="view-overview" data-tooltip="Visão Geral">
+          <button class="nav-tab active" data-view="view-terminal" id="nav-tab-terminal" data-tooltip="Terminal & OpenCode">
             <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="9"></rect>
-              <rect x="14" y="3" width="7" height="5"></rect>
-              <rect x="14" y="12" width="7" height="9"></rect>
-              <rect x="3" y="16" width="7" height="5"></rect>
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
             </svg>
-            <span class="tab-label">Visão Geral</span>
+            <span class="tab-label">Terminal / OpenCode</span>
           </button>
           <button class="nav-tab" data-view="view-flow" data-tooltip="Fluxo & Kanban">
             <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -164,13 +162,6 @@
               <line x1="1" y1="14" x2="4" y2="14"></line>
             </svg>
             <span class="tab-label">Local Worker</span>
-          </button>
-          <button class="nav-tab" data-view="view-terminal" id="nav-tab-terminal" data-tooltip="Terminal & OpenCode">
-            <svg class="tab-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="4 17 10 11 4 5"></polyline>
-              <line x1="12" y1="19" x2="20" y2="19"></line>
-            </svg>
-            <span class="tab-label">Terminal / OpenCode</span>
           </button>
           <!-- Botão mantido em modo oculto para paridade com testes automatizados -->
           <button class="nav-tab sr-only" data-view="view-settings" id="nav-tab-settings" style="display: none;" aria-hidden="true">
@@ -254,70 +245,6 @@
   <div class="workspace-wrapper">
     <!-- LEFT: DYNAMIC VIEW CONTAINER -->
     <div class="view-viewport">
-
-      <!-- VIEW 1: OVERVIEW DASHBOARD -->
-      <section class="tab-view active" id="view-overview">
-        <div class="overview-container">
-          <!-- KPI METRICS ROW -->
-          <div class="kpi-grid">
-            <div class="kpi-card highlight">
-              <div class="kpi-header">
-                <span class="kpi-title">Tokens Economizados</span>
-                <span class="kpi-badge green">98% Redução</span>
-              </div>
-              <div class="kpi-value" id="kpi-tokens">12.000</div>
-              <div class="kpi-desc">Via protocolo de ponteiro JSON & offload de contexto</div>
-            </div>
-
-            <div class="kpi-card">
-              <div class="kpi-header">
-                <span class="kpi-title">Taxa de Aprovação (1ª Tentativa)</span>
-                <span class="kpi-badge cyan">Gauntlet Quality</span>
-              </div>
-              <div class="kpi-value" id="kpi-first-pass">100%</div>
-              <div class="kpi-desc">Fatias aprovadas sem necessidade de refatoração</div>
-            </div>
-
-            <div class="kpi-card">
-              <div class="kpi-header">
-                <span class="kpi-title">Fatias Concluídas</span>
-                <span class="kpi-badge purple">Spec-Driven</span>
-              </div>
-              <div class="kpi-value" id="kpi-completed-slices">0 / 3</div>
-              <div class="kpi-desc">Progresso do Master Blueprint atual</div>
-            </div>
-
-            <div class="kpi-card">
-              <div class="kpi-header">
-                <span class="kpi-title">Auditorias Realizadas</span>
-                <span class="kpi-badge amber">Harsh Critics</span>
-              </div>
-              <div class="kpi-value" id="kpi-verdicts-count">0</div>
-              <div class="kpi-desc">Vereditos formais registrados no log</div>
-            </div>
-          </div>
-
-          <!-- SYSTEM STATUS & HERO BANNER -->
-          <div class="system-status-banner">
-            <div class="status-banner-left">
-              <span class="status-indicator-badge">SISTEMA ATIVO</span>
-              <h2 id="overview-epic-goal">Nenhum épico carregado. Conecte o Antigravity via MCP para inicializar.</h2>
-              <p class="status-meta">Orquestrador Staff Engineer pronto para coordenar fatias verticais e despachar a frota 3x3.</p>
-            </div>
-            <div class="status-banner-right">
-              <button class="hero-action-btn" onclick="switchTab('view-flow')">Ver Fluxograma ➔</button>
-            </div>
-          </div>
-
-          <!-- FLEET CARDS IN OVERVIEW -->
-          <div class="overview-fleet-grid">
-            <div class="overview-section-title">Status da Frota 3x3 (Pares Emparelhados)</div>
-            <div class="fleet-cards-row" id="overview-fleet-row">
-              <!-- Gerado via JS -->
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- VIEW 2: FLOWCHART, SLICE TABS & MICRO-KANBAN (ISSUE #7) -->
       <section class="tab-view" id="view-flow">
@@ -822,7 +749,7 @@
       </section>
 
       <!-- VIEW 6: TERMINAL INTERATIVO & ÁREA DE TRABALHO VIRTUAL (ISSUE #10) -->
-      <section class="tab-view" id="view-terminal">
+      <section class="tab-view active" id="view-terminal">
         <div class="terminal-view-container orca-workbench-container terminal-workbench-minimalist">
           <!-- CABEÇALHO LIMPO: CONFIGURAR GRID, ZOOM E NOVO ORQUESTRADOR -->
           <div class="terminal-view-header orca-workbench-header minimalist-header">
@@ -2023,8 +1950,10 @@
         </div>
       </section>
     </div>
+  </div>
+
   <!-- MODAL: TERMINAIS ATIVOS DO PROJETO -->
-  <div class="modal-backdrop" id="modal-active-terminals" style="display: none;">
+  <div class="modal-backdrop active-terminals-backdrop" id="modal-active-terminals" style="display: none;">
     <div class="active-terminals-dialog" style="max-width: 680px; width: 90%; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh;">
       <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
         <div>
