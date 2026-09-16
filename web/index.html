@@ -891,25 +891,49 @@
               <!-- Painéis de terminais gerados dinamicamente via JS -->
             </div>
 
-            <!-- CONTAINER CHAT VISUAL OPENCODE (ISSUE #18) -->
-            <div class="opencode-visual-chat-container" id="opencode-visual-chat-container" style="display: none;">
-              <div class="opencode-chat-header">
-                <div class="opencode-chat-header-title">
-                  <span class="opencode-chat-icon">💬</span>
-                  <span>OpenCode Chat Visual</span>
-                  <span class="opencode-chat-badge" id="opencode-chat-status">Ready</span>
+            <!-- CONTAINER CHAT VISUAL OPENCODE & ZEUS AGENT (ISSUE #18 & ISSUE #24) -->
+            <div class="opencode-visual-chat-container zeus-chat-container" id="opencode-visual-chat-container" style="display: none;">
+              <div class="opencode-chat-header zeus-chat-header">
+                <div class="opencode-chat-header-title zeus-chat-header-left">
+                  <span class="opencode-chat-icon zeus-chat-icon">⚡</span>
+                  <span style="font-weight: 700; color: #00e5ff;">ZEUS Agent Chat</span>
+                  <span class="opencode-chat-badge zeus-chat-badge" id="opencode-chat-status">Ready</span>
+                  <!-- Seletor de Modelo Contextual -->
+                  <select id="zeus-model-select" class="zeus-model-select" title="Selecionar modelo de IA"></select>
                 </div>
-                <div class="opencode-chat-header-actions">
+                <div class="opencode-chat-header-actions zeus-chat-header-actions">
+                  <!-- Botão com Dropdown Popover de Skills & MCPs -->
+                  <button type="button" id="btn-zeus-skills-mcps" class="zeus-btn-skills" title="Configurar Skills e Servidores MCP ativos">
+                    <span>⚡ Skills & MCPs</span>
+                    <span id="zeus-skills-badge-count" class="zeus-badge-count" style="display: none;">0</span>
+                  </button>
+                  <div id="zeus-skills-popover" class="zeus-skills-popover" style="display: none;"></div>
+
                   <button class="btn-chat-action" id="btn-clear-opencode-chat" title="Limpar conversa">🗑️</button>
                   <button class="btn-chat-action" id="btn-close-opencode-chat" title="Fechar Chat Visual">✕</button>
                 </div>
               </div>
-              <div class="opencode-chat-messages" id="opencode-chat-messages" role="log" aria-live="polite">
-                <!-- Mensagens renderizadas dinamicamente via opencode_chat.js -->
+
+              <!-- Badge de Aviso de Incompatibilidade Multimodal -->
+              <div id="zeus-model-warning" class="zeus-model-warning" style="display: none;"></div>
+
+              <div class="opencode-chat-messages zeus-chat-messages" id="opencode-chat-messages" role="log" aria-live="polite">
+                <!-- Mensagens renderizadas dinamicamente via zeus_chat_ui.js / opencode_chat.js -->
               </div>
-              <div class="opencode-chat-input-area">
-                <textarea id="opencode-chat-input" class="opencode-chat-textarea" placeholder="Digite uma instrução para o OpenCode... (Enter para enviar, Shift+Enter para nova linha)" rows="2"></textarea>
-                <div class="opencode-chat-input-actions">
+
+              <!-- Container de Preview de Imagens Anexadas -->
+              <div id="zeus-attachments-preview" class="zeus-attachments-preview" style="display: none;"></div>
+
+              <div class="opencode-chat-input-area zeus-chat-input-area">
+                <textarea id="opencode-chat-input" class="opencode-chat-textarea zeus-chat-input" placeholder="Digite uma instrução para o ZEUS Agent... (Enter para enviar, Shift+Enter para nova linha, Ctrl+V para colar imagens)" rows="2"></textarea>
+                <div class="opencode-chat-input-actions zeus-chat-input-actions">
+                  <!-- Anexo de Imagens -->
+                  <button type="button" id="btn-zeus-attach-img" class="zeus-btn-attach" title="Anexar imagem (ou arraste/solte ou cole com Ctrl+V)">📷</button>
+                  <input type="file" id="zeus-file-input" accept="image/*" multiple style="display: none;">
+                  
+                  <!-- Microfone STT com Gravação -->
+                  <button type="button" id="btn-zeus-mic" class="zeus-btn-mic" title="Gravar áudio (STT)">🎙️</button>
+
                   <button type="button" class="btn btn-primary btn-sm" id="btn-send-opencode-chat">
                     <span>Enviar</span>
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -44,6 +44,7 @@ import {
 import { initWebSocket, socket } from './js/websocket_client.js';
 import { openCodeChat, initOpenCodeChat } from './js/opencode_chat.js';
 import { zeusChatWorkspace, openOrCreateChatSession, initZeusChatWorkspace } from './js/zeus_chat_workspace.js';
+import { zeusChatUI, initZeusChatUI } from './js/zeus_chat_ui.js';
 
 
 // 2. Exportação para Escopo Global (window) para Retrocompatibilidade com DOM e Testes
@@ -178,14 +179,14 @@ Object.assign(window, {
   initWebSocket,
   cockpitSocket: socket,
 
-  // OpenCode Visual Chat
+  // OpenCode & Zeus Visual Chat
   openCodeChat,
   initOpenCodeChat,
-
-  // Zeus Chat Workspace (Issue #24)
   zeusChatWorkspace,
   openOrCreateChatSession,
-  openZeusChat: () => openOrCreateChatSession()
+  openZeusChat: () => openOrCreateChatSession(),
+  zeusChatUI,
+  initZeusChatUI
 });
 
 // 3. Inicialização e Bootstrapping da Aplicação
@@ -196,7 +197,7 @@ async function bootstrapCockpit() {
     try {
       fn();
     } catch (err) {
-      console.warn(`[Agent Cockpit] Aviso ao inicializar ${name}:`, err);
+      console.warn(, err);
     }
   };
 
@@ -213,6 +214,7 @@ async function bootstrapCockpit() {
   safeInit("terminalWorkspace.init", () => terminalWorkspace.init());
   safeInit("fileExplorerManager.init", () => fileExplorerManager.init());
   safeInit("initOpenCodeChat", initOpenCodeChat);
+  safeInit("initZeusChatUI", initZeusChatUI);
 
   // 3. Inicializa conexão WebSocket em tempo real
   safeInit("initWebSocket", initWebSocket);
@@ -261,6 +263,7 @@ export {
   openCodeChat,
   initOpenCodeChat,
   zeusChatWorkspace,
-  openOrCreateChatSession
+  openOrCreateChatSession,
+  zeusChatUI,
+  initZeusChatUI
 };
-
