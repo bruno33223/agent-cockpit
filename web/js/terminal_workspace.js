@@ -495,6 +495,22 @@ export class TerminalWorkspaceManager {
     const btnNewTerm = document.getElementById('btn-new-terminal');
     const newTermDropdown = document.getElementById('new-terminal-dropdown');
     if (btnNewTerm && newTermDropdown) {
+      // Garante a opção "Chat Visual (OpenCode)" no dropdown de criação de terminais
+      if (!newTermDropdown.querySelector('[data-terminal-type="opencode-visual"]')) {
+        const visualItem = document.createElement('div');
+        visualItem.className = 'grid-config-item';
+        visualItem.setAttribute('data-terminal-type', 'opencode-visual');
+        visualItem.setAttribute('data-role', 'agent');
+        visualItem.innerHTML = `
+          <span style="font-size: 14px;">💬</span>
+          <div>
+            <div style="font-weight: 600;">Chat Visual (OpenCode)</div>
+            <div style="font-size: 10px; color: var(--text-muted);">Sessão interativa visual de subagente</div>
+          </div>
+        `;
+        newTermDropdown.insertBefore(visualItem, newTermDropdown.firstChild);
+      }
+
       btnNewTerm.addEventListener('click', (e) => {
         e.stopPropagation();
         newTermDropdown.style.display = (newTermDropdown.style.display === 'none' || !newTermDropdown.style.display) ? 'block' : 'none';
@@ -521,6 +537,30 @@ export class TerminalWorkspaceManager {
           if (currentProjectId) {
             recordRecentProject(currentProjectId);
             renderWorktreeSidebar();
+          }
+
+          if (agentType === 'opencode-visual' || name.includes('Chat Visual (OpenCode)')) {
+            import('./subagent_tabs.js').then(mod => {
+              if (mod && mod.openSubagentTab) {
+                mod.openSubagentTab({
+                  role: 'agent',
+                  type: 'builder',
+                  agentType: 'opencode',
+                  name: 'Chat Visual (OpenCode)',
+                  title: '🤖 [Builder] Chat Visual (OpenCode)',
+                  status: 'RUNNING'
+                });
+              }
+            }).catch(() => {
+              this.createSession({
+                agentType: 'opencode',
+                role: 'agent',
+                name: 'Chat Visual (OpenCode)',
+                cwd: this.getActiveProjectRoot()
+              });
+            });
+            newTermDropdown.style.display = 'none';
+            return;
           }
 
           this.createSession({
