@@ -973,6 +973,13 @@ export function initLocalWorkerEvents() {
         searchHuggingFaceModels(val);
       }, 350);
     });
+
+    const btnHfSearch = document.getElementById('btn-hf-search');
+    if (btnHfSearch) {
+      btnHfSearch.addEventListener('click', () => {
+        searchHuggingFaceModels(inputHfSearch.value);
+      });
+    }
   }
 
   // Hugging Face: delegação de clique em 'Baixar Modelo' nos cards

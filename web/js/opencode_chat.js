@@ -75,6 +75,10 @@ class OpenCodeChatManager {
     }
   }
 
+  openChat() {
+    this.open();
+  }
+
   close() {
     if (this.container) {
       this.container.style.display = 'none';
