@@ -4,7 +4,7 @@
  * do serviço de autostart com o sistema operacional.
  */
 
-import { apiFetch, currentProjectId } from './state.js';
+import { apiFetch, currentProjectId, state } from './state.js';
 import { escapeHtml } from './ui_utils.js';
 
 // AUTOSTART LOGIC
@@ -838,7 +838,7 @@ export function initGovernanceEvents() {
 
   // Carrega status inicial
   checkAutostartStatus();
-  if (state && state.human_gates) {
+  if (typeof state !== "undefined" && state && state.human_gates) {
     updateHumanGateUI(state.human_gates.gate_ship_approved);
   }
 }

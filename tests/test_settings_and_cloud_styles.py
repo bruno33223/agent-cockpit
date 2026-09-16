@@ -260,3 +260,24 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+    def test_settings_js_imports_and_state_reference(self):
+        """Garante que web/js/settings.js importa state de state.js e nao lanca ReferenceError."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        js_path = os.path.join(base_dir, "web", "js", "settings.js")
+        with open(js_path, "r", encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("import { apiFetch, currentProjectId, state } from './state.js'", js)
+        self.assertIn("typeof state !== 'undefined'", js)
+    def test_settings_js_imports_and_state_reference(self):
+        """Garante que web/js/settings.js importa state de state.js e nao lanca ReferenceError."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        js_path = os.path.join(base_dir, "web", "js", "settings.js")
+        with open(js_path, "r", encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("import { apiFetch, currentProjectId, state } from './state.js';", js)
+        self.assertIn("state && state.human_gates", js)
+
+if __name__ == '__main__':
+    unittest.main()
