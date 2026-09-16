@@ -547,10 +547,20 @@ def handle_tool_call(name: str, args: dict) -> dict:
     elif name == "generate_handoff":
         import workflow_lock
         import time
+        active_root = db.get_project_root(target_pid) or "."
         bp_dir = args.get("blueprint_dir")
         if not bp_dir:
-            found = workflow_lock.find_latest_blueprint_dir(".")
-            bp_dir = found if found else "01_entrega"
+            found = workflow_lock.find_latest_blueprint_dir(active_root)
+            if not found and active_root != ".":
+                found = workflow_lock.find_latest_blueprint_dir(".")
+            bp_dir = found if found else os.path.join(workflow_lock.get_blueprints_base_dir(active_root), "01_entrega")
+        elif not os.path.isabs(bp_dir):
+            candidates = [
+                os.path.join(active_root, bp_dir),
+                os.path.join(active_root, "cockpit-agent", "blueprints", bp_dir),
+                os.path.abspath(bp_dir)
+            ]
+            bp_dir = next((c for c in candidates if os.path.exists(c)), candidates[0])
         epic_name = args.get("epic_name", "")
         summary = args.get("summary", "")
         files_touched = args.get("files_touched", [])
@@ -587,8 +597,10 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
     elif name == "read_last_handoff":
         import workflow_lock
-        base_dir = args.get("base_dir", ".")
+        base_dir = args.get("base_dir") or db.get_project_root(target_pid) or "."
         data = workflow_lock.read_latest_handoff(base_dir)
+        if not data and base_dir != ".":
+            data = workflow_lock.read_latest_handoff(".")
         if not data:
             return {"content": [{"type": "text", "text": json.dumps({"status": "NO_HANDOFF_FOUND"})}]}
         return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False)}]}
@@ -684,14 +696,22 @@ def handle_tool_call(name: str, args: dict) -> dict:
         max_age = args.get("max_age_seconds", 180)
         slice_id = args.get("slice_id")
         
-        possible_paths = [os.path.join(".", "TEST_RAW.log")]
+        active_root = db.get_project_root(target_pid) or "."
+        possible_paths = []
         try:
             import workflow_lock
-            latest_bp = workflow_lock.find_latest_blueprint_dir(".")
+            latest_bp = workflow_lock.find_latest_blueprint_dir(active_root)
             if latest_bp:
-                possible_paths.insert(0, os.path.join(latest_bp, "TEST_RAW.log"))
+                possible_paths.append(os.path.join(latest_bp, "TEST_RAW.log"))
+            if active_root != ".":
+                cwd_bp = workflow_lock.find_latest_blueprint_dir(".")
+                if cwd_bp:
+                    possible_paths.append(os.path.join(cwd_bp, "TEST_RAW.log"))
         except Exception:
             pass
+
+        possible_paths.append(os.path.join(active_root, "TEST_RAW.log"))
+        possible_paths.append(os.path.join(".", "TEST_RAW.log"))
 
         raw_log = next((p for p in possible_paths if os.path.exists(p)), possible_paths[0])
         
