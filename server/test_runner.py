@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import time
+import signal
 import subprocess
 from typing import Dict, List, Any, Optional
 
@@ -63,7 +64,8 @@ def run_distilled_tests(
             stderr=subprocess.PIPE,
             text=True,
             encoding='utf-8',
-            errors='ignore'
+            errors='ignore',
+            start_new_session=True
         )
         stdout, stderr = proc.communicate(timeout=timeout_sec)
         exit_code = proc.returncode
@@ -74,7 +76,14 @@ def run_distilled_tests(
             except Exception:
                 proc.kill()
         else:
-            proc.kill()
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                proc.kill()
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            pass
         return {
             "status": "TIMEOUT",
             "command": test_command,
@@ -82,6 +91,21 @@ def run_distilled_tests(
             "error": f"Execução de testes expirou após {timeout_sec}s."
         }
     except Exception as e:
+        if 'proc' in locals() and proc.poll() is None:
+            if sys.platform == "win32":
+                try:
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+                except Exception:
+                    proc.kill()
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except Exception:
+                    proc.kill()
+            try:
+                proc.wait(timeout=2)
+            except Exception:
+                pass
         return {
             "status": "ERROR",
             "command": test_command,
