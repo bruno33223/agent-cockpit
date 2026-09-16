@@ -26,12 +26,13 @@ class TestLocalBuilder(unittest.TestCase):
         # Configura worktree falso para testes de isolamento
         self.worktree_dir = os.path.join(self.test_dir, ".worktrees", self.slice_id)
         os.makedirs(self.worktree_dir, exist_ok=True)
-        # Reseta contador de tentativas e garante local_worker ativado e delegate_styles_to_cloud desativado nos testes base
+        db.switch_current_project("default")
         db.set_local_worker_config({"enabled": True, "delegate_styles_to_cloud": False})
         if hasattr(db, "reset_local_worker_attempts"):
             db.reset_local_worker_attempts(self.slice_id)
 
     def tearDown(self):
+        db.switch_current_project("default")
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir, ignore_errors=True)
 
