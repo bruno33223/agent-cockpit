@@ -410,6 +410,31 @@ def sync_opencode_config(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     try:
         with open(OPENCODE_JSON, "w", encoding="utf-8") as f:
             json.dump(opencode_structure, f, indent=2, ensure_ascii=False)
+        
+        # Sincroniza servidores MCP customizados caso existam
+        try:
+            sync_customizations_to_opencode(OPENCODE_JSON)
+        except Exception:
+            pass
+
         return {"status": "success", "file": OPENCODE_JSON, "config": opencode_structure}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def sync_customizations_to_opencode(
+    opencode_path: Optional[str] = None,
+    customizations_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Aciona o CustomizationsManager para sincronizar os servidores MCP customizados
+    no arquivo opencode.json preservando conectores e configurações existentes.
+    """
+    try:
+        from server.customizations_manager import CustomizationsManager
+        target_opencode = opencode_path or OPENCODE_JSON
+        manager = CustomizationsManager(base_dir=customizations_dir)
+        return manager.sync_with_opencode(target_opencode)
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
