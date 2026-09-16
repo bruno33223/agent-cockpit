@@ -889,17 +889,658 @@ export function initThemeAndFontSettings() {
   }
 }
 
-// Auto-inicializa governança e temas
-if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      initThemeAndFontSettings();
-      initGovernanceEvents();
-      loadGovernanceSettings();
+// =========================================================================
+// CUSTOMIZATIONS & MCP / SKILLS MANAGER (ISSUE #16)
+// =========================================================================
+
+export let currentCustomizations = {
+  mcp: {},
+  skills: []
+};
+
+/**
+ * Carrega Servidores MCP e Skills da API REST
+ */
+export async function loadCustomizations() {
+  try {
+    const [mcpRes, skillsRes] = await Promise.all([
+      apiFetch(`/api/customizations/mcp?project_id=${encodeURIComponent(currentProjectId)}`),
+      apiFetch(`/api/customizations/skills?project_id=${encodeURIComponent(currentProjectId)}`)
+    ]);
+
+    let mcps = {};
+    let skills = [];
+
+    if (mcpRes.ok) {
+      const data = await mcpRes.json();
+      mcps = data.mcp || data.servers || data;
+    }
+    if (skillsRes.ok) {
+      const data = await skillsRes.json();
+      skills = Array.isArray(data) ? data : (data.skills || []);
+    }
+
+    currentCustomizations = { mcp: mcps, skills };
+    renderMcpList(mcps);
+    renderSkillsList(skills);
+  } catch (err) {
+    console.warn('[Customizations] Falha ao carregar customizações:', err);
+  }
+}
+
+/**
+ * Renderiza a lista de servidores MCP no container #mcp-servers-list
+ */
+export function renderMcpList(mcps) {
+  const container = document.getElementById('mcp-servers-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const entries = mcps && typeof mcps === 'object' ? Object.entries(mcps) : [];
+
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px dashed var(--border-subtle);">
+        Nenhum servidor MCP configurado ainda. Clique em "Adicionar MCP" para cadastrar um servidor Stdio ou SSE.
+      </div>
+    `;
+    return;
+  }
+
+  entries.forEach(([id, mcp]) => {
+    const card = document.createElement('div');
+    card.className = 'ag-mcp-server-item';
+    card.dataset.mcpId = id;
+
+    const isEnabled = mcp.enabled !== false;
+    const isSse = mcp.type === 'sse' || !!mcp.url;
+    const typeLabel = isSse ? 'SSE' : 'Stdio';
+    const detail = isSse
+      ? escapeHtml(mcp.url || '')
+      : `${escapeHtml(mcp.command || '')} ${escapeHtml((mcp.args || []).join(' '))}`.trim();
+
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <span class="pulse-led ${isEnabled ? 'online' : 'stopped'}"></span>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong class="ag-mcp-name" style="font-size: 13px;">${escapeHtml(id)}</strong>
+              <span class="lw-badge ${isSse ? '' : 'active'}" style="font-size: 10px; padding: 1px 6px;">${typeLabel}</span>
+              <span style="font-size: 11px; color: ${isEnabled ? 'var(--color-success, #00ff66)' : 'var(--text-muted)'};">
+                ${isEnabled ? 'Ativo' : 'Desativado'}
+              </span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono, monospace); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px;">
+              ${detail || 'Sem comando especificado'}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn btn-secondary btn-sm btn-edit-mcp" data-id="${escapeHtml(id)}" title="Editar MCP" style="padding: 4px 8px; font-size: 11px;">
+            Editar
+          </button>
+          <button class="btn btn-secondary btn-sm btn-toggle-mcp" data-id="${escapeHtml(id)}" data-enabled="${isEnabled}" title="${isEnabled ? 'Desativar' : 'Ativar'}" style="padding: 4px 8px; font-size: 11px;">
+            ${isEnabled ? 'Desativar' : 'Ativar'}
+          </button>
+          <button class="btn btn-danger btn-sm btn-delete-mcp" data-id="${escapeHtml(id)}" title="Excluir MCP" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+            Excluir
+          </button>
+        </div>
+      </div>
+    `;
+
+    const btnEdit = card.querySelector('.btn-edit-mcp');
+    if (btnEdit) {
+      btnEdit.addEventListener('click', () => openMcpModal('edit', id, mcp));
+    }
+
+    const btnToggle = card.querySelector('.btn-toggle-mcp');
+    if (btnToggle) {
+      btnToggle.addEventListener('click', () => toggleMcpServer(id, !isEnabled));
+    }
+
+    const btnDelete = card.querySelector('.btn-delete-mcp');
+    if (btnDelete) {
+      btnDelete.addEventListener('click', () => deleteMcpServer(id));
+    }
+
+    container.appendChild(card);
+  });
+}
+
+/**
+ * Renderiza a lista de Skills no container #skills-list
+ */
+export function renderSkillsList(skills) {
+  const container = document.getElementById('skills-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+  const list = Array.isArray(skills) ? skills : [];
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px dashed var(--border-subtle);">
+        Nenhuma skill personalizada encontrada. Clique em "Adicionar Skill" para registrar novas diretrizes e fluxos.
+      </div>
+    `;
+    return;
+  }
+
+  list.forEach(skill => {
+    const name = skill.name || skill.id || 'sem-nome';
+    const isEnabled = skill.enabled !== false;
+    const card = document.createElement('div');
+    card.className = 'ag-mcp-server-item';
+    card.dataset.skillName = name;
+
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <span class="pulse-led ${isEnabled ? 'online' : 'stopped'}"></span>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong style="font-size: 13px; color: var(--text-primary);">${escapeHtml(name)}</strong>
+              <span style="font-size: 11px; color: ${isEnabled ? 'var(--color-success, #00ff66)' : 'var(--text-muted)'};">
+                ${isEnabled ? 'Ativa' : 'Desativada'}
+              </span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px;">
+              ${escapeHtml(skill.description || 'Sem descrição')}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn btn-secondary btn-sm btn-edit-skill" data-name="${escapeHtml(name)}" title="Editar Skill" style="padding: 4px 8px; font-size: 11px;">
+            Editar
+          </button>
+          <button class="btn btn-secondary btn-sm btn-toggle-skill" data-name="${escapeHtml(name)}" data-enabled="${isEnabled}" title="${isEnabled ? 'Desativar' : 'Ativar'}" style="padding: 4px 8px; font-size: 11px;">
+            ${isEnabled ? 'Desativar' : 'Ativar'}
+          </button>
+          <button class="btn btn-danger btn-sm btn-delete-skill" data-name="${escapeHtml(name)}" title="Excluir Skill" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+            Excluir
+          </button>
+        </div>
+      </div>
+    `;
+
+    const btnEdit = card.querySelector('.btn-edit-skill');
+    if (btnEdit) {
+      btnEdit.addEventListener('click', () => openSkillModal('edit', skill));
+    }
+
+    const btnToggle = card.querySelector('.btn-toggle-skill');
+    if (btnToggle) {
+      btnToggle.addEventListener('click', () => toggleSkill(name, !isEnabled));
+    }
+
+    const btnDelete = card.querySelector('.btn-delete-skill');
+    if (btnDelete) {
+      btnDelete.addEventListener('click', () => deleteSkill(name));
+    }
+
+    container.appendChild(card);
+  });
+}
+
+/**
+ * Ativa ou desativa um servidor MCP
+ */
+export async function toggleMcpServer(mcpId, enable) {
+  try {
+    const res = await apiFetch(`/api/customizations/mcp/${encodeURIComponent(mcpId)}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !!enable, project_id: currentProjectId })
     });
+    if (res.ok) {
+      await loadCustomizations();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[Customizations] Falha ao alterar status do MCP:`, err);
+    }
+  } catch (err) {
+    console.error('[Customizations] Erro ao alternar MCP:', err);
+  }
+}
+
+/**
+ * Exclui um servidor MCP
+ */
+export async function deleteMcpServer(mcpId) {
+  if (typeof confirm === 'function' && !confirm(`Deseja realmente remover o servidor MCP "${mcpId}"?`)) return;
+  try {
+    const res = await apiFetch(`/api/customizations/mcp/${encodeURIComponent(mcpId)}?project_id=${encodeURIComponent(currentProjectId)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      await loadCustomizations();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[Customizations] Falha ao excluir MCP:`, err);
+    }
+  } catch (err) {
+    console.error('[Customizations] Erro ao excluir MCP:', err);
+  }
+}
+
+/**
+ * Salva (cria ou atualiza) um servidor MCP
+ */
+export async function saveMcpServer(mcpData) {
+  const { id, originalId, mode, ...payload } = mcpData;
+  payload.project_id = currentProjectId;
+
+  const isEdit = mode === 'edit';
+  const targetId = isEdit ? (originalId || id) : id;
+  const endpoint = isEdit
+    ? `/api/customizations/mcp/${encodeURIComponent(targetId)}`
+    : '/api/customizations/mcp';
+  const method = isEdit ? 'PUT' : 'POST';
+
+  const res = await apiFetch(endpoint, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(isEdit ? { id: targetId, ...payload } : { id, ...payload })
+  });
+
+  if (res.ok) {
+    closeMcpModal();
+    await loadCustomizations();
   } else {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || err.message || 'Falha ao salvar servidor MCP');
+  }
+}
+
+/**
+ * Ativa ou desativa uma Skill
+ */
+export async function toggleSkill(skillName, enable) {
+  try {
+    const res = await apiFetch(`/api/customizations/skills/${encodeURIComponent(skillName)}/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !!enable, project_id: currentProjectId })
+    });
+    if (res.ok) {
+      await loadCustomizations();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[Customizations] Falha ao alterar status da skill:`, err);
+    }
+  } catch (err) {
+    console.error('[Customizations] Erro ao alternar skill:', err);
+  }
+}
+
+/**
+ * Exclui uma Skill
+ */
+export async function deleteSkill(skillName) {
+  if (typeof confirm === 'function' && !confirm(`Deseja realmente remover a Skill "${skillName}"?`)) return;
+  try {
+    const res = await apiFetch(`/api/customizations/skills/${encodeURIComponent(skillName)}?project_id=${encodeURIComponent(currentProjectId)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      await loadCustomizations();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[Customizations] Falha ao excluir skill:`, err);
+    }
+  } catch (err) {
+    console.error('[Customizations] Erro ao excluir skill:', err);
+  }
+}
+
+/**
+ * Salva (cria ou atualiza) uma Skill
+ */
+export async function saveSkill(skillData) {
+  const { name, originalName, mode, ...payload } = skillData;
+  payload.project_id = currentProjectId;
+
+  const isEdit = mode === 'edit';
+  const targetName = isEdit ? (originalName || name) : name;
+  const endpoint = isEdit
+    ? `/api/customizations/skills/${encodeURIComponent(targetName)}`
+    : '/api/customizations/skills';
+  const method = isEdit ? 'PUT' : 'POST';
+
+  const res = await apiFetch(endpoint, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(isEdit ? { name: targetName, ...payload } : { name, ...payload })
+  });
+
+  if (res.ok) {
+    closeSkillModal();
+    await loadCustomizations();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || err.message || 'Falha ao salvar skill');
+  }
+}
+
+// Helpers de Modais para Customizations
+export function openMcpModal(mode = 'create', id = '', mcp = {}) {
+  const modal = document.getElementById('modal-mcp-server');
+  if (!modal) return;
+
+  const modeInput = document.getElementById('mcp-form-mode');
+  const origIdInput = document.getElementById('mcp-form-original-id');
+  const nameInput = document.getElementById('mcp-form-name');
+  const typeSelect = document.getElementById('mcp-form-type');
+  const cmdInput = document.getElementById('mcp-form-command');
+  const argsInput = document.getElementById('mcp-form-args');
+  const envInput = document.getElementById('mcp-form-env');
+  const urlInput = document.getElementById('mcp-form-url');
+  const title = document.getElementById('modal-mcp-title');
+  const feedback = document.getElementById('mcp-form-feedback');
+
+  if (feedback) feedback.style.display = 'none';
+
+  if (mode === 'edit') {
+    if (title) title.textContent = `Editar Servidor MCP: ${id}`;
+    if (modeInput) modeInput.value = 'edit';
+    if (origIdInput) origIdInput.value = id;
+    if (nameInput) {
+      nameInput.value = id;
+      nameInput.disabled = true;
+    }
+    const isSse = mcp.type === 'sse' || !!mcp.url;
+    if (typeSelect) typeSelect.value = isSse ? 'sse' : 'stdio';
+    if (cmdInput) cmdInput.value = mcp.command || '';
+    if (argsInput) {
+      argsInput.value = Array.isArray(mcp.args) ? mcp.args.join(' ') : (mcp.args || '');
+    }
+    if (envInput) {
+      envInput.value = mcp.env ? JSON.stringify(mcp.env, null, 2) : '';
+    }
+    if (urlInput) urlInput.value = mcp.url || '';
+  } else {
+    if (title) title.textContent = 'Adicionar Servidor MCP';
+    if (modeInput) modeInput.value = 'create';
+    if (origIdInput) origIdInput.value = '';
+    if (nameInput) {
+      nameInput.value = '';
+      nameInput.disabled = false;
+    }
+    if (typeSelect) typeSelect.value = 'stdio';
+    if (cmdInput) cmdInput.value = '';
+    if (argsInput) argsInput.value = '';
+    if (envInput) envInput.value = '';
+    if (urlInput) urlInput.value = '';
+  }
+
+  updateMcpFormTypeFields();
+  modal.style.display = 'flex';
+}
+
+export function closeMcpModal() {
+  const modal = document.getElementById('modal-mcp-server');
+  if (modal) modal.style.display = 'none';
+}
+
+export function updateMcpFormTypeFields() {
+  const typeSelect = document.getElementById('mcp-form-type');
+  const stdioGroup = document.getElementById('mcp-form-stdio-group');
+  const sseGroup = document.getElementById('mcp-form-sse-group');
+  if (!typeSelect) return;
+
+  const isSse = typeSelect.value === 'sse';
+  if (stdioGroup) stdioGroup.style.display = isSse ? 'none' : 'flex';
+  if (sseGroup) sseGroup.style.display = isSse ? 'flex' : 'none';
+}
+
+export function openSkillModal(mode = 'create', skill = {}) {
+  const modal = document.getElementById('modal-skill');
+  if (!modal) return;
+
+  const modeInput = document.getElementById('skill-form-mode');
+  const origNameInput = document.getElementById('skill-form-original-name');
+  const nameInput = document.getElementById('skill-form-name');
+  const descInput = document.getElementById('skill-form-desc');
+  const contentInput = document.getElementById('skill-form-content');
+  const title = document.getElementById('modal-skill-title');
+  const feedback = document.getElementById('skill-form-feedback');
+
+  if (feedback) feedback.style.display = 'none';
+
+  const skillName = skill.name || skill.id || '';
+
+  if (mode === 'edit') {
+    if (title) title.textContent = `Editar Skill: ${skillName}`;
+    if (modeInput) modeInput.value = 'edit';
+    if (origNameInput) origNameInput.value = skillName;
+    if (nameInput) {
+      nameInput.value = skillName;
+      nameInput.disabled = true;
+    }
+    if (descInput) descInput.value = skill.description || '';
+    if (contentInput) contentInput.value = skill.content || skill.instructions || '';
+  } else {
+    if (title) title.textContent = 'Adicionar Nova Skill';
+    if (modeInput) modeInput.value = 'create';
+    if (origNameInput) origNameInput.value = '';
+    if (nameInput) {
+      nameInput.value = '';
+      nameInput.disabled = false;
+    }
+    if (descInput) descInput.value = '';
+    if (contentInput) contentInput.value = '';
+  }
+
+  modal.style.display = 'flex';
+}
+
+export function closeSkillModal() {
+  const modal = document.getElementById('modal-skill');
+  if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Inicializa bindings de eventos da UI de Customizations
+ */
+export function initCustomizationsEvents() {
+  // Abertura e fechamento do modal MCP
+  const btnAddMcp = document.getElementById('btn-add-mcp');
+  if (btnAddMcp) {
+    btnAddMcp.addEventListener('click', () => openMcpModal('create'));
+  }
+  const btnCloseMcp = document.getElementById('btn-close-mcp-modal');
+  if (btnCloseMcp) {
+    btnCloseMcp.addEventListener('click', closeMcpModal);
+  }
+  const btnCancelMcp = document.getElementById('btn-cancel-mcp-form');
+  if (btnCancelMcp) {
+    btnCancelMcp.addEventListener('click', closeMcpModal);
+  }
+
+  // Alternância de tipo MCP
+  const typeSelect = document.getElementById('mcp-form-type');
+  if (typeSelect) {
+    typeSelect.addEventListener('change', updateMcpFormTypeFields);
+  }
+
+  // Salvamento do modal MCP
+  const btnSaveMcp = document.getElementById('btn-save-mcp');
+  if (btnSaveMcp) {
+    btnSaveMcp.addEventListener('click', async () => {
+      const mode = document.getElementById('mcp-form-mode')?.value || 'create';
+      const originalId = document.getElementById('mcp-form-original-id')?.value || '';
+      const name = document.getElementById('mcp-form-name')?.value?.trim();
+      const type = document.getElementById('mcp-form-type')?.value || 'stdio';
+      const feedback = document.getElementById('mcp-form-feedback');
+
+      if (!name) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          feedback.style.color = '#ef4444';
+          feedback.textContent = 'Informe o nome do servidor MCP.';
+        }
+        return;
+      }
+
+      let mcpPayload = { id: name, originalId, mode, type };
+
+      if (type === 'sse') {
+        const url = document.getElementById('mcp-form-url')?.value?.trim();
+        if (!url) {
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+            feedback.style.color = '#ef4444';
+            feedback.textContent = 'Informe a URL do servidor SSE.';
+          }
+          return;
+        }
+        mcpPayload.url = url;
+      } else {
+        const command = document.getElementById('mcp-form-command')?.value?.trim();
+        const rawArgs = document.getElementById('mcp-form-args')?.value?.trim() || '';
+        const rawEnv = document.getElementById('mcp-form-env')?.value?.trim() || '';
+
+        if (!command) {
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+            feedback.style.color = '#ef4444';
+            feedback.textContent = 'Informe o comando executável.';
+          }
+          return;
+        }
+
+        let args = [];
+        if (rawArgs.startsWith('[') && rawArgs.endsWith(']')) {
+          try { args = JSON.parse(rawArgs); } catch (e) { args = rawArgs.split(' ').filter(Boolean); }
+        } else if (rawArgs) {
+          args = rawArgs.split(' ').filter(Boolean);
+        }
+
+        let env = {};
+        if (rawEnv.startsWith('{')) {
+          try { env = JSON.parse(rawEnv); } catch (e) {}
+        } else if (rawEnv) {
+          rawEnv.split('\n').forEach(line => {
+            const parts = line.split('=');
+            if (parts.length >= 2) {
+              env[parts[0].trim()] = parts.slice(1).join('=').trim();
+            }
+          });
+        }
+
+        mcpPayload.command = command;
+        mcpPayload.args = args;
+        mcpPayload.env = env;
+      }
+
+      try {
+        btnSaveMcp.disabled = true;
+        btnSaveMcp.textContent = 'Salvando...';
+        await saveMcpServer(mcpPayload);
+      } catch (err) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          feedback.style.color = '#ef4444';
+          feedback.textContent = err.message;
+        }
+      } finally {
+        btnSaveMcp.disabled = false;
+        btnSaveMcp.textContent = 'Salvar MCP';
+      }
+    });
+  }
+
+  // Abertura e fechamento do modal Skill
+  const btnAddSkill = document.getElementById('btn-add-skill');
+  if (btnAddSkill) {
+    btnAddSkill.addEventListener('click', () => openSkillModal('create'));
+  }
+  const btnCloseSkill = document.getElementById('btn-close-skill-modal');
+  if (btnCloseSkill) {
+    btnCloseSkill.addEventListener('click', closeSkillModal);
+  }
+  const btnCancelSkill = document.getElementById('btn-cancel-skill-form');
+  if (btnCancelSkill) {
+    btnCancelSkill.addEventListener('click', closeSkillModal);
+  }
+
+  // Salvamento do modal Skill
+  const btnSaveSkill = document.getElementById('btn-save-skill');
+  if (btnSaveSkill) {
+    btnSaveSkill.addEventListener('click', async () => {
+      const mode = document.getElementById('skill-form-mode')?.value || 'create';
+      const originalName = document.getElementById('skill-form-original-name')?.value || '';
+      const name = document.getElementById('skill-form-name')?.value?.trim();
+      const description = document.getElementById('skill-form-desc')?.value?.trim();
+      const content = document.getElementById('skill-form-content')?.value?.trim();
+      const feedback = document.getElementById('skill-form-feedback');
+
+      if (!name) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          feedback.style.color = '#ef4444';
+          feedback.textContent = 'Informe o nome da skill.';
+        }
+        return;
+      }
+
+      if (!content) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          feedback.style.color = '#ef4444';
+          feedback.textContent = 'Informe o conteúdo das instruções (SKILL.md).';
+        }
+        return;
+      }
+
+      const skillPayload = { name, originalName, mode, description, content };
+
+      try {
+        btnSaveSkill.disabled = true;
+        btnSaveSkill.textContent = 'Salvando...';
+        await saveSkill(skillPayload);
+      } catch (err) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+          feedback.style.color = '#ef4444';
+          feedback.textContent = err.message;
+        }
+      } finally {
+        btnSaveSkill.disabled = false;
+        btnSaveSkill.textContent = 'Salvar Skill';
+      }
+    });
+  }
+
+  // Tab de Customizations: carrega lista ao ser clicada
+  const tabCustomizations = document.getElementById('ag-tab-btn-customizations');
+  if (tabCustomizations) {
+    tabCustomizations.addEventListener('click', () => loadCustomizations());
+  }
+}
+
+// Auto-inicializa governança, temas e customizações
+if (typeof document !== 'undefined') {
+  const initAll = () => {
     initThemeAndFontSettings();
     initGovernanceEvents();
     loadGovernanceSettings();
+    initCustomizationsEvents();
+    loadCustomizations();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
   }
 }
