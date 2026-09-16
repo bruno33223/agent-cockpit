@@ -8983,3 +8983,553 @@ body.sidebar-pinned-hidden .main-content {
   background-color: var(--btn-secondary-hover-bg);
   color: var(--text-primary);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ZEUS AGENT CHAT UI - THEME DARK & CYAN STYLING (ISSUE #24 - FATIA 3)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── CONTAINER PRINCIPAL E CABEÇALHO DO CHAT ────────────────────────────── */
+.zeus-chat-container,
+.opencode-visual-chat-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface, #0d1117);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.zeus-chat-header,
+.opencode-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(10, 25, 47, 0.85);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+  gap: 12px;
+}
+
+.zeus-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.zeus-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+/* ── SELETOR DE MODELO CONTEXTUAL ────────────────────────────────────────── */
+.zeus-model-select {
+  background: #09131f;
+  color: #e2e8f0;
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font-sans, inherit);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  max-width: 260px;
+}
+
+.zeus-model-select:hover {
+  border-color: rgba(0, 229, 255, 0.7);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+}
+
+.zeus-model-select:focus {
+  border-color: #00e5ff;
+  box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25);
+}
+
+.zeus-model-select optgroup {
+  background: #0d1117;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.zeus-model-select option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 4px;
+}
+
+/* ── POPOVER SUSPENSO DE SKILLS & MCPS ───────────────────────────────────── */
+.zeus-btn-skills {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: #00e5ff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zeus-btn-skills:hover {
+  background: rgba(0, 229, 255, 0.16);
+  border-color: #00e5ff;
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+}
+
+.zeus-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #00e5ff;
+  color: #030712;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.zeus-skills-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 280px;
+  max-height: 380px;
+  background: #09131f;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  animation: agModalFadeIn 0.15s ease-out;
+}
+
+.zeus-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 229, 255, 0.08);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+}
+
+.zeus-popover-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #00e5ff;
+}
+
+.zeus-popover-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.zeus-popover-close:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.zeus-popover-body {
+  padding: 8px 10px;
+  overflow-y: auto;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.zeus-popover-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zeus-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.zeus-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.zeus-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #e2e8f0;
+  transition: background 0.15s ease;
+}
+
+.zeus-checkbox-item:hover {
+  background: rgba(0, 229, 255, 0.08);
+  color: #00e5ff;
+}
+
+.zeus-checkbox {
+  accent-color: #00e5ff;
+  cursor: pointer;
+}
+
+.zeus-empty-text {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+  padding: 4px 6px;
+}
+
+/* ── BLOCOS DE RACIOCÍNIO EXPANSÍVEIS (THINKING BOX) ─────────────────────── */
+.zeus-thinking-box {
+  background: rgba(10, 25, 47, 0.7);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 6px;
+  margin: 6px 0;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.zeus-thinking-box:hover {
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.12);
+}
+
+.zeus-thinking-box[open] {
+  border-color: rgba(0, 229, 255, 0.65);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.15);
+}
+
+.zeus-thinking-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: rgba(0, 229, 255, 0.05);
+  color: #00e5ff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.zeus-thinking-summary:hover {
+  background: rgba(0, 229, 255, 0.12);
+}
+
+.zeus-thinking-summary .think-badge {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 229, 255, 0.15);
+  color: #00e5ff;
+  text-transform: uppercase;
+}
+
+.zeus-thinking-box .thinking-text {
+  padding: 10px 14px;
+  background: rgba(3, 7, 18, 0.5);
+  border-top: 1px dashed rgba(0, 229, 255, 0.2);
+  color: #cbd5e1;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* ── CARDS DE TOOL CALLS ESPECIALIZADOS ──────────────────────────────────── */
+.zeus-tool-card {
+  background: #09131f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  margin: 6px 0;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.zeus-tool-card.type-read {
+  border-left: 3px solid #00e5ff;
+}
+
+.zeus-tool-card.type-write {
+  border-left: 3px solid #10b981;
+}
+
+.zeus-tool-card.type-exec {
+  border-left: 3px solid #f59e0b;
+}
+
+.zeus-tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.zeus-tool-name {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.zeus-tool-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.zeus-tool-badge.badge-read {
+  background: rgba(0, 229, 255, 0.15);
+  color: #00e5ff;
+}
+
+.zeus-tool-badge.badge-write {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.zeus-tool-badge.badge-exec {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.zeus-tool-status {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.zeus-tool-status.status-running {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.zeus-tool-status.status-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.zeus-tool-status.status-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.zeus-tool-detail {
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.zeus-tool-detail code {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: #94a3b8;
+  word-break: break-all;
+}
+
+.zeus-tool-output {
+  padding: 6px 10px;
+  background: #020617;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.zeus-tool-output code {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+}
+
+/* ── BOTÃO DE MICROFONE STT & ANIMAÇÃO DE GRAVAÇÃO ───────────────────────── */
+.zeus-btn-mic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-surface, #0f172a);
+  border: 1px solid var(--border-subtle, #334155);
+  color: var(--text-primary, #f8fafc);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zeus-btn-mic:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: #00e5ff;
+  color: #00e5ff;
+}
+
+.zeus-btn-mic.recording {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+  animation: zeus-mic-pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes zeus-mic-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    transform: scale(1.08);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+}
+
+/* ── ANEXO DE IMAGENS, THUMBNAILS & PREVIEWS ────────────────────────────── */
+.zeus-btn-attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-surface, #0f172a);
+  border: 1px solid var(--border-subtle, #334155);
+  color: var(--text-primary, #f8fafc);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zeus-btn-attach:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: #00e5ff;
+  color: #00e5ff;
+}
+
+.zeus-attachments-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.zeus-attachment-thumb {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  background: #000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.zeus-attachment-thumb img,
+.zeus-attachment-thumb .thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.zeus-thumb-remove,
+.zeus-attachment-thumb .btn-remove-thumb {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  border: none;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zeus-thumb-remove:hover,
+.zeus-attachment-thumb .btn-remove-thumb:hover {
+  background: #ef4444;
+}
+
+/* ── VALIDAÇÃO DE VISÃO MULTIMODAL & ERROS ──────────────────────────────── */
+.zeus-model-warning,
+.zeus-vision-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 6px 12px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.zeus-message-images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.zeus-message-image-preview {
+  max-width: 220px;
+  max-height: 180px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  object-fit: contain;
+  background: #020617;
+}
+
+/* Área de Drop Highlight */
+.zeus-chat-container.drag-over,
+.opencode-visual-chat-container.drag-over {
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.3) !important;
+}
+
