@@ -113,15 +113,33 @@ def apply_surgical_patch(existing_content: str, patch_text: str) -> Tuple[str, i
 
             occurrences = norm_content.count(norm_search)
             if occurrences == 0:
-                # Tenta match com strip de trailing whitespace em cada linha
-                search_lines = [l.rstrip() for l in norm_search.splitlines()]
-                clean_search = "\n".join(search_lines)
-                content_lines = [l.rstrip() for l in norm_content.splitlines()]
-                clean_content = "\n".join(content_lines)
+                # Localização exata por subsequência de linhas (evita descompasso de índices por rstrip assimétrico)
+                content_lines_raw = norm_content.splitlines(keepends=True)
+                search_lines = norm_search.splitlines()
+                n_search = len(search_lines)
+                stripped_search = [sl.rstrip() for sl in search_lines]
 
-                if clean_content.count(clean_search) == 1:
-                    idx = clean_content.find(clean_search)
-                    content = norm_content[:idx] + norm_replace + norm_content[idx + len(clean_search):]
+                matching_indices = []
+                if n_search > 0 and len(content_lines_raw) >= n_search:
+                    for i in range(len(content_lines_raw) - n_search + 1):
+                        window = [content_lines_raw[i + k].rstrip("\r\n").rstrip() for k in range(n_search)]
+                        if window == stripped_search:
+                            matching_indices.append(i)
+
+                if len(matching_indices) == 1:
+                    start_line = matching_indices[0]
+                    end_line = start_line + n_search
+                    start_char = sum(len(l) for l in content_lines_raw[:start_line])
+                    end_char = sum(len(l) for l in content_lines_raw[:end_line])
+
+                    matched_original = norm_content[start_char:end_char]
+                    replacement = norm_replace
+                    if matched_original.endswith("\n") and not replacement.endswith("\n"):
+                        replacement = replacement + "\n"
+
+                    content = norm_content[:start_char] + replacement + norm_content[end_char:]
+                elif len(matching_indices) > 1:
+                    raise ValueError(f"SEARCH block match failure: o bloco foi encontrado {len(matching_indices)} vezes no arquivo. O bloco deve ser único.")
                 else:
                     raise ValueError(f"SEARCH block match failure: o bloco a ser substituído não foi encontrado no arquivo.\nSEARCH:\n{norm_search}")
             elif occurrences > 1:
@@ -238,11 +256,23 @@ def call_local_llm(
     )
 
     url = f"{endpoint}/api/generate"
+    try:
+        from workers.ollama_client import calculate_dynamic_num_ctx, DEFAULT_NUM_CTX
+    except ImportError:
+        DEFAULT_NUM_CTX = 8192
+        def calculate_dynamic_num_ctx(p, min_ctx=8192):
+            return min_ctx
+
+    if "num_ctx" in cfg:
+        effective_num_ctx = int(cfg["num_ctx"])
+    else:
+        effective_num_ctx = calculate_dynamic_num_ctx(prompt, min_ctx=DEFAULT_NUM_CTX)
+
     builder_options = {
         "temperature": 0.1,
         "top_p": 0.95,
         "num_predict": 4096,
-        "num_ctx": int(cfg.get("num_ctx", 2048)),
+        "num_ctx": effective_num_ctx,
     }
     num_threads = cfg.get("num_thread")
     if num_threads:
