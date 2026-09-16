@@ -22,6 +22,10 @@ export async function checkAutostartStatus() {
   }
 }
 
+export function getBtnAutostart() {
+  return document.getElementById("btn-toggle-autostart") || document.getElementById("ag-btn-autostart-on");
+}
+
 export function updateAutostartUI(enabled) {
   autostartEnabled = !!enabled;
   const btnOn = document.getElementById('ag-btn-autostart-on');
@@ -316,6 +320,15 @@ export function initSettingsEvents() {
         saveSettingUpdate({ project_root: rootInput.value.trim() }, 'Raiz do projeto atualizada!');
       }
     });
+  }
+
+  const btnOn = document.getElementById("ag-btn-autostart-on");
+  if (btnOn) {
+    btnOn.addEventListener("click", () => setSystemAutostart(true));
+  }
+  const btnOff = document.getElementById("ag-btn-autostart-off");
+  if (btnOff) {
+    btnOff.addEventListener("click", () => setSystemAutostart(false));
   }
 
   const btnAutostart = getBtnAutostart();

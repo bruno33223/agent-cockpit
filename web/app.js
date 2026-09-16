@@ -244,20 +244,28 @@ Object.assign(window, {
 async function bootstrapCockpit() {
   console.log('[Agent Cockpit] Inicializando orquestrador modular...');
 
+  const safeInit = (name, fn) => {
+    try {
+      fn();
+    } catch (err) {
+      console.warn(`[Agent Cockpit] Aviso ao inicializar ${name}:`, err);
+    }
+  };
+
   // 1. Inicializa subsistemas visuais e eventos
-  initSidebar();
-  initSlicesChatEvents();
-  initCodebaseGraphEvents();
-  initLocalWorkerEvents();
-  initSettingsEvents();
-  initTerminalAndOmniEvents();
+  safeInit("initSidebar", initSidebar);
+  safeInit("initSlicesChatEvents", initSlicesChatEvents);
+  safeInit("initCodebaseGraphEvents", initCodebaseGraphEvents);
+  safeInit("initLocalWorkerEvents", initLocalWorkerEvents);
+  safeInit("initSettingsEvents", initSettingsEvents);
+  safeInit("initTerminalAndOmniEvents", initTerminalAndOmniEvents);
 
   // 2. Inicializa terminais virtuais e explorador de arquivos
-  terminalWorkspace.init();
-  fileExplorerManager.init();
+  safeInit("terminalWorkspace.init", () => terminalWorkspace.init());
+  safeInit("fileExplorerManager.init", () => fileExplorerManager.init());
 
   // 3. Inicializa conexão WebSocket em tempo real
-  initWebSocket();
+  safeInit("initWebSocket", initWebSocket);
 
   // 4. Carrega projetos e sincroniza estado dos subsistemas
   try {
