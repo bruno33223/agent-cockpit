@@ -913,7 +913,7 @@ export async function loadCustomizations() {
 
     if (mcpRes.ok) {
       const data = await mcpRes.json();
-      mcps = data.mcp || data.servers || data;
+      mcps = data.mcp_servers !== undefined ? data.mcp_servers : (data.mcp || data.servers || (data.status ? [] : data));
     }
     if (skillsRes.ok) {
       const data = await skillsRes.json();
@@ -936,7 +936,12 @@ export function renderMcpList(mcps) {
   if (!container) return;
 
   container.innerHTML = '';
-  const entries = mcps && typeof mcps === 'object' ? Object.entries(mcps) : [];
+  let entries = [];
+  if (Array.isArray(mcps)) {
+    entries = mcps.map(m => [m.id || m.name || 'mcp', m]);
+  } else if (mcps && typeof mcps === 'object') {
+    entries = Object.entries(mcps);
+  }
 
   if (entries.length === 0) {
     container.innerHTML = `

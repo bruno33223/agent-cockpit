@@ -1032,6 +1032,12 @@ def get_opencode_credentials():
         return opencode_manager.detect_opencode_credentials()
     return {"omniroute_url": None, "api_key": None, "model": None, "sources": []}
 
+@app.get("/api/opencode/detect")
+def get_opencode_detect():
+    """Detecta credenciais e configurações do OpenCode para auto-preenchimento do frontend."""
+    creds = get_opencode_credentials()
+    return {"status": "ok", "credentials": creds}
+
 
 # =========================================================================
 # OPENCODE HEADLESS REST ENDPOINTS & SUBAGENT TRACKING
