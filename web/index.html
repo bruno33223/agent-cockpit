@@ -1761,22 +1761,37 @@
             <p>Model Context Protocol servers, skills ativas e ferramentas integradas.</p>
           </div>
           <div class="ag-panel-content">
+            <!-- SEÇÃO MCP SERVERS -->
             <div class="ag-setting-section">
-              <span class="ag-section-title">Servidores MCP Conectados</span>
-              <div class="ag-mcp-server-item">
-                <span class="pulse-led online"></span>
-                <span class="ag-mcp-name">agent-cockpit</span>
-                <span class="ag-mcp-tools">26 Tools registradas (Stdio)</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span class="ag-section-title" style="margin-bottom: 0;">Servidores MCP Conectados</span>
+                <button class="btn btn-primary btn-sm" id="btn-add-mcp" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Adicionar MCP
+                </button>
               </div>
-              <div class="ag-mcp-server-item">
-                <span class="pulse-led online"></span>
-                <span class="ag-mcp-name">chrome-devtools-mcp</span>
-                <span class="ag-mcp-tools">28 Tools de automação e inspeção de UI</span>
+              <div id="mcp-servers-list" class="ag-mcp-list">
+                <!-- Preenchido dinamicamente via settings.js -->
               </div>
-              <div class="ag-mcp-server-item">
-                <span class="pulse-led online"></span>
-                <span class="ag-mcp-name">genkit-mcp-server</span>
-                <span class="ag-mcp-tools">10 Tools de fluxos e documentação</span>
+            </div>
+
+            <!-- SEÇÃO SKILLS -->
+            <div class="ag-setting-section" style="margin-top: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span class="ag-section-title" style="margin-bottom: 0;">Skills & Superpowers</span>
+                <button class="btn btn-primary btn-sm" id="btn-add-skill" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Adicionar Skill
+                </button>
+              </div>
+              <div id="skills-list" class="ag-skills-list">
+                <!-- Preenchido dinamicamente via settings.js -->
               </div>
             </div>
           </div>
@@ -1843,6 +1858,117 @@
           </button>
         </div>
         <button class="btn btn-primary btn-sm" id="btn-active-terminals-close-footer">Fechar</button>
+      </div>
+    </div>
+  <!-- MODAL: CONFIGURAÇÃO / EDIÇÃO DE SERVIDOR MCP -->
+  <div class="modal-backdrop" id="modal-mcp-server" style="display: none;">
+    <div class="active-terminals-dialog" style="max-width: 600px; width: 90%; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column;">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <h3 id="modal-mcp-title" style="margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          Configurar Servidor MCP
+        </h3>
+        <button class="modal-close-btn" id="btn-close-mcp-modal" aria-label="Fechar" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary);">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; max-height: 70vh; overflow-y: auto;">
+        <input type="hidden" id="mcp-form-mode" value="create">
+        <input type="hidden" id="mcp-form-original-id" value="">
+
+        <div class="ag-form-group">
+          <label for="mcp-form-name" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Nome / Identificador do MCP *</label>
+          <input type="text" id="mcp-form-name" class="ag-input" placeholder="ex: postgres-db, chrome-devtools" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+        </div>
+
+        <div class="ag-form-group">
+          <label for="mcp-form-type" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Tipo de Transporte *</label>
+          <select id="mcp-form-type" class="ag-select" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+            <option value="stdio">Stdio (Linha de Comando / Processo Local)</option>
+            <option value="sse">SSE (Server-Sent Events / HTTP Remoto)</option>
+          </select>
+        </div>
+
+        <!-- Campos para Stdio -->
+        <div id="mcp-form-stdio-group" style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="ag-form-group">
+            <label for="mcp-form-command" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Comando Executável *</label>
+            <input type="text" id="mcp-form-command" class="ag-input" placeholder="ex: npx, uvx, node, python3" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+          </div>
+          <div class="ag-form-group">
+            <label for="mcp-form-args" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Argumentos (separados por espaço ou array JSON)</label>
+            <input type="text" id="mcp-form-args" class="ag-input" placeholder='ex: -y @modelcontextprotocol/server-postgres "postgresql://..."' style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+          </div>
+          <div class="ag-form-group">
+            <label for="mcp-form-env" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Variáveis de Ambiente (JSON ou KEY=VALUE por linha)</label>
+            <textarea id="mcp-form-env" class="ag-input" rows="2" placeholder='{"API_KEY": "..."}' style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 12px; font-family: var(--font-mono, monospace);"></textarea>
+          </div>
+        </div>
+
+        <!-- Campos para SSE -->
+        <div id="mcp-form-sse-group" style="display: none; flex-direction: column; gap: 12px;">
+          <div class="ag-form-group">
+            <label for="mcp-form-url" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">URL Endpoint SSE *</label>
+            <input type="url" id="mcp-form-url" class="ag-input" placeholder="http://127.0.0.1:8080/sse" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+          </div>
+        </div>
+
+        <div id="mcp-form-feedback" style="display: none; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 8px; background: var(--bg-surface);">
+        <button class="btn btn-secondary btn-sm" id="btn-cancel-mcp-form">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-mcp">Salvar MCP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURAÇÃO / EDIÇÃO DE SKILL -->
+  <div class="modal-backdrop" id="modal-skill" style="display: none;">
+    <div class="active-terminals-dialog" style="max-width: 650px; width: 90%; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column;">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <h3 id="modal-skill-title" style="margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          Configurar Skill & Superpower
+        </h3>
+        <button class="modal-close-btn" id="btn-close-skill-modal" aria-label="Fechar" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary);">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; max-height: 70vh; overflow-y: auto;">
+        <input type="hidden" id="skill-form-mode" value="create">
+        <input type="hidden" id="skill-form-original-name" value="">
+
+        <div class="ag-form-group">
+          <label for="skill-form-name" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Nome da Skill *</label>
+          <input type="text" id="skill-form-name" class="ag-input" placeholder="ex: tdd-workflows, code-review" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+        </div>
+
+        <div class="ag-form-group">
+          <label for="skill-form-desc" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Descrição Curta</label>
+          <input type="text" id="skill-form-desc" class="ag-input" placeholder="ex: Executa ciclo rigoroso de TDD antes de codificar" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+        </div>
+
+        <div class="ag-form-group">
+          <label for="skill-form-content" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Conteúdo / Instruções (SKILL.md) *</label>
+          <textarea id="skill-form-content" class="ag-input" rows="8" placeholder="---
+name: my-skill
+description: Minha skill personalizada
+---
+# Instruções operacionais..." style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 12px; font-family: var(--font-mono, monospace); line-height: 1.4;"></textarea>
+        </div>
+
+        <div id="skill-form-feedback" style="display: none; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 8px; background: var(--bg-surface);">
+        <button class="btn btn-secondary btn-sm" id="btn-cancel-skill-form">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-skill">Salvar Skill</button>
       </div>
     </div>
   </div>
