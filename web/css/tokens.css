@@ -1,0 +1,281 @@
+/* ==========================================================================
+   MODULE: TOKENS & THEMES
+   Design tokens canônicos, variáveis reativas e temas (dark, light, classic, sepia).
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Superfícies e Fundos */
+  --bg-void: #0c0e11;
+  --bg-sidebar: #0c0e11;
+  --bg-main: #111417;
+  --bg-surface: #0c0e11;
+  --bg-card: #181b20;
+  --bg-card-hover: rgba(255, 255, 255, 0.05);
+  --bg-card-active: #23282f;
+  --bg-active: #23282f;
+  --background: #0c0e11;
+  --foreground: #f4f4f5;
+  --card: #181b20;
+  --card-foreground: #f4f4f5;
+  --sidebar: #0c0e11;
+  --worktree-sidebar: #0c0e11;
+  --worktree-sidebar-accent: #23282f;
+
+  /* Bordas */
+  --border: #23282f;
+  --border-subtle: #23282f;
+  --border-strong: #272c35;
+  --border-focus: #00ff66;
+
+  /* Tipografia */
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --muted-foreground: #a1a1aa;
+  --muted: #181b20;
+  --accent: #23282f;
+
+  /* Botões e Seleções Semânticas */
+  --btn-secondary-bg: #181b20;
+  --btn-secondary-border: #272c35;
+  --btn-secondary-text: #f4f4f5;
+  --btn-secondary-hover-bg: #23282f;
+  --btn-active-bg: #23282f;
+  --btn-active-text: #ffffff;
+  --active-project-text: #00ff66;
+  --active-project-dot: #00ff66;
+
+  /* Terminal Xterm Tokens */
+  --terminal-bg: #09090b;
+  --terminal-fg: #f4f4f5;
+  --terminal-cursor: #f4f4f5;
+  --terminal-selection: rgba(255, 255, 255, 0.18);
+
+  /* Acentos e Status */
+  --primary: #2563eb;
+  --status-success: #00ff66;
+  --agent-question: #f97316;
+  --destructive: #ff6568;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Geist', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+  /* Git Decorations Orca */
+  --git-decoration-added: #81b88b;
+  --git-decoration-modified: #e2c08d;
+  --git-decoration-deleted: #c74e39;
+  --git-decoration-renamed: #73c991;
+  --git-decoration-untracked: #73c991;
+  --git-decoration-ignored: #6e6e6e;
+
+  /* Elevation & Radius */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --shadow-floating: 0 10px 24px rgba(0, 0, 0, 0.5);
+  --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* Cores funcionais do Cockpit */
+  --cyan-bright: #38bdf8;
+  --cyan-dim: rgba(56, 189, 248, 0.08);
+  --green-bright: #00ff66;
+  --green-dim: rgba(0, 255, 102, 0.1);
+  --amber-bright: #f59e0b;
+  --amber-dim: rgba(245, 158, 11, 0.12);
+  --red-bright: var(--destructive);
+  --red-dim: rgba(255, 101, 104, 0.12);
+  --purple-bright: #a855f7;
+  --purple-dim: rgba(168, 85, 247, 0.12);
+
+  /* Escala de fonte dinâmica */
+  --app-font-scale: 1;
+}
+
+html {
+  font-size: calc(13px * var(--app-font-scale, 1));
+}
+
+/* ── TEMA CLARO (ALTO CONTRASTE) ── */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-void: #f8fafc;
+  --bg-sidebar: #f1f5f9;
+  --bg-main: #ffffff;
+  --bg-surface: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #e2e8f0;
+  --bg-card-active: #cbd5e1;
+  --bg-active: #e2e8f0;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --sidebar: #f1f5f9;
+  --worktree-sidebar: #f1f5f9;
+  --worktree-sidebar-accent: #e2e8f0;
+
+  --border: #e2e8f0;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #2563eb;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #475569;
+  --muted-foreground: #334155;
+  --muted: #e2e8f0;
+  --accent: #e2e8f0;
+
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-border: #cbd5e1;
+  --btn-secondary-text: #0f172a;
+  --btn-secondary-hover-bg: #f1f5f9;
+  --btn-active-bg: #e2e8f0;
+  --btn-active-text: #0f172a;
+  --active-project-text: #15803d;
+  --active-project-dot: #16a34a;
+
+  /* Terminal Xterm Tokens */
+  --terminal-bg: #ffffff;
+  --terminal-fg: #0f172a;
+  --terminal-cursor: #0f172a;
+  --terminal-selection: rgba(15, 23, 42, 0.18);
+
+  --primary: #2563eb;
+  --status-success: #15803d;
+  --agent-question: #c2410c;
+  --destructive: #b91c1c;
+
+  --cyan-bright: #0369a1;
+  --cyan-dim: rgba(3, 105, 161, 0.12);
+  --green-bright: #15803d;
+  --green-dim: rgba(21, 128, 61, 0.12);
+  --amber-bright: #b45309;
+  --amber-dim: rgba(180, 83, 9, 0.12);
+  --red-bright: #b91c1c;
+  --red-dim: rgba(185, 28, 28, 0.12);
+  --purple-bright: #7e22ce;
+  --purple-dim: rgba(126, 34, 206, 0.12);
+}
+
+/* ── TEMA CLÁSSICO (TERMINAL ESCURO) ── */
+[data-theme="classic"] {
+  color-scheme: dark;
+  --bg-void: #181818;
+  --bg-sidebar: #1e1e1e;
+  --bg-main: #181818;
+  --bg-surface: #1e1e1e;
+  --bg-card: #1e1e1e;
+  --bg-card-hover: #2d2d2d;
+  --bg-card-active: #37373d;
+  --bg-active: #37373d;
+  --background: #181818;
+  --foreground: #d4d4d4;
+  --card: #1e1e1e;
+  --card-foreground: #d4d4d4;
+  --sidebar: #1e1e1e;
+  --worktree-sidebar: #252526;
+  --worktree-sidebar-accent: #2d2d2d;
+
+  --border: #2d2d2d;
+  --border-subtle: #252526;
+  --border-strong: #3e3e42;
+  --border-focus: #00ff66;
+
+  --text-primary: #d4d4d4;
+  --text-secondary: #858585;
+  --text-muted: #606060;
+  --muted-foreground: #858585;
+  --muted: #2d2d2d;
+  --accent: #37373d;
+
+  --btn-secondary-bg: #252526;
+  --btn-secondary-border: #3e3e42;
+  --btn-secondary-text: #d4d4d4;
+  --btn-secondary-hover-bg: #2d2d2d;
+  --btn-active-bg: #37373d;
+  --btn-active-text: #ffffff;
+  --active-project-text: #00ff66;
+  --active-project-dot: #00ff66;
+
+  /* Terminal Xterm Tokens */
+  --terminal-bg: #181818;
+  --terminal-fg: #d4d4d4;
+  --terminal-cursor: #00ff66;
+  --terminal-selection: rgba(0, 255, 102, 0.25);
+
+  --primary: #00ff66;
+  --status-success: #00ff66;
+  --agent-question: #f97316;
+  --destructive: #ff6568;
+}
+
+/* ── TEMA PAPEL ANTIGO (SEPIA) ── */
+[data-theme="sepia"] {
+  color-scheme: light;
+  --bg-void: #f4ecd8;
+  --bg-sidebar: #eee4cc;
+  --bg-main: #faf4e8;
+  --bg-surface: #eee4cc;
+  --bg-card: #faf4e8;
+  --bg-card-hover: #e5dac0;
+  --bg-card-active: #dcd0b5;
+  --bg-active: #dcd0b5;
+  --background: #f4ecd8;
+  --foreground: #291e12;
+  --card: #faf4e8;
+  --card-foreground: #291e12;
+  --sidebar: #eee4cc;
+  --worktree-sidebar: #e5dac0;
+  --worktree-sidebar-accent: #dcd0b5;
+
+  --border: rgba(90, 65, 35, 0.2);
+  --border-subtle: rgba(90, 65, 35, 0.16);
+  --border-strong: rgba(90, 65, 35, 0.32);
+  --border-focus: #5a4123;
+
+  --text-primary: #291e12;
+  --text-secondary: #5c4731;
+  --text-muted: #78654c;
+  --muted-foreground: #5c4731;
+  --muted: #e5dac0;
+  --accent: #dcd0b5;
+
+  --btn-secondary-bg: #faf4e8;
+  --btn-secondary-border: #cfc1a2;
+  --btn-secondary-text: #291e12;
+  --btn-secondary-hover-bg: #e5dac0;
+  --btn-active-bg: #dcd0b5;
+  --btn-active-text: #291e12;
+  --active-project-text: #2e7d32;
+  --active-project-dot: #2e7d32;
+
+  /* Terminal Xterm Tokens */
+  --terminal-bg: #faf4e8;
+  --terminal-fg: #291e12;
+  --terminal-cursor: #5a4123;
+  --terminal-selection: rgba(90, 65, 35, 0.25);
+
+  --primary: #5a4123;
+  --status-success: #2e7d32;
+  --agent-question: #9a3412;
+  --destructive: #b91c1c;
+
+  --cyan-bright: #0369a1;
+  --cyan-dim: rgba(3, 105, 161, 0.14);
+  --green-bright: #2e7d32;
+  --green-dim: rgba(46, 125, 50, 0.14);
+  --amber-bright: #9a3412;
+  --amber-dim: rgba(154, 52, 18, 0.14);
+  --red-bright: #b91c1c;
+  --red-dim: rgba(185, 28, 28, 0.14);
+  --purple-bright: #7e22ce;
+  --purple-dim: rgba(126, 34, 206, 0.14);
+}
+

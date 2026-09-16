@@ -1,0 +1,79 @@
+/* ==========================================================================
+   MODULE: BASE & LAYOUT
+   Reset universal, scrollbars, html/body e wrappers de layout.
+   ========================================================================== */
+
+/* UNIVERSAL SELECT & DARK MODE RESET */
+select {
+  color-scheme: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+select option {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* UNIVERSAL INPUT & PLACEHOLDER */
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.85;
+}
+
+/* CUSTOM SLICK SCROLLBARS */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-void);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* APP LAYOUT */
+.app-layout {
+  display: flex;
+  width: 100vw;
+  height: calc(100vh - 38px);
+  flex: 1;
+  overflow: hidden;
+  background-color: var(--bg-void);
+}
+
+/* MAIN CONTENT WRAPPER */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  min-width: 0;
+}

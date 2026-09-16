@@ -1,0 +1,946 @@
+/* ==========================================================================
+   MODULE: SIDEBAR & WORKSPACES
+   Barra lateral retrátil, navegação (.nav-tab), workspaces e worktree-cards.
+   ========================================================================== */
+
+/* SIDEBAR RETRÁTIL ESTILO ORCA */
+.app-sidebar {
+  width: 250px;
+  min-width: 68px;
+  height: 100%;
+  background-color: var(--worktree-sidebar, #18181b);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.app-sidebar.collapsed {
+  width: 68px;
+}
+
+/* SIDEBAR HEADER & TOGGLE */
+.sidebar-top-header,
+.sidebar-header {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow: hidden;
+  background-color: var(--worktree-sidebar, #18181b);
+  flex-shrink: 0;
+}
+
+.sidebar-top-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+
+.app-sidebar.collapsed .sidebar-top-header {
+  justify-content: center;
+  padding: 0;
+}
+
+.app-sidebar.collapsed .sidebar-top-title {
+  display: none;
+}
+
+.btn-sidebar-toggle {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-sidebar-toggle:hover {
+  color: var(--cyan-bright);
+  background-color: var(--cyan-dim);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.2s ease, width 0.2s ease;
+}
+
+.app-sidebar.collapsed .sidebar-brand {
+  opacity: 0;
+  width: 0;
+  pointer-events: none;
+}
+
+.sidebar-brand-badge {
+  background: var(--cyan-dim);
+  color: var(--cyan-bright);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-brand-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+/* SIDEBAR NAVIGATION TABS (ORCA CLEAN DEV TOOL STYLE) */
+.sidebar-nav {
+  padding: 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  height: 36px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-card-hover);
+  border-color: transparent;
+}
+
+.nav-tab.active {
+  color: var(--btn-active-text);
+  background-color: var(--bg-active);
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+
+.tab-svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+  width: 15px;
+  height: 15px;
+}
+
+.tab-label {
+  transition: opacity 0.2s ease, width 0.2s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sidebar.collapsed .tab-label {
+  opacity: 0;
+  width: 0;
+  display: none;
+}
+
+.app-sidebar.collapsed .nav-tab {
+  justify-content: center;
+  padding: 0;
+  width: 38px;
+  height: 38px;
+  margin: 2px auto;
+}
+
+/* TOOLTIP NO MODO COLAPSADO */
+.app-sidebar.collapsed .nav-tab:hover::after,
+.app-sidebar.collapsed .sidebar-action-btn:hover::after,
+.app-sidebar.collapsed .meta-btn:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #1e293b;
+  color: #f8fafc;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* SIDEBAR FOOTER */
+.sidebar-footer {
+  padding: 12px 10px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: transparent;
+}
+
+.sidebar-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background-color: var(--btn-secondary-bg);
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--btn-secondary-text);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sidebar-action-btn:hover {
+  background-color: var(--btn-secondary-hover-bg);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.sidebar-action-btn .action-svg {
+  flex-shrink: 0;
+}
+
+/* Gate Button States */
+.sidebar-action-btn.gate-btn.pending {
+  color: var(--amber-bright);
+  background-color: var(--amber-dim);
+  border-color: var(--amber-bright);
+}
+
+.sidebar-action-btn.gate-btn.pending:hover {
+  background-color: var(--amber-dim);
+  border-color: var(--amber-bright);
+  color: var(--amber-bright);
+}
+
+.sidebar-action-btn.gate-btn.approved {
+  color: var(--status-success);
+  background-color: var(--green-dim);
+  border-color: var(--status-success);
+}
+
+.sidebar-action-btn.gate-btn.approved:hover {
+  background-color: var(--green-dim);
+  border-color: var(--status-success);
+}
+
+/* Autostart Button States */
+.sidebar-action-btn.autostart-btn.enabled {
+  color: var(--status-success);
+  border-color: var(--status-success);
+}
+
+.sidebar-action-btn.autostart-btn.disabled {
+  color: var(--text-muted);
+}
+
+/* MODO COLAPSADO: MOSTRAR APENAS O ÍCONE SEM OVERFLOW */
+.app-sidebar.collapsed .sidebar-action-btn {
+  justify-content: center;
+  padding: 0;
+  width: 44px;
+  height: 38px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.app-sidebar.collapsed .sidebar-action-btn .tab-label,
+.app-sidebar.collapsed .sidebar-action-btn .gate-text,
+.app-sidebar.collapsed .sidebar-action-btn .autostart-text,
+.app-sidebar.collapsed .sidebar-action-btn .autostart-dot {
+  display: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  pointer-events: none;
+}
+
+.sidebar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.app-sidebar.collapsed .sidebar-meta {
+  justify-content: center;
+}
+
+.meta-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.meta-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.meta-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background-color: var(--bg-card);
+}
+
+.meta-btn.danger:hover {
+  color: var(--red-bright);
+  border-color: rgba(239, 68, 68, 0.4);
+  background-color: var(--red-dim);
+}
+
+
+
+/* ── 2. WORKTREE CARDS & AGENT STATE ─────────────────────────────────────── */
+.worktree-list,
+.worktree-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.worktree-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.worktree-card:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: transparent;
+}
+
+.worktree-card.active {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.worktree-card.active:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.worktree-card.active::before {
+  display: none !important;
+}
+
+.worktree-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.worktree-title {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+  transition: color 0.15s ease;
+}
+
+.worktree-card:hover .worktree-title {
+  color: var(--text-primary);
+}
+
+.worktree-card.active .worktree-title {
+  color: var(--active-project-text);
+  font-weight: 600;
+}
+
+
+.worktree-header-actions {
+  order: -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-pin-action {
+  background: transparent;
+  border: none;
+  padding: 2px 3px;
+  cursor: pointer;
+  color: #71717a;
+  opacity: 0;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.worktree-card:hover .btn-pin-action {
+  opacity: 0.9;
+}
+
+.btn-pin-action:hover {
+  opacity: 1;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.btn-pin-action.pinned {
+  color: #38bdf8;
+  opacity: 0.85;
+}
+
+.btn-pin-action.pinned:hover {
+  color: #f87171;
+}
+
+.btn-show-more-projects {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: calc(100% - 12px);
+  margin: 4px auto 6px auto;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: #71717a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-show-more-projects:hover {
+  color: #f4f4f5;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.app-sidebar.collapsed .btn-show-more-projects,
+.app-sidebar.collapsed .btn-pin-action {
+  display: none !important;
+}
+
+.worktree-meta-row {
+  display: none !important;
+}
+
+.worktree-repo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-transform: lowercase;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.worktree-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.worktree-branch svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.worktree-time {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  opacity: 0.8;
+  flex-shrink: 0;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Agent State Dot & Indicadores de Atenção */
+.agent-state-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #71717a;
+  flex-shrink: 0;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.agent-state-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Variante: Executando / Working (Azul com pulso) */
+.agent-state-dot.working {
+  background-color: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  animation: orca-agent-pulse 1.8s infinite ease-in-out;
+}
+
+.agent-state-dot.working::after {
+  animation: orca-agent-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Variante: Aprovado / Done (Verde sólido) */
+.agent-state-dot.done {
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.45);
+}
+
+.worktree-card.active .agent-state-dot {
+  background-color: var(--active-project-dot) !important;
+  box-shadow: 0 0 6px var(--active-project-dot) !important;
+}
+
+/* Variante: Pergunta do Agente / Needs Attention / Waiting (Laranja piscando) */
+.agent-state-dot.permission,
+.agent-state-dot.waiting,
+.agent-state-dot.question {
+  background-color: #f97316;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.65);
+  animation: orca-agent-pulse 1.4s infinite ease-in-out;
+}
+
+.agent-state-dot.permission::after,
+.agent-state-dot.waiting::after,
+.agent-state-dot.question::after {
+  animation: orca-agent-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Variante: Erro / Bloqueado / Interrompido */
+.agent-state-dot.blocked,
+.agent-state-dot.failed,
+.agent-state-dot.destructive {
+  background-color: var(--destructive);
+  box-shadow: 0 0 6px rgba(255, 101, 104, 0.5);
+}
+
+/* Variante: Inativo / Idle (Cinza estático sem piscar) */
+.agent-state-dot.idle {
+  background-color: #52525b;
+  box-shadow: none;
+}
+
+@keyframes orca-agent-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.7;
+  }
+}
+
+@keyframes orca-agent-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  75%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+
+
+/* ── 6. ORCA SIDEBAR WORKSPACES & SESSIONS ───────────────────────────── */
+.sidebar-workspaces-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.sidebar-workspaces-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background-color: transparent;
+  height: 30px;
+  min-height: 30px;
+  flex-shrink: 0;
+}
+
+.sidebar-workspaces-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-workspaces-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+}
+
+.app-sidebar.collapsed .sidebar-workspaces-section {
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.app-sidebar.collapsed .sidebar-workspaces-header {
+  justify-content: center;
+  padding: 2px 0;
+}
+
+.app-sidebar.collapsed .sidebar-workspaces-title {
+  display: none;
+}
+
+.btn-sidebar-new-worktree {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sidebar-new-worktree:hover {
+  background: var(--muted);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.app-sidebar.collapsed .btn-sidebar-new-worktree {
+  display: none;
+}
+
+.sidebar-scrollable-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.worktree-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.worktree-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.worktree-section-header:hover {
+  color: #f4f4f5;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.worktree-section-toggle {
+  display: inline-block;
+  font-size: 9px;
+  color: #71717a;
+  transition: transform 0.2s ease;
+  width: 12px;
+  text-align: center;
+}
+
+.worktree-section.collapsed .worktree-section-toggle {
+  transform: rotate(-90deg);
+}
+
+.worktree-section.collapsed .worktree-sidebar-list,
+.worktree-section.collapsed .sidebar-nav {
+  display: none;
+}
+
+.worktree-section-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #71717a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-sidebar.collapsed .worktree-section-header {
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.app-sidebar.collapsed .worktree-section-toggle,
+.app-sidebar.collapsed .worktree-section-label,
+.app-sidebar.collapsed .worktree-section-count {
+  display: none;
+}
+
+
+
+.sidebar-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 4px;
+  width: 100%;
+}
+
+.sidebar-footer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-footer-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-footer-btn.active {
+  background: var(--bg-active);
+  color: var(--btn-active-text);
+}
+
+
+.app-sidebar.collapsed .sidebar-footer-btn {
+  justify-content: center;
+  padding: 6px;
+  width: 44px;
+  height: 38px;
+  margin: 0 auto;
+}
+
+.app-sidebar.collapsed .sidebar-footer-btn .tab-label {
+  display: none;
+}
+
+/* ORCA COMMAND PALETTE / QUICK SEARCH */
+.orca-command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  animation: orca-fade-in 0.15s ease;
+}
+
+.orca-command-palette-card {
+  width: 560px;
+  max-width: 92vw;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.orca-command-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.orca-command-search-bar svg {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.orca-command-search-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--foreground);
+}
+
+.orca-command-search-bar input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.orca-command-results {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orca-command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  transition: all 0.12s ease;
+}
+
+.orca-command-item:hover,
+.orca-command-item.selected {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+
+.orca-command-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.orca-command-item-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+}
