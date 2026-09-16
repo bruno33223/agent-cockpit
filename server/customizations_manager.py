@@ -107,9 +107,9 @@ class CustomizationsManager:
         Cria um novo servidor MCP.
         Valida tipos (stdio, sse, http) e campos obrigatórios.
         """
-        name = mcp_data.get("name")
+        name = mcp_data.get("name") or mcp_data.get("id")
         if not name or not str(name).strip():
-            raise ValueError("O campo 'name' é obrigatório para servidores MCP.")
+            raise ValueError("O campo 'name' ou 'id' é obrigatório para servidores MCP.")
 
         mcp_type = mcp_data.get("type")
         if mcp_type not in ("stdio", "sse", "http"):

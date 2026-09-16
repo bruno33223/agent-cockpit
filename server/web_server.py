@@ -2009,7 +2009,12 @@ def post_customizations_mcp(payload: MCPServerPayload):
     method = getattr(mgr, "create_mcp_server", getattr(mgr, "add_mcp_server", getattr(mgr, "create_mcp", None)))
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método de criação de MCP não disponível no manager.")
-    res = method(data)
+    try:
+        res = method(data)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "create", "mcp": res})
     return {"status": "success", "mcp_server": res, "message": f"Servidor MCP '{mcp_id}' criado com sucesso."}
 
@@ -2018,11 +2023,16 @@ def post_customizations_mcp(payload: MCPServerPayload):
 def put_customizations_mcp(mcp_id: str, payload: MCPServerUpdatePayload):
     """Atualiza configurações de um servidor MCP existente."""
     mgr = get_customizations_mgr()
-    data = payload.dict(exclude_unset=True)
+    data = payload.dict(exclude_unset=True) if hasattr(payload, "dict") else payload.model_dump(exclude_unset=True)
     method = getattr(mgr, "update_mcp_server", getattr(mgr, "update_mcp", None))
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método de atualização de MCP não disponível no manager.")
-    res = method(mcp_id, data)
+    try:
+        res = method(mcp_id, data)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if res is None:
         raise HTTPException(status_code=404, detail=f"Servidor MCP '{mcp_id}' não encontrado.")
     manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "update", "mcp": res})
@@ -2036,7 +2046,12 @@ def delete_customizations_mcp(mcp_id: str):
     method = getattr(mgr, "delete_mcp_server", getattr(mgr, "delete_mcp", None))
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método de exclusão de MCP não disponível no manager.")
-    deleted = method(mcp_id)
+    try:
+        deleted = method(mcp_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Servidor MCP '{mcp_id}' não encontrado.")
     manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "delete", "mcp_id": mcp_id})
@@ -2051,7 +2066,12 @@ def toggle_customizations_mcp(mcp_id: str, payload: Optional[MCPTogglePayload] =
     method = getattr(mgr, "toggle_mcp_server", getattr(mgr, "toggle_mcp", None))
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método toggle de MCP não disponível no manager.")
-    res = method(mcp_id, enabled=target_enabled)
+    try:
+        res = method(mcp_id, enabled=target_enabled)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if res is None:
         raise HTTPException(status_code=404, detail=f"Servidor MCP '{mcp_id}' não encontrado.")
     manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "toggle", "mcp": res})
@@ -2080,12 +2100,17 @@ def post_customizations_skills(payload: SkillPayload):
     if not name:
         raise HTTPException(status_code=400, detail="Nome da skill é obrigatório.")
     mgr = get_customizations_mgr()
-    data = payload.dict(exclude_unset=True)
+    data = payload.dict(exclude_unset=True) if hasattr(payload, "dict") else payload.model_dump(exclude_unset=True)
     data["name"] = name
     method = getattr(mgr, "create_skill", getattr(mgr, "add_skill", None))
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método de criação de skill não disponível no manager.")
-    res = method(data)
+    try:
+        res = method(data)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "create", "skill": res})
     return {"status": "success", "skill": res, "message": f"Skill '{name}' criada com sucesso."}
 
@@ -2094,11 +2119,16 @@ def post_customizations_skills(payload: SkillPayload):
 def put_customizations_skills(skill_name: str, payload: SkillUpdatePayload):
     """Atualiza metadados e conteúdo de uma Skill existente."""
     mgr = get_customizations_mgr()
-    data = payload.dict(exclude_unset=True)
+    data = payload.dict(exclude_unset=True) if hasattr(payload, "dict") else payload.model_dump(exclude_unset=True)
     method = getattr(mgr, "update_skill", None)
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método de atualização de skill não disponível no manager.")
-    res = method(skill_name, data)
+    try:
+        res = method(skill_name, data)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if res is None:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' não encontrada.")
     manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "update", "skill": res})
@@ -2112,7 +2142,12 @@ def delete_customizations_skills(skill_name: str):
     method = getattr(mgr, "delete_skill", None)
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método de exclusão de skill não disponível no manager.")
-    deleted = method(skill_name)
+    try:
+        deleted = method(skill_name)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' não encontrada.")
     manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "delete", "skill_name": skill_name})
@@ -2127,7 +2162,12 @@ def toggle_customizations_skills(skill_name: str, payload: Optional[SkillToggleP
     method = getattr(mgr, "toggle_skill", None)
     if not callable(method):
         raise HTTPException(status_code=500, detail="Método toggle de skill não disponível no manager.")
-    res = method(skill_name, enabled=target_enabled)
+    try:
+        res = method(skill_name, enabled=target_enabled)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if res is None:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' não encontrada.")
     manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "toggle", "skill": res})
