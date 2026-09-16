@@ -2197,11 +2197,125 @@ def post_customizations_sync():
     return {"status": "success", "synced": True, "result": sync_result, "message": "Customizações sincronizadas com sucesso."}
 
 
+# --- MÉTODOS DE SUPORTE NO STATESTORE (Issue #17 Fatia 2) ---
+from state_store import StateStore
+
+if not hasattr(StateStore, "get_general_defaults"):
+    def _store_get_general_defaults(self) -> Dict[str, Any]:
+        with self.lock:
+            gov = self.get_governance_settings("default")
+            st = self.get_settings("default")
+            return {
+                "autostart_slices": gov.get("autostart_slices", False),
+                "security_preset": gov.get("security_preset", "standard"),
+                "human_gate_policy": gov.get("human_gate_policy", "manual"),
+                "artifact_review_policy": gov.get("artifact_review_policy", "strict"),
+                "enable_local_ai": st.get("enable_local_ai", False),
+                "delegate_styles_to_cloud": st.get("delegate_styles_to_cloud", True),
+                "model": st.get("model", "deepseek-coder-v2:16b-q3_k_m"),
+                "endpoint": st.get("endpoint", "http://127.0.0.1:11434"),
+                "auto_start_ollama": st.get("auto_start_ollama", False),
+                "circuit_breaker_threshold": st.get("circuit_breaker_threshold", 2),
+                "project_root": st.get("project_root")
+            }
+    StateStore.get_general_defaults = _store_get_general_defaults
+
+if not hasattr(StateStore, "get_project_settings"):
+    def _store_get_project_settings(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            overrides = dict(state.get("project_settings_overrides", {}))
+            general_defaults = self.get_general_defaults()
+            effective = dict(general_defaults)
+            for k, v in overrides.items():
+                if v is not None:
+                    effective[k] = v
+            return {
+                "project_id": target_pid,
+                "overrides": overrides,
+                "general_defaults": general_defaults,
+                "effective_settings": effective
+            }
+    StateStore.get_project_settings = _store_get_project_settings
+
+if not hasattr(StateStore, "set_project_settings"):
+    def _store_set_project_settings(self, project_id: Optional[str] = None, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            current_overrides = state.setdefault("project_settings_overrides", {})
+            if overrides:
+                for k, v in overrides.items():
+                    if v is None:
+                        current_overrides.pop(k, None)
+                    else:
+                        current_overrides[k] = v
+            self._save_state(state, target_pid)
+            res = self.get_project_settings(target_pid)
+        self._notify("PROJECT_SETTINGS_UPDATED", res, target_pid)
+        return res
+    StateStore.set_project_settings = _store_set_project_settings
+
+if not hasattr(StateStore, "clear_project_settings_overrides"):
+    def _store_clear_project_settings_overrides(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            state["project_settings_overrides"] = {}
+            self._save_state(state, target_pid)
+            res = self.get_project_settings(target_pid)
+        self._notify("PROJECT_SETTINGS_UPDATED", res, target_pid)
+        return res
+    StateStore.clear_project_settings_overrides = _store_clear_project_settings_overrides
+
+
+# --- ROTAS REST PARA CONFIGURAÇÕES DE PROJETO (Issue #17 Fatia 2) ---
+
+@app.get("/api/projects/{project_id}/settings")
+def get_project_settings_endpoint(project_id: str):
+    """Retorna status 200 com project_id, effective_settings, overrides e general_defaults."""
+    try:
+        return db.get_project_settings(project_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/projects/{project_id}/settings")
+@app.post("/api/projects/{project_id}/settings")
+def update_project_settings_endpoint(project_id: str, payload: Dict[str, Any]):
+    """Salva overrides de configurações para o projeto especificado e retorna os valores efetivos."""
+    try:
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Payload inválido: deve ser um objeto JSON.")
+        overrides = payload.get("overrides") if isinstance(payload.get("overrides"), dict) else payload
+        clean_overrides = {k: v for k, v in overrides.items() if k != "project_id"}
+        res = db.set_project_settings(project_id, clean_overrides)
+        manager.broadcast_sync("PROJECT_SETTINGS_UPDATED", res, project_id)
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/projects/{project_id}/settings/overrides")
+def clear_project_settings_overrides_endpoint(project_id: str):
+    """Limpa todos os overrides de um projeto restaurando herança total de General."""
+    try:
+        res = db.clear_project_settings_overrides(project_id)
+        manager.broadcast_sync("PROJECT_SETTINGS_UPDATED", res, project_id)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Garante que o mount de arquivos estáticos permaneça no final da lista de rotas
 for _r in list(app.router.routes):
     if getattr(_r, "name", None) == "web":
         app.router.routes.remove(_r)
         app.router.routes.append(_r)
         break
+
 
 
