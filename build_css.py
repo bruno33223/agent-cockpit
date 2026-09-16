@@ -24,6 +24,7 @@ MODULES = [
     "right-sidebar.css",
     "worker.css",
     "modals.css",
+    "zeus_chat.css",
 ]
 
 HEADER = """/* ==========================================================================

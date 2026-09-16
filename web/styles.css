@@ -9265,7 +9265,12 @@ body.sidebar-pinned-hidden .main-content {
   color: var(--text-primary);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+
+/* ==========================================================================
+   MODULE: ZEUS CHAT UI & MULTIMODAL
+   Thinking boxes, tool cards, model selector, skills popover, STT mic & multimodal
+   ========================================================================== */
+
    ZEUS AGENT CHAT UI - THEME DARK & CYAN STYLING (ISSUE #24 - FATIA 3)
    ═══════════════════════════════════════════════════════════════════════════ */
 
