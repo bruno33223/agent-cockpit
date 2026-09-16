@@ -197,7 +197,7 @@ async function bootstrapCockpit() {
     try {
       fn();
     } catch (err) {
-      console.warn(, err);
+      console.warn(`[Agent Cockpit] Aviso ao inicializar ${name}:`, err);
     }
   };
 
