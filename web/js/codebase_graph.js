@@ -4,8 +4,10 @@
  */
 
 import { escapeHtml } from './ui_utils.js';
-import { apiFetch, state, currentProjectId, knownProjects } from './state.js';
+import { apiFetch, state, currentProjectId, knownProjects, getActiveProjectRoot } from './state.js';
 import { switchTab } from './sidebar.js';
+
+export { getActiveProjectRoot };
 
 let graphData = { nodes: [], edges: [] };
 let selectedGraphNode = null;
@@ -27,17 +29,6 @@ export function resolveGraphElements() {
   inspectorContent = document.getElementById('inspector-content');
   btnRefreshGraph = document.getElementById('btn-refresh-graph');
   graphSearchInput = document.getElementById('graph-search');
-}
-
-export function getActiveProjectRoot() {
-  if (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) {
-    const activeProj = knownProjects.find(p => p.id === currentProjectId);
-    if (activeProj && activeProj.project_root) return activeProj.project_root;
-  }
-  if (typeof state !== 'undefined' && state && state.project_root) {
-    return state.project_root;
-  }
-  return localStorage.getItem('cockpit_target_project') || '';
 }
 
 export function deselectGraphNode() {

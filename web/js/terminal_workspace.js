@@ -4,7 +4,7 @@
  */
 
 import { escapeHtml, formatRelativeCwd } from './ui_utils.js';
-import { currentProjectId, activeSliceId, state, knownProjects, recordRecentProject, apiFetch } from './state.js';
+import { currentProjectId, activeSliceId, state, knownProjects, recordRecentProject, apiFetch, getActiveProjectRoot } from './state.js';
 import { renderWorktreeSidebar } from './sidebar.js';
 
 export class TerminalWorkspaceManager {
@@ -628,22 +628,13 @@ export class TerminalWorkspaceManager {
     }
   }
 
-  getActiveProjectRoot() {
-    if (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) {
-      const activeProj = knownProjects.find(p => p.id === currentProjectId);
-      if (activeProj && activeProj.project_root) return activeProj.project_root;
-    }
-    if (typeof state !== 'undefined' && state) {
-      if (state.project_root) return state.project_root;
-      if (state.config && state.config.project_root) return state.config.project_root;
-    }
-    return '';
+  getActiveProjectRoot(projectId = null) {
+    return getActiveProjectRoot(projectId || currentProjectId, knownProjects);
   }
 
   getSliceCwd(sliceId, projectId = null) {
     const pid = projectId || currentProjectId;
-    const proj = (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) ? knownProjects.find(p => p.id === pid) : null;
-    const root = proj && proj.project_root ? proj.project_root : this.getActiveProjectRoot();
+    const root = this.getActiveProjectRoot(pid);
     if (!root) return '';
     return `${root}/.worktrees/${sliceId}`;
   }
