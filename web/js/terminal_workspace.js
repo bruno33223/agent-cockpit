@@ -38,6 +38,7 @@ export class TerminalWorkspaceManager {
       case 'orchestrator': return '⚡';
       case 'agent': return '⚙️';
       case 'subagent': return '🔬';
+      case 'visual-chat': return `<img src="/zeus_terminal_god.svg" class="zeus-tab-god-icon" alt="Zeus Chat" style="width:14px;height:14px;vertical-align:middle;display:inline-block;" />`;
       default: return '💻';
     }
   }
@@ -47,6 +48,7 @@ export class TerminalWorkspaceManager {
       case 'orchestrator': return 'Orquestrador';
       case 'agent': return 'Agente Executor';
       case 'subagent': return 'Subagente Efêmero';
+      case 'visual-chat': return 'Zeus Chat';
       default: return 'Terminal';
     }
   }
@@ -65,6 +67,8 @@ export class TerminalWorkspaceManager {
         return '⚡ Fleet Agent (Worktree Isolated / Auto-Red-Green)';
       case 'subagent':
         return '🔬 Ephemeral Subagent (Task Sandbox / Read-Write)';
+      case 'visual-chat':
+        return '⚡ Zeus Master Chat (Interactive Blueprint & Subagent Dispatcher)';
       default:
         return '⚡ bypass permissions on (shift+tab to cycle) - for agents';
     }
@@ -261,6 +265,10 @@ export class TerminalWorkspaceManager {
 
   getAgentIcon(agentType) {
     switch (agentType) {
+      case 'zeus':
+      case 'zeus-chat':
+      case 'visual-chat':
+        return `<span class="orca-tab-agent-icon orca-agent-zeus" title="Zeus Chat"><img src="/zeus_terminal_god.svg" class="zeus-tab-god-icon" alt="Zeus Chat" style="width:14px;height:14px;vertical-align:middle;display:inline-block;" /></span>`;
       case 'claude':
         return `<span class="orca-tab-agent-icon orca-agent-claude" title="Claude Code"><svg class="orca-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="#D97757" aria-label="Claude Code"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></svg></span>`;
       case 'opencode':
@@ -491,92 +499,113 @@ export class TerminalWorkspaceManager {
       }, { passive: false });
     }
 
-    // Botão e Dropdown Novo Terminal (+ Novo Terminal)
+    // Botão e Dropdown Novo Terminal (+ Novo Terminal) - Split Button
     const btnNewTerm = document.getElementById('btn-new-terminal');
+    const btnNewTermDropdown = document.getElementById('btn-new-terminal-dropdown');
     const newTermDropdown = document.getElementById('new-terminal-dropdown');
-    if (btnNewTerm && newTermDropdown) {
-      // Garante a opção "Chat Visual (OpenCode)" no dropdown de criação de terminais
-      if (!newTermDropdown.querySelector('[data-terminal-type="opencode-visual"]')) {
-        const visualItem = document.createElement('div');
-        visualItem.className = 'grid-config-item';
-        visualItem.setAttribute('data-terminal-type', 'opencode-visual');
-        visualItem.setAttribute('data-role', 'agent');
-        visualItem.innerHTML = `
-          <span style="font-size: 14px;">💬</span>
-          <div>
-            <div style="font-weight: 600;">Chat Visual (OpenCode)</div>
-            <div style="font-size: 10px; color: var(--text-muted);">Sessão interativa visual de subagente</div>
-          </div>
-        `;
-        newTermDropdown.insertBefore(visualItem, newTermDropdown.firstChild);
-      }
-
+    if (btnNewTerm && (newTermDropdown || btnNewTermDropdown)) {
+      // 1. Clique direto no botão principal abre ou foca o Zeus Chat
       btnNewTerm.addEventListener('click', (e) => {
         e.stopPropagation();
-        newTermDropdown.style.display = (newTermDropdown.style.display === 'none' || !newTermDropdown.style.display) ? 'block' : 'none';
+        if (newTermDropdown) newTermDropdown.style.display = 'none';
+        if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+        if (currentProjectId) {
+          recordRecentProject(currentProjectId);
+          renderWorktreeSidebar();
+        }
+        this.openZeusChat();
       });
 
-      newTermDropdown.querySelectorAll('.grid-config-item').forEach(item => {
-        item.addEventListener('click', (e) => {
+      // 2. Seta lateral (▾): abre o menu suspenso de seleção de terminais alternativos
+      if (btnNewTermDropdown && newTermDropdown) {
+        btnNewTermDropdown.addEventListener('click', (e) => {
           e.stopPropagation();
-          const action = item.getAttribute('data-action');
-          if (action === 'open-visual-chat') {
-            if (typeof openCodeChat !== 'undefined' && openCodeChat && openCodeChat.open) {
-              openCodeChat.open();
-            } else if (typeof window !== 'undefined' && window.openCodeChat && window.openCodeChat.open) {
-              window.openCodeChat.open();
-            }
-            newTermDropdown.style.display = 'none';
-            return;
-          }
-
-          const agentType = item.getAttribute('data-terminal-type') || 'bash';
-          const role = item.getAttribute('data-role') || 'agent';
-          const name = item.querySelector('div div') ? item.querySelector('div div').textContent.trim() : 'Terminal';
-
-          if (currentProjectId) {
-            recordRecentProject(currentProjectId);
-            renderWorktreeSidebar();
-          }
-
-          if (agentType === 'opencode-visual' || name.includes('Chat Visual (OpenCode)')) {
-            import('./subagent_tabs.js').then(mod => {
-              if (mod && mod.openSubagentTab) {
-                mod.openSubagentTab({
-                  role: 'agent',
-                  type: 'builder',
-                  agentType: 'opencode',
-                  name: 'Chat Visual (OpenCode)',
-                  title: '🤖 [Builder] Chat Visual (OpenCode)',
-                  status: 'RUNNING'
-                });
-              }
-            }).catch(() => {
-              this.createSession({
-                agentType: 'opencode',
-                role: 'agent',
-                name: 'Chat Visual (OpenCode)',
-                cwd: this.getActiveProjectRoot()
-              });
-            });
-            newTermDropdown.style.display = 'none';
-            return;
-          }
-
-          this.createSession({
-            agentType,
-            role,
-            name,
-            cwd: this.getActiveProjectRoot()
-          });
-
-          newTermDropdown.style.display = 'none';
+          const isHidden = (newTermDropdown.style.display === 'none' || !newTermDropdown.style.display);
+          newTermDropdown.style.display = isHidden ? 'block' : 'none';
+          btnNewTermDropdown.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
         });
-      });
+      }
 
-      document.addEventListener('click', () => {
-        newTermDropdown.style.display = 'none';
-      });
+      if (newTermDropdown) {
+        newTermDropdown.querySelectorAll('.grid-config-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = item.getAttribute('data-action');
+            if (action === 'open-zeus-chat') {
+              this.openZeusChat();
+              newTermDropdown.style.display = 'none';
+              if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+              return;
+            }
+            if (action === 'open-visual-chat') {
+              if (typeof openCodeChat !== 'undefined' && openCodeChat && openCodeChat.open) {
+                openCodeChat.open();
+              } else if (typeof window !== 'undefined' && window.openCodeChat && window.openCodeChat.open) {
+                window.openCodeChat.open();
+              }
+              newTermDropdown.style.display = 'none';
+              if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+              return;
+            }
+
+            const agentType = item.getAttribute('data-terminal-type') || 'bash';
+            const role = item.getAttribute('data-role') || 'agent';
+            const name = item.querySelector('div div') ? item.querySelector('div div').textContent.trim() : 'Terminal';
+
+            if (currentProjectId) {
+              recordRecentProject(currentProjectId);
+              renderWorktreeSidebar();
+            }
+
+            if (agentType === 'zeus-chat' || role === 'visual-chat') {
+              this.openZeusChat();
+              newTermDropdown.style.display = 'none';
+              if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+              return;
+            }
+
+            if (agentType === 'opencode-visual' || name.includes('Chat Visual (OpenCode)')) {
+              import('./subagent_tabs.js').then(mod => {
+                if (mod && mod.openSubagentTab) {
+                  mod.openSubagentTab({
+                    role: 'agent',
+                    type: 'builder',
+                    agentType: 'opencode',
+                    name: 'Chat Visual (OpenCode)',
+                    title: '🤖 [Builder] Chat Visual (OpenCode)',
+                    status: 'RUNNING'
+                  });
+                }
+              }).catch(() => {
+                this.createSession({
+                  agentType: 'opencode',
+                  role: 'agent',
+                  name: 'Chat Visual (OpenCode)',
+                  cwd: this.getActiveProjectRoot()
+                });
+              });
+              newTermDropdown.style.display = 'none';
+              if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+              return;
+            }
+
+            this.createSession({
+              agentType,
+              role,
+              name,
+              cwd: this.getActiveProjectRoot()
+            });
+
+            newTermDropdown.style.display = 'none';
+            if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+          });
+        });
+
+        document.addEventListener('click', () => {
+          newTermDropdown.style.display = 'none';
+          if (btnNewTermDropdown) btnNewTermDropdown.setAttribute('aria-expanded', 'false');
+        });
+      }
     } else if (btnNewTerm) {
       btnNewTerm.addEventListener('click', () => {
         if (currentProjectId) {
@@ -715,7 +744,9 @@ export class TerminalWorkspaceManager {
       this.gridContainer = document.getElementById('terminal-workspace-grid');
     }
 
-    if (typeof Terminal === 'undefined') {
+    const isVisualChat = (options.role === 'visual-chat');
+
+    if (typeof Terminal === 'undefined' && !isVisualChat) {
       if (this.gridContainer) {
         this.gridContainer.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace;">Aguardando carregamento da biblioteca xterm.js...</div>';
       }
@@ -727,7 +758,7 @@ export class TerminalWorkspaceManager {
     }
 
     this.counter++;
-    const id = options.id || `term-${Date.now()}-${this.counter}`;
+    const id = options.id || (isVisualChat ? 'zeus-chat' : `term-${Date.now()}-${this.counter}`);
     const contextKey = options.contextKey || this.activeContextKey || (currentProjectId ? `project:${currentProjectId}` : 'global');
     let projectId = options.projectId;
     let taskId = options.taskId;
@@ -746,12 +777,14 @@ export class TerminalWorkspaceManager {
 
     const role = options.role || (options.taskId ? 'agent' : 'orchestrator');
     const sliceId = options.sliceId || (role === 'agent' ? (activeSliceId || options.taskId) : null);
-    const agentType = options.agentType || (options.name && options.name.toLowerCase().includes('claude') ? 'claude' : (options.name && options.name.toLowerCase().includes('opencode') ? 'opencode' : 'bash'));
-    const defaultName = role === 'orchestrator'
-      ? (this.counter === 1 ? 'Orquestrador' : `Orquestrador #${this.counter}`)
-      : (role === 'agent'
-        ? (sliceId ? `Agente (${sliceId})` : `Agente da Frota #${this.counter}`)
-        : (taskId ? `Subagente (${taskId})` : `Subagente #${this.counter}`));
+    const agentType = options.agentType || (isVisualChat ? 'zeus' : (options.name && options.name.toLowerCase().includes('claude') ? 'claude' : (options.name && options.name.toLowerCase().includes('opencode') ? 'opencode' : 'bash')));
+    const defaultName = isVisualChat
+      ? 'Zeus Chat'
+      : (role === 'orchestrator'
+        ? (this.counter === 1 ? 'Orquestrador' : `Orquestrador #${this.counter}`)
+        : (role === 'agent'
+          ? (sliceId ? `Agente (${sliceId})` : `Agente da Frota #${this.counter}`)
+          : (taskId ? `Subagente (${taskId})` : `Subagente #${this.counter}`)));
     const name = options.name || defaultName;
     const cwd = options.cwd || (sliceId ? this.getSliceCwd(sliceId, projectId) : (taskId ? this.getSliceCwd(taskId, projectId) : this.getActiveProjectRoot()));
     const model = this.getCurrentModel();
@@ -763,34 +796,49 @@ export class TerminalWorkspaceManager {
     const roleBadgeHtml = this.getRoleBadgeHtml(role);
     const rolePerms = this.getRolePermissionsText(role);
 
-    // 1. Instância do Xterm
-    const term = new Terminal({
-      cursorBlink: true,
-      cursorStyle: 'block',
-      fontFamily: "'JetBrains Mono', monospace",
-      fontSize: 13,
-      lineHeight: 1.25,
-      minimumContrastRatio: 4.5,
-      theme: this.getTerminalTheme()
-    });
-
+    // 1. Instância do Xterm ou Adaptador de Chat Visual
+    let term = null;
     let fitAddon = null;
-    if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
-      fitAddon = new FitAddon.FitAddon();
-      term.loadAddon(fitAddon);
-    }
-    if (typeof WebLinksAddon !== 'undefined' && WebLinksAddon.WebLinksAddon) {
-      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+    if (!isVisualChat && typeof Terminal !== 'undefined') {
+      term = new Terminal({
+        cursorBlink: true,
+        cursorStyle: 'block',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 13,
+        lineHeight: 1.25,
+        minimumContrastRatio: 4.5,
+        theme: this.getTerminalTheme()
+      });
+
+      if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+        fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+      }
+      if (typeof WebLinksAddon !== 'undefined' && WebLinksAddon.WebLinksAddon) {
+        term.loadAddon(new WebLinksAddon.WebLinksAddon());
+      }
+    } else {
+      term = {
+        focus: () => {
+          if (elPane) {
+            const inp = elPane.querySelector('.zeus-chat-input');
+            if (inp) inp.focus();
+          }
+        },
+        dispose: () => {},
+        write: () => {},
+        onData: () => {}
+      };
     }
 
-    // 2. Elementos DOM (Aba e Painel Minimalista - Issue #10)
+    // 2. Elementos DOM (Aba e Painel Minimalista - Issue #10 e Issue #24)
     const elTab = document.createElement('div');
     elTab.className = `term-tab orca-tab role-${role}`;
     elTab.id = `tab-${id}`;
     elTab.setAttribute('data-session-id', id);
     elTab.setAttribute('data-role', role);
     elTab.innerHTML = `
-      <span class="term-tab-dot disconnected" title="Status de Conexão"></span>
+      <span class="term-tab-dot connected" title="Status de Conexão"></span>
       <span class="term-tab-icon">${iconHtml}</span>
       <span class="term-tab-title orca-tab-title" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
       ${roleBadgeHtml}
@@ -817,29 +865,61 @@ export class TerminalWorkspaceManager {
     ` : `<span class="orca-role-badge role-${role}" title="${roleTitle}">${roleIcon} ${roleTitle}</span>`;
 
     const elPane = document.createElement('div');
-    elPane.className = 'terminal-pane orca-split-pane';
+    elPane.className = `terminal-pane orca-split-pane ${isVisualChat ? 'zeus-chat-pane' : ''}`;
     elPane.id = `pane-${id}`;
     elPane.setAttribute('data-session-id', id);
     elPane.setAttribute('data-role', role);
-    elPane.innerHTML = `
-      <div class="orca-pane-header">
-        <div class="orca-tab-strip">
-          <div class="orca-tab active">
-            <span class="orca-tab-icon">${iconHtml}</span>
-            <span class="orca-tab-title">${escapeHtml(name)}</span>
-          </div>
-          ${orchestratorControlHtml}
-          <div class="orca-pane-controls ml-auto">
-            ${role === 'subagent' ? '<button class="orca-pane-btn orca-btn-terminate-subagent danger" title="Encerrar Subagente">Encerrar Subagente</button>' : ''}
-            <button class="orca-pane-btn orca-btn-minimize" title="Minimizar (Ocultar Terminal)">–</button>
-            <button class="orca-pane-btn orca-btn-close danger" title="Fechar sessão (×)">×</button>
+
+    if (isVisualChat) {
+      elPane.innerHTML = `
+        <div class="orca-pane-header zeus-chat-pane-header">
+          <div class="orca-tab-strip">
+            <div class="orca-tab active">
+              <span class="orca-tab-icon">${iconHtml}</span>
+              <span class="orca-tab-title">${escapeHtml(name)}</span>
+            </div>
+            <span class="orca-role-badge role-visual-chat" title="Zeus Master Chat">
+              <img src="/zeus_terminal_god.svg" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 4px;" alt="" /> Zeus Chat
+            </span>
+            <div class="orca-pane-controls ml-auto">
+              <button class="orca-pane-btn zeus-btn-clear-history" id="btn-clear-zeus-chat" title="Limpar Mensagens">🗑️</button>
+              <button class="orca-pane-btn orca-btn-minimize" title="Minimizar (Ocultar Terminal)">–</button>
+              <button class="orca-pane-btn orca-btn-close danger" title="Fechar sessão (×)">×</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="pane-body">
-        <div class="xterm-mount" style="width: 100%; height: 100%; position: relative;"></div>
-      </div>
-    `;
+        <div class="pane-body zeus-chat-pane-body" style="width: 100%; height: calc(100% - 35px); display: flex; flex-direction: column; overflow: hidden; background: var(--bg-void, #0c0e11);">
+          <div class="zeus-chat-messages" id="zeus-chat-messages" style="flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;"></div>
+          <div class="zeus-chat-input-bar" style="border-top: 1px solid var(--border-subtle, #23282f); padding: 10px 14px; display: flex; gap: 8px; background: var(--bg-surface, #111417); align-items: flex-end;">
+            <textarea class="zeus-chat-input" id="zeus-chat-input" placeholder="Comunique-se com o Orquestrador Zeus ou despache subagentes..." rows="1" style="flex: 1; resize: none; min-height: 38px; max-height: 120px; padding: 8px 12px; border-radius: 6px; background: var(--bg-card, #181b20); border: 1px solid var(--border, #23282f); color: var(--foreground, #f4f4f5); font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;"></textarea>
+            <button class="action-btn primary btn-sm btn-send-zeus-chat" id="btn-send-zeus-chat" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+              <span>Enviar</span>
+              <span>⚡</span>
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      elPane.innerHTML = `
+        <div class="orca-pane-header">
+          <div class="orca-tab-strip">
+            <div class="orca-tab active">
+              <span class="orca-tab-icon">${iconHtml}</span>
+              <span class="orca-tab-title">${escapeHtml(name)}</span>
+            </div>
+            ${orchestratorControlHtml}
+            <div class="orca-pane-controls ml-auto">
+              ${role === 'subagent' ? '<button class="orca-pane-btn orca-btn-terminate-subagent danger" title="Encerrar Subagente">Encerrar Subagente</button>' : ''}
+              <button class="orca-pane-btn orca-btn-minimize" title="Minimizar (Ocultar Terminal)">–</button>
+              <button class="orca-pane-btn orca-btn-close danger" title="Fechar sessão (×)">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="pane-body">
+          <div class="xterm-mount" style="width: 100%; height: 100%; position: relative;"></div>
+        </div>
+      `;
+    }
 
     // Botão "+" na barra de abas
     let btnAddTab = document.getElementById('btn-tab-add-wrap') || document.getElementById('btn-tab-add');
@@ -865,8 +945,10 @@ export class TerminalWorkspaceManager {
       elPane.style.height = '440px';
     }
 
-    const mountEl = elPane.querySelector('.xterm-mount');
-    term.open(mountEl);
+    if (!isVisualChat && term && term.open) {
+      const mountEl = elPane.querySelector('.xterm-mount');
+      if (mountEl) term.open(mountEl);
+    }
 
     // 3. Estrutura da Sessão
     const session = {
@@ -890,7 +972,10 @@ export class TerminalWorkspaceManager {
       customHeight: 440,
       elPane,
       elTab,
-      resizeObserver: null
+      resizeObserver: null,
+      focusInput: () => {
+        if (term && term.focus) term.focus();
+      }
     };
     this.sessions.set(id, session);
 
@@ -922,21 +1007,30 @@ export class TerminalWorkspaceManager {
     elPane.classList.toggle('context-hidden', !isVisible);
     elPane.style.display = isVisible ? '' : 'none';
 
-    // 4. WebSocket Conexão
-    this.connectSessionSocket(session);
+    // 4. WebSocket Conexão / Inicialização do Chat Visual
+    if (!isVisualChat) {
+      this.connectSessionSocket(session);
 
-    // 5. Eventos de Entrada no Terminal
-    term.onData(data => {
-      if (session.socket && session.socket.readyState === WebSocket.OPEN) {
-        session.socket.send(data);
-      }
-      if (data && (data.includes('\r') || data.includes('\n'))) {
-        const pid = session.projectId || currentProjectId;
-        if (pid) {
-          recordRecentProject(pid);
+      // 5. Eventos de Entrada no Terminal
+      term.onData(data => {
+        if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+          session.socket.send(data);
         }
-      }
-    });
+        if (data && (data.includes('\r') || data.includes('\n'))) {
+          const pid = session.projectId || currentProjectId;
+          if (pid) {
+            recordRecentProject(pid);
+          }
+        }
+      });
+    } else {
+      session.isConnected = true;
+      import('./zeus_chat_workspace.js').then(mod => {
+        if (mod && mod.zeusChatWorkspace) {
+          mod.zeusChatWorkspace.attachPane(session, elPane);
+        }
+      }).catch(() => {});
+    }
 
     // 6. Eventos de Interação DOM
     elTab.addEventListener('click', (e) => {
@@ -1048,6 +1142,32 @@ export class TerminalWorkspaceManager {
     }
 
     this.updateActiveTerminalsCount();
+    return session;
+  }
+
+  openZeusChat() {
+    // 1. Procura se já existe sessão de Zeus Chat ativa
+    for (const [id, s] of this.sessions) {
+      if (s.role === 'visual-chat' || id === 'zeus-chat' || s.name === 'Zeus Chat') {
+        this.selectSession(id);
+        if (s.focusInput) s.focusInput();
+        return s;
+      }
+    }
+
+    // 2. Cria nova sessão nativa visual-chat no TerminalWorkspaceManager
+    const session = this.createSession({
+      id: 'zeus-chat',
+      role: 'visual-chat',
+      name: 'Zeus Chat',
+      agentType: 'zeus',
+      cwd: this.getActiveProjectRoot ? this.getActiveProjectRoot() : '/'
+    });
+
+    if (session) {
+      this.selectSession(session.id);
+      if (session.focusInput) session.focusInput();
+    }
     return session;
   }
 
