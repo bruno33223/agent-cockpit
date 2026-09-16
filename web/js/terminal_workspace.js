@@ -6,6 +6,8 @@
 import { escapeHtml, formatRelativeCwd } from './ui_utils.js';
 import { currentProjectId, activeSliceId, state, knownProjects, recordRecentProject, apiFetch, getActiveProjectRoot } from './state.js';
 import { renderWorktreeSidebar } from './sidebar.js';
+import { openCodeChat } from './opencode_chat.js';
+
 
 export class TerminalWorkspaceManager {
   constructor() {
@@ -501,6 +503,17 @@ export class TerminalWorkspaceManager {
       newTermDropdown.querySelectorAll('.grid-config-item').forEach(item => {
         item.addEventListener('click', (e) => {
           e.stopPropagation();
+          const action = item.getAttribute('data-action');
+          if (action === 'open-visual-chat') {
+            if (typeof openCodeChat !== 'undefined' && openCodeChat && openCodeChat.open) {
+              openCodeChat.open();
+            } else if (typeof window !== 'undefined' && window.openCodeChat && window.openCodeChat.open) {
+              window.openCodeChat.open();
+            }
+            newTermDropdown.style.display = 'none';
+            return;
+          }
+
           const agentType = item.getAttribute('data-terminal-type') || 'bash';
           const role = item.getAttribute('data-role') || 'agent';
           const name = item.querySelector('div div') ? item.querySelector('div div').textContent.trim() : 'Terminal';

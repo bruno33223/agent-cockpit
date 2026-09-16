@@ -106,6 +106,11 @@ import {
   initWebSocket,
   socket
 } from './js/websocket_client.js';
+import {
+  openCodeChat,
+  initOpenCodeChat
+} from './js/opencode_chat.js';
+
 
 // 2. Exportação para Escopo Global (window) para Retrocompatibilidade com DOM e Testes
 if (typeof window !== 'undefined') {
@@ -237,7 +242,11 @@ Object.assign(window, {
 
   // WebSocket
   initWebSocket,
-  cockpitSocket: socket
+  cockpitSocket: socket,
+
+  // OpenCode Visual Chat
+  openCodeChat,
+  initOpenCodeChat
 });
 
 // 3. Inicialização e Bootstrapping da Aplicação
@@ -260,9 +269,10 @@ async function bootstrapCockpit() {
   safeInit("initSettingsEvents", initSettingsEvents);
   safeInit("initTerminalAndOmniEvents", initTerminalAndOmniEvents);
 
-  // 2. Inicializa terminais virtuais e explorador de arquivos
+  // 2. Inicializa terminais virtuais, explorador de arquivos e chat visual
   safeInit("terminalWorkspace.init", () => terminalWorkspace.init());
   safeInit("fileExplorerManager.init", () => fileExplorerManager.init());
+  safeInit("initOpenCodeChat", initOpenCodeChat);
 
   // 3. Inicializa conexão WebSocket em tempo real
   safeInit("initWebSocket", initWebSocket);
@@ -301,5 +311,8 @@ export {
   fileExplorerManager,
   switchProject,
   switchTab,
-  renderWorktreeSidebar
+  renderWorktreeSidebar,
+  openCodeChat,
+  initOpenCodeChat
 };
+

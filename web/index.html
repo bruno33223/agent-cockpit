@@ -880,6 +880,13 @@
                   <span>+ Novo Terminal</span>
                 </button>
                 <div class="grid-config-dropdown new-terminal-dropdown" id="new-terminal-dropdown" style="display: none; width: 230px; right: 0; left: auto; top: calc(100% + 6px);">
+                  <div class="grid-config-item" data-terminal-type="opencode-visual" data-role="agent" data-action="open-visual-chat">
+                    <span style="font-size: 14px;">💬</span>
+                    <div>
+                      <div style="font-weight: 600;">Chat Visual (OpenCode)</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Interface conversacional headless</div>
+                    </div>
+                  </div>
                   <div class="grid-config-item" data-terminal-type="opencode" data-role="agent">
                     <span style="font-size: 14px;">⚡</span>
                     <div>
@@ -944,6 +951,36 @@
           <div class="terminal-canvas-viewport" id="terminal-canvas-viewport">
             <div class="terminal-workspace-grid layout-grid" id="terminal-workspace-grid">
               <!-- Painéis de terminais gerados dinamicamente via JS -->
+            </div>
+
+            <!-- CONTAINER CHAT VISUAL OPENCODE (ISSUE #18) -->
+            <div class="opencode-visual-chat-container" id="opencode-visual-chat-container" style="display: none;">
+              <div class="opencode-chat-header">
+                <div class="opencode-chat-header-title">
+                  <span class="opencode-chat-icon">💬</span>
+                  <span>OpenCode Chat Visual</span>
+                  <span class="opencode-chat-badge" id="opencode-chat-status">Ready</span>
+                </div>
+                <div class="opencode-chat-header-actions">
+                  <button class="btn-chat-action" id="btn-clear-opencode-chat" title="Limpar conversa">🗑️</button>
+                  <button class="btn-chat-action" id="btn-close-opencode-chat" title="Fechar Chat Visual">✕</button>
+                </div>
+              </div>
+              <div class="opencode-chat-messages" id="opencode-chat-messages" role="log" aria-live="polite">
+                <!-- Mensagens renderizadas dinamicamente via opencode_chat.js -->
+              </div>
+              <div class="opencode-chat-input-area">
+                <textarea id="opencode-chat-input" class="opencode-chat-textarea" placeholder="Digite uma instrução para o OpenCode... (Enter para enviar, Shift+Enter para nova linha)" rows="2"></textarea>
+                <div class="opencode-chat-input-actions">
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-send-opencode-chat">
+                    <span>Enviar</span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
