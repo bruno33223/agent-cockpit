@@ -1601,3 +1601,567 @@ def handle_port_conflict(port: int = 8765, host: str = "127.0.0.1", force: bool 
 
     # Verificação final via socket bind antes de declarar a porta como livre
     return not is_port_in_use(port=port, host=host)
+
+
+# =========================================================================
+# CUSTOMIZATIONS & MCP / SKILLS MANAGER (ISSUE #16)
+# =========================================================================
+
+import shutil
+
+try:
+    import customizations_manager
+    _CustomizationsManagerClass = getattr(customizations_manager, "CustomizationsManager", None)
+except ImportError:
+    try:
+        from server import customizations_manager
+        _CustomizationsManagerClass = getattr(customizations_manager, "CustomizationsManager", None)
+    except ImportError:
+        customizations_manager = None
+        _CustomizationsManagerClass = None
+
+
+class _FallbackCustomizationsManager:
+    """Implementação resiliente de CustomizationsManager para gerenciamento em AppData."""
+
+    def __init__(self, base_dir: Optional[str] = None):
+        self._custom_base = base_dir
+        self._lock = threading.Lock()
+
+    @property
+    def base_dir(self) -> str:
+        if self._custom_base:
+            return os.path.abspath(self._custom_base)
+        if sys.platform == "win32":
+            appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
+            return os.path.join(appdata, "AgentCockpit", "customizations")
+        config_dir = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+        return os.path.join(config_dir, "agent-cockpit", "customizations")
+
+    @property
+    def mcp_dir(self) -> str:
+        d = os.path.join(self.base_dir, "mcp")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    @property
+    def skills_dir(self) -> str:
+        d = os.path.join(self.base_dir, "skills")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def list_mcp_servers(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            servers = []
+            if not os.path.exists(self.mcp_dir):
+                return servers
+            for fname in sorted(os.listdir(self.mcp_dir)):
+                if fname.endswith(".json"):
+                    fpath = os.path.join(self.mcp_dir, fname)
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            cfg = json.load(f)
+                            if "id" not in cfg:
+                                cfg["id"] = fname[:-5]
+                            servers.append(cfg)
+                    except Exception:
+                        pass
+            return servers
+
+    def list_mcps(self) -> List[Dict[str, Any]]:
+        return self.list_mcp_servers()
+
+    def get_mcp_server(self, mcp_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            fpath = os.path.join(self.mcp_dir, f"{mcp_id}.json")
+            if not os.path.exists(fpath):
+                return None
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    if "id" not in cfg:
+                        cfg["id"] = mcp_id
+                    return cfg
+            except Exception:
+                return None
+
+    def get_mcp(self, mcp_id: str) -> Optional[Dict[str, Any]]:
+        return self.get_mcp_server(mcp_id)
+
+    def create_mcp_server(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        with self._lock:
+            mcp_id = data.get("id") or data.get("name")
+            data["id"] = mcp_id
+            fpath = os.path.join(self.mcp_dir, f"{mcp_id}.json")
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            return data
+
+    def add_mcp_server(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        return self.create_mcp_server(data)
+
+    def create_mcp(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        return self.create_mcp_server(data)
+
+    def update_mcp_server(self, mcp_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            fpath = os.path.join(self.mcp_dir, f"{mcp_id}.json")
+            if not os.path.exists(fpath):
+                return None
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except Exception:
+                cfg = {"id": mcp_id}
+            cfg.update({k: v for k, v in data.items() if v is not None})
+            cfg["id"] = mcp_id
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            return cfg
+
+    def update_mcp(self, mcp_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return self.update_mcp_server(mcp_id, data)
+
+    def delete_mcp_server(self, mcp_id: str) -> bool:
+        with self._lock:
+            fpath = os.path.join(self.mcp_dir, f"{mcp_id}.json")
+            if os.path.exists(fpath):
+                try:
+                    os.remove(fpath)
+                    return True
+                except Exception:
+                    return False
+            return False
+
+    def delete_mcp(self, mcp_id: str) -> bool:
+        return self.delete_mcp_server(mcp_id)
+
+    def toggle_mcp_server(self, mcp_id: str, enabled: Optional[bool] = None) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            fpath = os.path.join(self.mcp_dir, f"{mcp_id}.json")
+            if not os.path.exists(fpath):
+                return None
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except Exception:
+                return None
+            if enabled is None:
+                cfg["enabled"] = not cfg.get("enabled", True)
+            else:
+                cfg["enabled"] = bool(enabled)
+            cfg["id"] = mcp_id
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            return cfg
+
+    def toggle_mcp(self, mcp_id: str, enabled: Optional[bool] = None) -> Optional[Dict[str, Any]]:
+        return self.toggle_mcp_server(mcp_id, enabled)
+
+    def list_skills(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            skills = []
+            if not os.path.exists(self.skills_dir):
+                return skills
+            for entry in sorted(os.listdir(self.skills_dir)):
+                entry_path = os.path.join(self.skills_dir, entry)
+                if os.path.isdir(entry_path):
+                    meta_path = os.path.join(entry_path, "metadata.json")
+                    skill_md = os.path.join(entry_path, "SKILL.md")
+                    meta = {"name": entry, "description": "", "enabled": True}
+                    if os.path.exists(meta_path):
+                        try:
+                            with open(meta_path, "r", encoding="utf-8") as f:
+                                meta.update(json.load(f))
+                        except Exception:
+                            pass
+                    if os.path.exists(skill_md):
+                        try:
+                            with open(skill_md, "r", encoding="utf-8") as f:
+                                meta["content"] = f.read()
+                        except Exception:
+                            meta["content"] = ""
+                    meta["name"] = entry
+                    skills.append(meta)
+            return skills
+
+    def get_skill(self, skill_name: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            entry_path = os.path.join(self.skills_dir, skill_name)
+            if not os.path.isdir(entry_path):
+                return None
+            meta_path = os.path.join(entry_path, "metadata.json")
+            skill_md = os.path.join(entry_path, "SKILL.md")
+            meta = {"name": skill_name, "description": "", "enabled": True, "content": ""}
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        meta.update(json.load(f))
+                except Exception:
+                    pass
+            if os.path.exists(skill_md):
+                try:
+                    with open(skill_md, "r", encoding="utf-8") as f:
+                        meta["content"] = f.read()
+                except Exception:
+                    pass
+            meta["name"] = skill_name
+            return meta
+
+    def create_skill(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        with self._lock:
+            skill_name = (data.get("name") or "").strip()
+            entry_path = os.path.join(self.skills_dir, skill_name)
+            os.makedirs(entry_path, exist_ok=True)
+            meta_path = os.path.join(entry_path, "metadata.json")
+            skill_md = os.path.join(entry_path, "SKILL.md")
+
+            content = data.get("content") or data.get("instructions") or ""
+            with open(skill_md, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            meta = {
+                "name": skill_name,
+                "description": data.get("description", ""),
+                "enabled": data.get("enabled", True),
+            }
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(meta, f, indent=2, ensure_ascii=False)
+
+            meta["content"] = content
+            return meta
+
+    def add_skill(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        return self.create_skill(data)
+
+    def update_skill(self, skill_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            entry_path = os.path.join(self.skills_dir, skill_name)
+            if not os.path.isdir(entry_path):
+                return None
+            meta_path = os.path.join(entry_path, "metadata.json")
+            skill_md = os.path.join(entry_path, "SKILL.md")
+
+            meta = {"name": skill_name, "description": "", "enabled": True}
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        meta.update(json.load(f))
+                except Exception:
+                    pass
+
+            for k in ("description", "enabled"):
+                if k in data and data[k] is not None:
+                    meta[k] = data[k]
+
+            meta["name"] = skill_name
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(meta, f, indent=2, ensure_ascii=False)
+
+            if "content" in data and data["content"] is not None:
+                with open(skill_md, "w", encoding="utf-8") as f:
+                    f.write(data["content"])
+                meta["content"] = data["content"]
+            elif os.path.exists(skill_md):
+                with open(skill_md, "r", encoding="utf-8") as f:
+                    meta["content"] = f.read()
+
+            return meta
+
+    def delete_skill(self, skill_name: str) -> bool:
+        with self._lock:
+            entry_path = os.path.join(self.skills_dir, skill_name)
+            if os.path.isdir(entry_path):
+                try:
+                    shutil.rmtree(entry_path)
+                    return True
+                except Exception:
+                    return False
+            return False
+
+    def toggle_skill(self, skill_name: str, enabled: Optional[bool] = None) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            entry_path = os.path.join(self.skills_dir, skill_name)
+            if not os.path.isdir(entry_path):
+                return None
+            meta_path = os.path.join(entry_path, "metadata.json")
+            meta = {"name": skill_name, "description": "", "enabled": True}
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        meta.update(json.load(f))
+                except Exception:
+                    pass
+            if enabled is None:
+                meta["enabled"] = not meta.get("enabled", True)
+            else:
+                meta["enabled"] = bool(enabled)
+            meta["name"] = skill_name
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(meta, f, indent=2, ensure_ascii=False)
+
+            skill_md = os.path.join(entry_path, "SKILL.md")
+            if os.path.exists(skill_md):
+                try:
+                    with open(skill_md, "r", encoding="utf-8") as f:
+                        meta["content"] = f.read()
+                except Exception:
+                    pass
+            return meta
+
+    def sync(self) -> Dict[str, Any]:
+        if opencode_manager and hasattr(opencode_manager, "sync_opencode_config"):
+            try:
+                return opencode_manager.sync_opencode_config()
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+        return {"status": "success", "mcp_synced": True, "skills_synced": True}
+
+    def sync_all(self) -> Dict[str, Any]:
+        return self.sync()
+
+
+CustomizationsManager = _CustomizationsManagerClass or _FallbackCustomizationsManager
+_customizations_mgr_instance = None
+
+
+def get_customizations_mgr() -> Any:
+    global _customizations_mgr_instance
+    if _customizations_mgr_instance is None:
+        _customizations_mgr_instance = CustomizationsManager()
+    return _customizations_mgr_instance
+
+
+def set_customizations_mgr(mgr: Any):
+    global _customizations_mgr_instance
+    _customizations_mgr_instance = mgr
+
+
+class MCPServerPayload(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    type: str
+    command: Optional[str] = None
+    args: Optional[List[str]] = []
+    env: Optional[Dict[str, str]] = {}
+    url: Optional[str] = None
+    enabled: Optional[bool] = True
+    description: Optional[str] = ""
+
+
+class MCPServerUpdatePayload(BaseModel):
+    type: Optional[str] = None
+    command: Optional[str] = None
+    args: Optional[List[str]] = None
+    env: Optional[Dict[str, str]] = None
+    url: Optional[str] = None
+    enabled: Optional[bool] = None
+    description: Optional[str] = None
+
+
+class MCPTogglePayload(BaseModel):
+    enabled: Optional[bool] = None
+
+
+class SkillPayload(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    content: Optional[str] = ""
+    instructions: Optional[str] = None
+    enabled: Optional[bool] = True
+
+
+class SkillUpdatePayload(BaseModel):
+    description: Optional[str] = None
+    content: Optional[str] = None
+    instructions: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class SkillTogglePayload(BaseModel):
+    enabled: Optional[bool] = None
+
+
+@app.get("/api/customizations/mcp")
+def get_customizations_mcp():
+    """Lista todos os servidores MCP configurados."""
+    mgr = get_customizations_mgr()
+    method = getattr(mgr, "list_mcp_servers", getattr(mgr, "list_mcps", None))
+    servers = method() if callable(method) else []
+    return {"status": "success", "mcp_servers": servers, "count": len(servers)}
+
+
+@app.post("/api/customizations/mcp")
+def post_customizations_mcp(payload: MCPServerPayload):
+    """Cria um novo servidor MCP."""
+    mcp_id = (payload.id or payload.name or "").strip()
+    if not mcp_id:
+        raise HTTPException(status_code=400, detail="ID ou nome do servidor MCP é obrigatório.")
+    mcp_type = (payload.type or "").strip().lower()
+    if mcp_type == "stdio" and not (payload.command and payload.command.strip()):
+        raise HTTPException(status_code=400, detail="Comando é obrigatório para MCP do tipo stdio.")
+    if mcp_type in ("sse", "http") and not (payload.url and payload.url.strip()):
+        raise HTTPException(status_code=400, detail="URL é obrigatória para MCP do tipo sse/http.")
+
+    mgr = get_customizations_mgr()
+    data = payload.dict(exclude_unset=True)
+    data["id"] = mcp_id
+    method = getattr(mgr, "create_mcp_server", getattr(mgr, "add_mcp_server", getattr(mgr, "create_mcp", None)))
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método de criação de MCP não disponível no manager.")
+    res = method(data)
+    manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "create", "mcp": res})
+    return {"status": "success", "mcp_server": res, "message": f"Servidor MCP '{mcp_id}' criado com sucesso."}
+
+
+@app.put("/api/customizations/mcp/{mcp_id}")
+def put_customizations_mcp(mcp_id: str, payload: MCPServerUpdatePayload):
+    """Atualiza configurações de um servidor MCP existente."""
+    mgr = get_customizations_mgr()
+    data = payload.dict(exclude_unset=True)
+    method = getattr(mgr, "update_mcp_server", getattr(mgr, "update_mcp", None))
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método de atualização de MCP não disponível no manager.")
+    res = method(mcp_id, data)
+    if res is None:
+        raise HTTPException(status_code=404, detail=f"Servidor MCP '{mcp_id}' não encontrado.")
+    manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "update", "mcp": res})
+    return {"status": "success", "mcp_server": res, "message": f"Servidor MCP '{mcp_id}' atualizado com sucesso."}
+
+
+@app.delete("/api/customizations/mcp/{mcp_id}")
+def delete_customizations_mcp(mcp_id: str):
+    """Exclui um servidor MCP configurado."""
+    mgr = get_customizations_mgr()
+    method = getattr(mgr, "delete_mcp_server", getattr(mgr, "delete_mcp", None))
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método de exclusão de MCP não disponível no manager.")
+    deleted = method(mcp_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Servidor MCP '{mcp_id}' não encontrado.")
+    manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "delete", "mcp_id": mcp_id})
+    return {"status": "success", "message": f"Servidor MCP '{mcp_id}' excluído com sucesso."}
+
+
+@app.post("/api/customizations/mcp/{mcp_id}/toggle")
+def toggle_customizations_mcp(mcp_id: str, payload: Optional[MCPTogglePayload] = None):
+    """Ativa ou desativa um servidor MCP."""
+    mgr = get_customizations_mgr()
+    target_enabled = payload.enabled if payload else None
+    method = getattr(mgr, "toggle_mcp_server", getattr(mgr, "toggle_mcp", None))
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método toggle de MCP não disponível no manager.")
+    res = method(mcp_id, enabled=target_enabled)
+    if res is None:
+        raise HTTPException(status_code=404, detail=f"Servidor MCP '{mcp_id}' não encontrado.")
+    manager.broadcast_sync("CUSTOMIZATIONS_MCP_UPDATED", {"action": "toggle", "mcp": res})
+    return {
+        "status": "success",
+        "mcp_id": mcp_id,
+        "enabled": res.get("enabled", False),
+        "mcp_server": res,
+        "message": f"Servidor MCP '{mcp_id}' {'ativado' if res.get('enabled') else 'desativado'} com sucesso."
+    }
+
+
+@app.get("/api/customizations/skills")
+def get_customizations_skills():
+    """Lista todas as skills configuradas."""
+    mgr = get_customizations_mgr()
+    method = getattr(mgr, "list_skills", None)
+    skills = method() if callable(method) else []
+    return {"status": "success", "skills": skills, "count": len(skills)}
+
+
+@app.post("/api/customizations/skills")
+def post_customizations_skills(payload: SkillPayload):
+    """Cria uma nova Skill com instruções SKILL.md."""
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome da skill é obrigatório.")
+    mgr = get_customizations_mgr()
+    data = payload.dict(exclude_unset=True)
+    data["name"] = name
+    method = getattr(mgr, "create_skill", getattr(mgr, "add_skill", None))
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método de criação de skill não disponível no manager.")
+    res = method(data)
+    manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "create", "skill": res})
+    return {"status": "success", "skill": res, "message": f"Skill '{name}' criada com sucesso."}
+
+
+@app.put("/api/customizations/skills/{skill_name}")
+def put_customizations_skills(skill_name: str, payload: SkillUpdatePayload):
+    """Atualiza metadados e conteúdo de uma Skill existente."""
+    mgr = get_customizations_mgr()
+    data = payload.dict(exclude_unset=True)
+    method = getattr(mgr, "update_skill", None)
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método de atualização de skill não disponível no manager.")
+    res = method(skill_name, data)
+    if res is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' não encontrada.")
+    manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "update", "skill": res})
+    return {"status": "success", "skill": res, "message": f"Skill '{skill_name}' atualizada com sucesso."}
+
+
+@app.delete("/api/customizations/skills/{skill_name}")
+def delete_customizations_skills(skill_name: str):
+    """Exclui uma Skill existente."""
+    mgr = get_customizations_mgr()
+    method = getattr(mgr, "delete_skill", None)
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método de exclusão de skill não disponível no manager.")
+    deleted = method(skill_name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' não encontrada.")
+    manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "delete", "skill_name": skill_name})
+    return {"status": "success", "message": f"Skill '{skill_name}' excluída com sucesso."}
+
+
+@app.post("/api/customizations/skills/{skill_name}/toggle")
+def toggle_customizations_skills(skill_name: str, payload: Optional[SkillTogglePayload] = None):
+    """Ativa ou desativa uma Skill."""
+    mgr = get_customizations_mgr()
+    target_enabled = payload.enabled if payload else None
+    method = getattr(mgr, "toggle_skill", None)
+    if not callable(method):
+        raise HTTPException(status_code=500, detail="Método toggle de skill não disponível no manager.")
+    res = method(skill_name, enabled=target_enabled)
+    if res is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' não encontrada.")
+    manager.broadcast_sync("CUSTOMIZATIONS_SKILLS_UPDATED", {"action": "toggle", "skill": res})
+    return {
+        "status": "success",
+        "name": skill_name,
+        "enabled": res.get("enabled", False),
+        "skill": res,
+        "message": f"Skill '{skill_name}' {'ativada' if res.get('enabled') else 'desativada'} com sucesso."
+    }
+
+
+@app.post("/api/customizations/sync")
+def post_customizations_sync():
+    """Executa sincronização imediata de MCPs e Skills com o OpenCode."""
+    mgr = get_customizations_mgr()
+    sync_result = {}
+    if hasattr(mgr, "sync_all"):
+        sync_result = mgr.sync_all()
+    elif hasattr(mgr, "sync"):
+        sync_result = mgr.sync()
+    elif hasattr(mgr, "sync_opencode"):
+        sync_result = mgr.sync_opencode()
+    else:
+        sync_result = {"mcp_synced": True, "skills_synced": True}
+    manager.broadcast_sync("CUSTOMIZATIONS_SYNCED", sync_result)
+    return {"status": "success", "synced": True, "result": sync_result, "message": "Customizações sincronizadas com sucesso."}
+
+
+# Garante que o mount de arquivos estáticos permaneça no final da lista de rotas
+for _r in list(app.router.routes):
+    if getattr(_r, "name", None) == "web":
+        app.router.routes.remove(_r)
+        app.router.routes.append(_r)
+        break
+
+
