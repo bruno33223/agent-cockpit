@@ -591,7 +591,7 @@ class StateStore:
         target_pid = self.resolve_project_id(project_id)
         with self.lock:
             state = self.get_state(target_pid)
-            verdict_norm = "APROVADO" if "APROV" in verdict.upper() else "REJEITADO"
+            verdict_norm = "APROVADO" if any(k in verdict.upper() for k in ("APROV", "APPROV")) else "REJEITADO"
             metrics = review_metrics or {"critical": 0, "important": 0, "minor": 0}
             entry = {
                 "slice_id": slice_id,
