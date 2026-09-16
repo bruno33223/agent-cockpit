@@ -1389,6 +1389,22 @@
           </form>
         </div>
 
+        <div class="modal-section hf-hub-section">
+          <div class="hf-section-header">
+            <h4>Buscar Modelos no Hugging Face Hub</h4>
+            <span class="hf-badge-tag">GGUF</span>
+          </div>
+          <p class="modal-desc-sub">Pesquise modelos quantizados em GGUF diretamente na comunidade do Hugging Face para rodar localmente no Ollama.</p>
+          <div class="hf-search-container">
+            <div class="hf-search-bar">
+              <input type="text" id="hf-search-input" class="custom-model-input hf-search-input" placeholder="Buscar modelos (ex: bartowski, unsloth, Qwen2.5-Coder)..." autocomplete="off">
+              <button type="button" class="action-btn secondary" id="btn-hf-search">Buscar</button>
+            </div>
+          </div>
+          <div class="hf-search-status" id="hf-search-status" style="display: none;"></div>
+          <div class="hf-search-results" id="hf-search-results"></div>
+        </div>
+
         <div class="pull-status-box" id="pull-status-box" style="display: none;">
           <div class="pull-status-info">
             <span class="pull-spinner">⏳</span>
