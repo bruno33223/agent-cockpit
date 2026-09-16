@@ -5,6 +5,12 @@ import hashlib
 import inspect
 import threading
 import time
+import tempfile
+from contextlib import contextmanager
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 from typing import List, Dict, Any, Optional, Callable
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -158,6 +164,61 @@ class StateStore:
     def register_listener(self, callback: Callable):
         self.listeners.append(callback)
 
+    @contextmanager
+    def _file_lock(self, filepath: str):
+        """Context manager de lock inter-processo seguro usando fcntl.flock (Linux/Unix)."""
+        lock_path = filepath if filepath.endswith('.lock') else f"{filepath}.lock"
+        try:
+            lock_dir = os.path.dirname(os.path.abspath(lock_path))
+            if lock_dir and not os.path.exists(lock_dir):
+                os.makedirs(lock_dir, exist_ok=True)
+        except Exception:
+            pass
+
+        fd = None
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o666)
+            if fcntl:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX)
+                except (OSError, IOError):
+                    pass
+            yield
+        finally:
+            if fd is not None:
+                if fcntl:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    except (OSError, IOError):
+                        pass
+                try:
+                    os.close(fd)
+                except Exception:
+                    pass
+
+    def _atomic_write_json(self, filepath: str, data: Any):
+        """Grava JSON de forma atômica criando arquivo temporário no mesmo diretório e aplicando os.replace."""
+        target_dir = os.path.dirname(os.path.abspath(filepath))
+        os.makedirs(target_dir, exist_ok=True)
+        
+        lock_target = filepath
+        with self._file_lock(lock_target):
+            # Cria arquivo temporário no mesmo sistema de arquivos/diretório para garantir atomicidade do os.replace
+            temp_fd, temp_path = tempfile.mkstemp(dir=target_dir, prefix=".tmp_", suffix=".tmp")
+            try:
+                with open(temp_fd, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temp_path, filepath)
+            except Exception:
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except Exception:
+                        pass
+                raise
+
     def _notify(self, event_type: str, payload: Any, project_id: Optional[str] = None):
         target_pid = project_id or self.get_current_project_id()
         for listener in self.listeners:
@@ -180,8 +241,7 @@ class StateStore:
                     "current_project_id": "default",
                     "projects": {}
                 }
-                with open(self.index_file, 'w', encoding='utf-8') as f:
-                    json.dump(initial_index, f, indent=2, ensure_ascii=False)
+                self._save_index(initial_index)
 
             # Migração transparente de workflow_state.json legado se existir
             default_file = self._get_project_file("default")
@@ -189,8 +249,7 @@ class StateStore:
                 try:
                     with open(self.legacy_file, 'r', encoding='utf-8') as f:
                         legacy_data = json.load(f)
-                    with open(default_file, 'w', encoding='utf-8') as f:
-                        json.dump(legacy_data, f, indent=2, ensure_ascii=False)
+                    self._atomic_write_json(default_file, legacy_data)
                     root_p = legacy_data.get("project_root")
                     epic_name = legacy_data.get("epic", {}).get("name", "Default Project")
                     self._update_index_entry("default", epic_name, root_p, legacy_data)
@@ -200,8 +259,7 @@ class StateStore:
             # Garante que o projeto 'default' tenha arquivo
             if not os.path.exists(default_file):
                 data = default_initial_state("Projeto Padrão")
-                with open(default_file, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
+                self._atomic_write_json(default_file, data)
                 self._update_index_entry("default", "Projeto Padrão", None, data)
 
     def _get_project_file(self, project_id: str) -> str:
@@ -251,8 +309,7 @@ class StateStore:
             return {"current_project_id": "default", "projects": {}}
 
     def _save_index(self, index_data: Dict[str, Any]):
-        with open(self.index_file, 'w', encoding='utf-8') as f:
-            json.dump(index_data, f, indent=2, ensure_ascii=False)
+        self._atomic_write_json(self.index_file, index_data)
 
     def _update_index_entry(self, project_id: str, project_name: str,
                             project_root: Optional[str], state_data: Dict[str, Any]):
@@ -382,8 +439,7 @@ class StateStore:
 
     def _save_state(self, state: Dict[str, Any], project_id: str):
         pfile = self._get_project_file(project_id)
-        with open(pfile, 'w', encoding='utf-8') as f:
-            json.dump(state, f, indent=2, ensure_ascii=False)
+        self._atomic_write_json(pfile, state)
         
         epic_name = state.get("epic", {}).get("name", "Épico")
         root_p = state.get("project_root")
@@ -392,10 +448,14 @@ class StateStore:
         if project_id == self.get_current_project_id():
             self._sync_legacy_file(state)
 
+    def _save_workflow(self, state: Dict[str, Any], filepath: Optional[str] = None):
+        """Salva o fluxo de trabalho de forma atômica no arquivo especificado ou no arquivo legado."""
+        target_path = filepath or self.legacy_file
+        self._atomic_write_json(target_path, state)
+
     def _sync_legacy_file(self, state: Dict[str, Any]):
         try:
-            with open(self.legacy_file, 'w', encoding='utf-8') as f:
-                json.dump(state, f, indent=2, ensure_ascii=False)
+            self._save_workflow(state, self.legacy_file)
         except Exception:
             pass
 
@@ -824,8 +884,7 @@ class StateStore:
                 
                 target_mtime = os.path.getmtime(pfile) if os.path.exists(pfile) else 0
                 if leg_mtime > target_mtime:
-                    with open(pfile, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    self._atomic_write_json(pfile, data)
                     epic_name = data.get("epic", {}).get("name", os.path.basename(root) if root else "Projeto")
                     self._update_index_entry(pid, epic_name, root, data)
                     
@@ -862,8 +921,7 @@ class StateStore:
                 
                 if not os.path.exists(pfile):
                     initial_state = default_initial_state(project_name=entry.name, project_root=p_path)
-                    with open(pfile, 'w', encoding='utf-8') as f:
-                        json.dump(initial_state, f, indent=2, ensure_ascii=False)
+                    self._atomic_write_json(pfile, initial_state)
                     self._update_index_entry(pid, entry.name, p_path, initial_state)
                     found_any = True
                 elif pid not in projects:
@@ -899,8 +957,7 @@ class StateStore:
                 "pairs_3x3": state.get("pairs_3x3"),
                 "human_gates": state.get("human_gates")
             }
-            with open(cp_file, 'w', encoding='utf-8') as f:
-                json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
+            self._atomic_write_json(cp_file, checkpoint_data)
             return cp_file
 
     def read_checkpoint(self, project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
