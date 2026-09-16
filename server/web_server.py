@@ -776,9 +776,16 @@ def _get_local_worker_client(project_id: Optional[str] = None):
 
 @app.get("/api/local-worker/queue")
 def get_local_worker_queue(slice_id: Optional[str] = None, ticket_id: Optional[str] = None):
-    """Retorna o status atual da fila de tarefas da GPU do Local Worker."""
+    """Retorna o status atual da fila de tarefas da GPU do Local Worker lendo snapshot compartilhado."""
     if local_worker_queue:
         return local_worker_queue.get_queue_status(slice_id=slice_id, ticket_id=ticket_id)
+    try:
+        from workers.worker_queue import DEFAULT_SNAPSHOT_PATH
+        if os.path.exists(DEFAULT_SNAPSHOT_PATH):
+            with open(DEFAULT_SNAPSHOT_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
     return {
         "is_busy": False,
         "active_task": None,
