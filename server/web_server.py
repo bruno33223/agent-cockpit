@@ -385,7 +385,14 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Ao encerrar o Cockpit, finaliza o processo do Ollama se foi iniciado pelo Cockpit."""
+    """Ao encerrar o Cockpit, finaliza sessões PTY ativas e o processo do Ollama se gerenciado."""
+    if pty_session_manager:
+        try:
+            print("[PTY] Encerrando todas as sessões ativas no shutdown...")
+            pty_session_manager.stop_all()
+        except Exception as e:
+            print(f"[PTY] Erro ao encerrar sessões PTY: {e}")
+
     if ollama_process_manager:
         is_managed = getattr(ollama_process_manager, "managed_by_cockpit", False)
         if is_managed:
