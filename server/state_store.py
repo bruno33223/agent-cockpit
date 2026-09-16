@@ -363,7 +363,7 @@ class StateStore:
         
         norm_root = os.path.realpath(os.path.abspath(project_root)) if project_root and os.path.exists(project_root) else project_root
         
-        # Unicidade por pasta: se outro ID já aponta para esta mesma pasta física, reutiliza/funde
+        # Unicidade por pasta: se outro ID já apontava para esta mesma pasta física, remove a duplicata
         target_id = project_id
         if norm_root:
             for existing_id, meta in list(projects.items()):
@@ -371,10 +371,9 @@ class StateStore:
                 if m_root:
                     existing_norm = os.path.realpath(os.path.abspath(m_root)) if os.path.exists(m_root) else m_root
                     if existing_norm == norm_root and existing_id != project_id:
-                        if existing_id == index_data.get("current_project_id"):
-                            target_id = existing_id
-                        else:
-                            projects.pop(existing_id, None)
+                        if index_data.get("current_project_id") == existing_id:
+                            index_data["current_project_id"] = project_id
+                        projects.pop(existing_id, None)
                         break
 
         folder_name = os.path.basename(norm_root) if norm_root else "Projeto Sem Nome"
