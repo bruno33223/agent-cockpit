@@ -225,9 +225,9 @@ export function renderNodes() {
           <span class="node-title">${escapeHtml(node.title)}</span>
         </div>
         <div class="node-meta">
-          <span class="pair-tag">Par ${node.pair_id}</span>
-          <span class="attempt-badge">Tentativa ${node.attempt}/${node.max_attempts || 5}</span>
-          <button class="btn-inspect" onclick="openDrawer('${node.id}')">Inspecionar Spec</button>
+          <span class="pair-tag">Par ${escapeHtml(String(node.pair_id || ''))}</span>
+          <span class="attempt-badge">Tentativa ${escapeHtml(String(node.attempt || 1))}/${escapeHtml(String(node.max_attempts || 5))}</span>
+          <button class="btn-inspect" type="button" data-node-id="${escapeHtml(node.id)}">Inspecionar Spec</button>
         </div>
       </div>
       <div class="node-kanban-board">
@@ -237,6 +237,15 @@ export function renderNodes() {
         <div class="kanban-col"><div class="kanban-col-header">4. Aprovado</div>${colApproved}</div>
       </div>
     `;
+    const btnInspect = card.querySelector('.btn-inspect');
+    if (btnInspect) {
+      btnInspect.addEventListener('click', () => {
+        const nodeId = btnInspect.getAttribute('data-node-id') || btnInspect.dataset.nodeId;
+        if (nodeId && typeof window.openDrawer === 'function') {
+          window.openDrawer(nodeId);
+        }
+      });
+    }
     nodesCanvas.appendChild(card);
   });
 }
@@ -802,6 +811,18 @@ export function renderDedicatedSliceChatMessages(sliceId) {
 
 export function initSlicesChatEvents() {
   resolveSlicesElements();
+
+  if (nodesCanvas) {
+    nodesCanvas.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-inspect');
+      if (btn) {
+        const nodeId = btn.getAttribute('data-node-id') || btn.dataset.nodeId;
+        if (nodeId && typeof window.openDrawer === 'function') {
+          window.openDrawer(nodeId);
+        }
+      }
+    });
+  }
 
   if (btnRefreshHandoff) {
     btnRefreshHandoff.addEventListener('click', loadHandoff);
