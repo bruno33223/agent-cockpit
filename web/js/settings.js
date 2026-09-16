@@ -625,7 +625,7 @@ export function initTerminalAndOmniEvents() {
 
     try {
       if (btn) btn.textContent = 'Salvando...';
-      const res = await fetch('/api/omniroute/config', {
+      const res = await apiFetch('/api/omniroute/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
