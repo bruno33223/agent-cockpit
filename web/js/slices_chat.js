@@ -956,8 +956,14 @@ export function initSlicesChatEvents() {
     if (drawerBackdrop) drawerBackdrop.classList.remove('open');
   };
 
-  // Fallback Polling a cada 2s (garante atualização automática sem F5)
+  // Fallback Polling apenas se o WebSocket estiver desconectado / inativo
   setInterval(async () => {
+    // Se o WebSocket estiver ativo (OPEN), o estado e o chat são atualizados em tempo real por eventos push
+    const isWsActive = typeof WebSocket !== 'undefined' &&
+      window.cockpitSocket &&
+      window.cockpitSocket.readyState === WebSocket.OPEN;
+    if (isWsActive) return;
+
     try {
       const res = await apiFetch(`/api/state?project_id=${encodeURIComponent(currentProjectId)}`);
       if (res.ok) {

@@ -520,35 +520,6 @@ export function initAntigravitySettingsModal() {
     btnShortcuts.addEventListener('click', () => switchAgSettingsTab('shortcuts'));
   }
 
-  // OmniRoute Salvar & Testar no Modal
-  const btnSaveOmni = document.getElementById('btn-ag-save-omniroute');
-  if (btnSaveOmni) {
-    btnSaveOmni.addEventListener('click', async () => {
-      const urlInput = document.getElementById('ag-omniroute-url');
-      const keyInput = document.getElementById('ag-omniroute-key');
-      const modelInput = document.getElementById('ag-omniroute-model');
-      const feedback = document.getElementById('ag-omniroute-feedback');
-
-      const origUrl = document.getElementById('omniroute-url-input');
-      const origKey = document.getElementById('omniroute-key-input');
-      const origModel = document.getElementById('omniroute-model-input');
-      if (origUrl && urlInput) origUrl.value = urlInput.value;
-      if (origKey && keyInput) origKey.value = keyInput.value;
-      if (origModel && modelInput) origModel.value = modelInput.value;
-
-      const origSave = document.getElementById('btn-save-omniroute-config');
-      if (origSave) {
-        origSave.click();
-        if (feedback) {
-          feedback.style.display = 'block';
-          feedback.style.background = 'rgba(0, 255, 102, 0.1)';
-          feedback.style.color = '#00ff66';
-          feedback.textContent = 'Configurações do OmniRoute salvas e sincronizadas!';
-          setTimeout(() => { feedback.style.display = 'none'; }, 3500);
-        }
-      }
-    });
-  }
 
   const btnTestOmni = document.getElementById('btn-ag-test-omniroute');
   if (btnTestOmni) {
