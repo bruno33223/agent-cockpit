@@ -802,11 +802,22 @@
                 </svg>
                 <span>Terminais Ativos (<span id="active-terminals-count">0</span>)</span>
               </button>
-              <div class="new-terminal-wrap" style="position: relative; display: inline-block;">
-                <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Abrir novo terminal">
+              <div class="new-terminal-wrap split-btn-group" id="split-new-terminal-wrap" style="position: relative; display: inline-flex; align-items: stretch;">
+                <button class="action-btn primary btn-sm btn-split-main" id="btn-new-terminal" title="Abrir ou focar Zeus Chat">
+                  <img src="/zeus_terminal_god.svg" class="zeus-btn-icon" alt="" style="width: 14px; height: 14px; margin-right: 4px; vertical-align: middle;" />
                   <span>+ Novo Terminal</span>
                 </button>
+                <button class="action-btn primary btn-sm btn-split-arrow" id="btn-new-terminal-dropdown" title="Opções de terminais alternativos" aria-haspopup="true" aria-expanded="false" style="padding: 0 7px; border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,0.18);">
+                  <span class="split-arrow">▾</span>
+                </button>
                 <div class="grid-config-dropdown new-terminal-dropdown" id="new-terminal-dropdown" style="display: none; width: 230px; right: 0; left: auto; top: calc(100% + 6px);">
+                  <div class="grid-config-item" data-terminal-type="zeus-chat" data-role="visual-chat" data-action="open-zeus-chat">
+                    <img src="/zeus_terminal_god.svg" style="width: 15px; height: 15px; vertical-align: middle;" />
+                    <div>
+                      <div style="font-weight: 600;">Zeus Chat (Visual)</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Painel do Orquestrador Zeus</div>
+                    </div>
+                  </div>
                   <div class="grid-config-item" data-terminal-type="opencode-visual" data-role="agent" data-action="open-visual-chat">
                     <span style="font-size: 14px;">💬</span>
                     <div>

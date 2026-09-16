@@ -210,6 +210,11 @@ export function initWebSocket() {
           renderAll();
           loadHandoff();
         }
+      } else if (data.event === 'subagent_spawn' || data.type === 'subagent_spawn' || data.event === 'SUBAGENT_SPAWN') {
+        const subPayload = data.payload || data;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('subagent_spawn', { detail: subPayload }));
+        }
       }
     } catch (e) {
       console.error('Erro processando mensagem WebSocket:', e);

@@ -6,110 +6,44 @@
 // 1. Importação dos Módulos Especializados
 import { escapeHtml, formatRelativeCwd, formatBytes, showToast } from './js/ui_utils.js';
 import {
-  state,
-  setState,
-  currentProjectId,
-  setCurrentProjectId,
-  activeSliceId,
-  setActiveSliceId,
-  knownProjects,
-  setKnownProjects,
-  apiFetch,
-  loadProjects,
-  switchProject,
-  triggerScanProjects,
-  getPinnedProjectIds,
-  savePinnedProjectIds,
-  getRecentProjectIds,
-  recordRecentProject,
-  getProjectDotClass,
-  getProjectDotTitle
+  state, setState, currentProjectId, setCurrentProjectId, activeSliceId, setActiveSliceId,
+  knownProjects, setKnownProjects, apiFetch, loadProjects, switchProject, triggerScanProjects,
+  getPinnedProjectIds, savePinnedProjectIds, getRecentProjectIds, recordRecentProject,
+  getProjectDotClass, getProjectDotTitle
 } from './js/state.js';
 import {
-  initSidebar,
-  switchTab,
-  renderWorktreeSidebar,
-  togglePinProject,
-  toggleShowMoreProjects,
-  initOrcaNavigationAndModals,
-  openQuickSearch,
-  closeQuickSearch,
-  renderQuickSearchResults
+  initSidebar, switchTab, renderWorktreeSidebar, togglePinProject, toggleShowMoreProjects,
+  initOrcaNavigationAndModals, openQuickSearch, closeQuickSearch, renderQuickSearchResults
 } from './js/sidebar.js';
 import {
-  TerminalWorkspaceManager,
-  terminalWorkspace,
-  initOrFitTerminal,
-  sendTerminalCommand
+  TerminalWorkspaceManager, terminalWorkspace, initOrFitTerminal, sendTerminalCommand
 } from './js/terminal_workspace.js';
 import {
-  FileExplorerManager,
-  fileExplorerManager
+  FileExplorerManager, fileExplorerManager
 } from './js/file_explorer.js';
 import {
-  renderAll,
-  renderHeaderAndKPIs,
-  loadHandoff,
-  renderNodes,
-  getNodeStatusClass,
-  renderTaskCard,
-  renderPairs,
-  createPairCard,
-  getAgentStatusClass,
-  renderFinalGate,
-  renderChatMessages,
-  renderGauntletFull,
-  updateDrawerContent,
-  initSlicesChatEvents,
-  activeSliceTabId,
-  setActiveSliceTabId,
-  getActiveSliceTabId,
-  renderSliceTabs,
-  switchSliceTab,
-  renderDedicatedSliceView,
-  renderDedicatedSliceChatMessages
+  renderAll, renderHeaderAndKPIs, loadHandoff, renderNodes, getNodeStatusClass, renderTaskCard,
+  renderPairs, createPairCard, getAgentStatusClass, renderFinalGate, renderChatMessages,
+  renderGauntletFull, updateDrawerContent, initSlicesChatEvents, activeSliceTabId,
+  setActiveSliceTabId, getActiveSliceTabId, renderSliceTabs, switchSliceTab,
+  renderDedicatedSliceView, renderDedicatedSliceChatMessages
 } from './js/slices_chat.js';
 import {
-  initOrRefreshGraph,
-  getActiveProjectRoot,
-  selectGraphNode,
-  deselectGraphNode,
-  fitGraphToViewport,
-  initCodebaseGraphEvents
+  initOrRefreshGraph, getActiveProjectRoot, selectGraphNode, deselectGraphNode,
+  fitGraphToViewport, initCodebaseGraphEvents
 } from './js/codebase_graph.js';
 import {
-  loadLocalWorker,
-  loadWorkerQueue,
-  renderWorkerQueue,
-  selectLocalModel,
-  pullLocalModel,
-  startOllamaServer,
-  stopOllamaServer,
-  openOllamaConsole,
-  closeOllamaConsole,
-  fetchOllamaLogs,
-  renderOllamaLogLine,
-  initLocalWorkerEvents
+  loadLocalWorker, loadWorkerQueue, renderWorkerQueue, selectLocalModel, pullLocalModel,
+  startOllamaServer, stopOllamaServer, openOllamaConsole, closeOllamaConsole,
+  fetchOllamaLogs, renderOllamaLogLine, initLocalWorkerEvents
 } from './js/local_worker.js';
 import {
-  checkAutostartStatus,
-  updateAutostartUI,
-  loadSettings,
-  applySettingsToUI,
-  saveSettingUpdate,
-  initSettingsEvents,
-  checkOmniRouteStatus,
-  loadOmniRouteSettings,
-  initTerminalAndOmniEvents
+  checkAutostartStatus, updateAutostartUI, loadSettings, applySettingsToUI, saveSettingUpdate,
+  initSettingsEvents, checkOmniRouteStatus, loadOmniRouteSettings, initTerminalAndOmniEvents
 } from './js/settings.js';
-import {
-  initWebSocket,
-  socket
-} from './js/websocket_client.js';
-import {
-  openCodeChat,
-  initOpenCodeChat
-} from './js/opencode_chat.js';
+import { initWebSocket, socket } from './js/websocket_client.js';
+import { openCodeChat, initOpenCodeChat } from './js/opencode_chat.js';
+import { zeusChatWorkspace, openOrCreateChatSession, initZeusChatWorkspace } from './js/zeus_chat_workspace.js';
 
 
 // 2. Exportação para Escopo Global (window) para Retrocompatibilidade com DOM e Testes
@@ -246,7 +180,12 @@ Object.assign(window, {
 
   // OpenCode Visual Chat
   openCodeChat,
-  initOpenCodeChat
+  initOpenCodeChat,
+
+  // Zeus Chat Workspace (Issue #24)
+  zeusChatWorkspace,
+  openOrCreateChatSession,
+  openZeusChat: () => openOrCreateChatSession()
 });
 
 // 3. Inicialização e Bootstrapping da Aplicação
@@ -268,6 +207,7 @@ async function bootstrapCockpit() {
   safeInit("initLocalWorkerEvents", initLocalWorkerEvents);
   safeInit("initSettingsEvents", initSettingsEvents);
   safeInit("initTerminalAndOmniEvents", initTerminalAndOmniEvents);
+  safeInit("initZeusChatWorkspace", initZeusChatWorkspace);
 
   // 2. Inicializa terminais virtuais, explorador de arquivos e chat visual
   safeInit("terminalWorkspace.init", () => terminalWorkspace.init());
@@ -319,6 +259,8 @@ export {
   switchTab,
   renderWorktreeSidebar,
   openCodeChat,
-  initOpenCodeChat
+  initOpenCodeChat,
+  zeusChatWorkspace,
+  openOrCreateChatSession
 };
 

@@ -402,6 +402,44 @@ body {
   border-radius: 4px;
 }
 
+/* Split Button - Issue #24 */
+.split-btn-group {
+  display: inline-flex;
+  align-items: stretch;
+  position: relative;
+}
+
+.split-btn-group .btn-split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.split-btn-group .btn-split-arrow {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 0 7px;
+  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background-color: #1d4ed8;
+}
+
+.split-btn-group .btn-split-arrow:hover {
+  background-color: #1e40af;
+}
+
+.split-btn-group .split-arrow {
+  font-size: 11px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
 .action-btn.primary {
   background-color: #2563eb;
   color: #ffffff;
@@ -3617,6 +3655,440 @@ body {
 .slice-chat-send-btn:hover {
   background: #0284c7;
 }
+/* ==========================================================================
+   SUBAGENT DEDICATED TABS & OPENCODE VISUAL CHAT ISOLATION (ISSUE #18)
+   ========================================================================== */
+.subagent-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-subtle, #334155);
+  border-radius: 6px 6px 0 0;
+  color: var(--text-secondary, #94a3b8);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+.subagent-tab:hover {
+  background: var(--bg-card-hover, #334155);
+  color: var(--text-primary, #f8fafc);
+  border-color: var(--border-default, #475569);
+}
+.subagent-tab.active {
+  background: var(--bg-card, #0f172a);
+  color: var(--text-primary, #ffffff);
+  border-color: var(--accent-primary, #38bdf8);
+  border-bottom-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.15);
+}
+.subagent-tab-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.subagent-tab-title {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subagent-tab-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 3px;
+}
+.subagent-tab-close:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+/* Badge de status para subagentes */
+.subagent-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+.subagent-badge.status-running {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  animation: pulse-badge 2s infinite ease-in-out;
+}
+.subagent-badge.status-idle {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+.subagent-badge.status-done {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.subagent-badge.status-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.subagent-badge.status-pending {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+/* Painel de chat visual OpenCode */
+.opencode-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-card, #0f172a);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.opencode-chat-panel:not(.active) {
+  display: none;
+}
+.opencode-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface, #1e293b);
+  border-bottom: 1px solid var(--border-subtle, #334155);
+}
+.opencode-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #f8fafc);
+}
+.opencode-chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.opencode-chat-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-primary, #e2e8f0);
+}
+.chat-placeholder-msg {
+  color: var(--text-muted, #64748b);
+  font-style: italic;
+  text-align: center;
+  margin: auto;
+}
+/* ==========================================================================
+   MODULE: OPENCODE VISUAL CHAT (Issue #18)
+   Interface de chat conversacional em background com cards de pensamento,
+   ações/ferramentas e streaming no tema dark do Agent Cockpit.
+   ========================================================================== */
+.opencode-visual-chat-container {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 480px;
+  max-width: calc(100% - 32px);
+  height: calc(100% - 32px);
+  max-height: 780px;
+  background: var(--bg-card, #181b20);
+  border: 1px solid var(--border-strong, #272c35);
+  border-radius: var(--radius-lg, 8px);
+  box-shadow: var(--shadow-floating, 0 10px 24px rgba(0, 0, 0, 0.5));
+  display: flex;
+  flex-direction: column;
+  z-index: 150;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  animation: opencodeChatFadeIn 0.2s ease-out;
+}
+@keyframes opencodeChatFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.opencode-chat-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+.opencode-chat-icon {
+  font-size: 16px;
+}
+.opencode-chat-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary, #a1a1aa);
+}
+.opencode-chat-badge.status-ready {
+  background: var(--green-dim, rgba(0, 255, 102, 0.1));
+  color: var(--status-success, #00ff66);
+  border: 1px solid rgba(0, 255, 102, 0.2);
+}
+.opencode-chat-badge.status-busy {
+  background: var(--amber-dim, rgba(245, 158, 11, 0.12));
+  color: var(--amber-bright, #f59e0b);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  animation: pulseBusy 1.5s infinite ease-in-out;
+}
+.opencode-chat-badge.status-error {
+  background: var(--red-dim, rgba(255, 101, 104, 0.12));
+  color: var(--destructive, #ff6568);
+  border: 1px solid rgba(255, 101, 104, 0.25);
+}
+@keyframes pulseBusy {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.opencode-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-chat-action {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary, #a1a1aa);
+  border-radius: var(--radius-sm, 4px);
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.btn-chat-action:hover {
+  background: var(--bg-card-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text-primary, #ffffff);
+  border-color: var(--border, #23282f);
+}
+.opencode-chat-messages {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-main, #111417);
+  scroll-behavior: smooth;
+}
+.opencode-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+.opencode-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.opencode-chat-messages::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #272c35);
+  border-radius: 3px;
+}
+.opencode-chat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--border, #23282f);
+  background: var(--bg-card, #181b20);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary, #ffffff);
+}
+.opencode-chat-card.role-user {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+  margin-left: 24px;
+}
+.opencode-chat-card.role-assistant {
+  background: var(--bg-card, #181b20);
+  border-color: var(--border-strong, #272c35);
+  margin-right: 12px;
+}
+.opencode-chat-card.role-system {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--text-muted, #71717a);
+}
+.opencode-chat-card.role-error {
+  background: var(--red-dim, rgba(255, 101, 104, 0.12));
+  border-color: rgba(255, 101, 104, 0.3);
+  color: var(--red-bright, #ff6568);
+}
+.opencode-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.role-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.role-badge.badge-user {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(37, 99, 235, 0.4);
+}
+.role-badge.badge-assistant {
+  background: var(--green-dim, rgba(0, 255, 102, 0.1));
+  color: var(--status-success, #00ff66);
+  border: 1px solid rgba(0, 255, 102, 0.25);
+}
+.role-badge.badge-system {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted, #71717a);
+}
+.role-badge.badge-error {
+  background: rgba(255, 101, 104, 0.2);
+  color: var(--destructive, #ff6568);
+  border: 1px solid rgba(255, 101, 104, 0.35);
+}
+.card-author {
+  font-weight: 600;
+  color: var(--text-secondary, #a1a1aa);
+}
+.card-timestamp {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted, #71717a);
+}
+.opencode-thinking-box,
+.thinking-box {
+  margin: 6px 0;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 2px solid var(--cyan-bright, #38bdf8);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 12px;
+}
+.opencode-thinking-box summary,
+.thinking-box summary {
+  cursor: pointer;
+  color: var(--cyan-bright, #38bdf8);
+  font-size: 11px;
+  user-select: none;
+  font-weight: 500;
+}
+.thinking-text {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary, #a1a1aa);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.opencode-tools-box,
+.tools-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+.tool-item {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border, #23282f);
+  border-radius: 4px;
+  color: var(--text-secondary, #a1a1aa);
+}
+.tool-item strong {
+  color: var(--amber-bright, #f59e0b);
+}
+.opencode-card-body {
+  font-size: 13px;
+  word-break: break-word;
+}
+.opencode-chat-input-area {
+  padding: 10px 14px;
+  background: var(--bg-surface, #0c0e11);
+  border-top: 1px solid var(--border, #23282f);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opencode-chat-textarea,
+.opencode-chat-input {
+  width: 100%;
+  background: var(--bg-main, #111417);
+  border: 1px solid var(--border-strong, #272c35);
+  border-radius: var(--radius-md, 6px);
+  color: var(--text-primary, #ffffff);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 10px;
+  resize: vertical;
+  min-height: 48px;
+  max-height: 140px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.opencode-chat-textarea:focus,
+.opencode-chat-input:focus {
+  border-color: var(--border-focus, #00ff66);
+}
+.opencode-chat-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
 
 
 /* ==========================================================================
@@ -3810,6 +4282,11 @@ body {
   background: #f59e0b;
 }
 
+.term-tab.role-visual-chat.active::before {
+  background: #00ff66;
+  box-shadow: 0 0 8px rgba(0, 255, 102, 0.6);
+}
+
 /* Badges distintivos de Papel (Role Badges) */
 .term-tab-role-badge {
   display: inline-flex;
@@ -3841,6 +4318,12 @@ body {
   border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
+.term-tab-role-badge.role-visual-chat {
+  background: rgba(0, 255, 102, 0.12);
+  color: #00ff66;
+  border: 1px solid rgba(0, 255, 102, 0.35);
+}
+
 .orca-role-badge {
   display: inline-flex;
   align-items: center;
@@ -3868,6 +4351,12 @@ body {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.orca-role-badge.role-visual-chat {
+  background: rgba(0, 255, 102, 0.12);
+  color: #00ff66;
+  border: 1px solid rgba(0, 255, 102, 0.35);
 }
 
 /* Filtros rápidos por papel de terminais */
@@ -4664,6 +5153,296 @@ body {
 .orca-split-divider.active,
 .tab-group-split-divider:hover {
   background-color: var(--accent);
+}
+
+/* ==========================================================================
+   ZEUS CHAT WORKSPACE & SUBAGENT INTERACTIVE CARDS (Issue #24)
+   ========================================================================== */
+
+.terminal-pane.zeus-chat-pane {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-void, #0c0e11);
+  position: relative;
+  overflow: hidden;
+}
+
+.zeus-chat-pane-header {
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface, #111417);
+}
+
+.zeus-chat-pane-body {
+  background-color: var(--bg-void, #0c0e11);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100% - 35px);
+}
+
+.zeus-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zeus-chat-msg {
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card, #181b20);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 90%;
+  animation: fadeIn 0.15s ease;
+}
+
+.zeus-chat-msg.role-user {
+  align-self: flex-end;
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.zeus-chat-msg.role-assistant {
+  align-self: flex-start;
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(0, 255, 102, 0.25);
+}
+
+.zeus-chat-msg.role-system {
+  align-self: center;
+  background: var(--bg-card);
+  border-color: var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.zeus-chat-msg.role-error {
+  align-self: flex-start;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.zeus-msg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.zeus-msg-author-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zeus-msg-god-icon {
+  width: 15px;
+  height: 15px;
+  vertical-align: middle;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 102, 0.5));
+}
+
+.zeus-msg-author {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.zeus-msg-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.zeus-thinking-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.zeus-thinking-box summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+  user-select: none;
+}
+
+.zeus-thinking-content {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.zeus-tools-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zeus-tool-item {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.zeus-msg-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--foreground);
+  word-break: break-word;
+}
+
+/* Subagent Spawn Interactive Card (Issue #24) */
+.zeus-subagent-card {
+  align-self: stretch;
+  background: linear-gradient(135deg, rgba(24, 27, 32, 0.95), rgba(17, 20, 23, 0.98));
+  border: 1px solid rgba(0, 255, 102, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(0, 255, 102, 0.05);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.zeus-subagent-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.zeus-subagent-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zeus-subagent-icon {
+  font-size: 16px;
+}
+
+.zeus-subagent-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.zeus-subagent-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zeus-subagent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.zeus-meta-pill {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.zeus-subagent-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.zeus-subagent-card-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.btn-open-subagent-terminal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #059669;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  transition: all 0.15s ease;
+}
+
+.btn-open-subagent-terminal:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.45);
+}
+
+.focused-pulse {
+  animation: badgePulse 0.8s ease;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 255, 102, 0); }
+  50% { transform: scale(1.15); box-shadow: 0 0 12px rgba(0, 255, 102, 0.8); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 255, 102, 0); }
+}
+
+.zeus-chat-input-bar {
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+  display: flex;
+  gap: 8px;
+  background: var(--bg-surface, #111417);
+  align-items: flex-end;
+}
+
+.zeus-chat-input {
+  flex: 1;
+  resize: none;
+  min-height: 38px;
+  max-height: 120px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--bg-card, #181b20);
+  border: 1px solid var(--border, #23282f);
+  color: var(--foreground, #f4f4f5);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.zeus-chat-input:focus {
+  border-color: #00ff66;
+  box-shadow: 0 0 0 2px rgba(0, 255, 102, 0.15);
+}
+
+.btn-send-zeus-chat {
+  height: 38px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  background: #2563eb;
+}
+
+.btn-send-zeus-chat:hover {
+  background: #1d4ed8;
 }
 
 
@@ -8448,504 +9227,6 @@ body.sidebar-pinned-hidden .main-content {
   border: 1px solid rgba(56, 189, 248, 0.25);
   padding: 2px 8px;
   border-radius: 4px;
-}
-
-<<<<<<< Updated upstream
-/* ==========================================================================
-   SUBAGENT DEDICATED TABS & OPENCODE VISUAL CHAT ISOLATION (ISSUE #18)
-   ========================================================================== */
-
-.subagent-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--bg-surface, #1e293b);
-  border: 1px solid var(--border-subtle, #334155);
-  border-radius: 6px 6px 0 0;
-  color: var(--text-secondary, #94a3b8);
-  font-family: var(--font-sans, system-ui, sans-serif);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  user-select: none;
-}
-
-.subagent-tab:hover {
-  background: var(--bg-card-hover, #334155);
-  color: var(--text-primary, #f8fafc);
-  border-color: var(--border-default, #475569);
-}
-
-.subagent-tab.active {
-  background: var(--bg-card, #0f172a);
-  color: var(--text-primary, #ffffff);
-  border-color: var(--accent-primary, #38bdf8);
-  border-bottom-color: transparent;
-  font-weight: 600;
-  box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.15);
-}
-
-.subagent-tab-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.subagent-tab-title {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.subagent-tab-close {
-  background: transparent;
-  border: none;
-  color: inherit;
-  font-size: 14px;
-  line-height: 1;
-  padding: 0 2px;
-  cursor: pointer;
-  opacity: 0.6;
-  border-radius: 3px;
-}
-
-.subagent-tab-close:hover {
-  opacity: 1;
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-}
-
-/* Badge de status para subagentes */
-.subagent-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  font-family: var(--font-mono, monospace);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-radius: 4px;
-  line-height: 1.2;
-}
-
-.subagent-badge.status-running {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  animation: pulse-badge 2s infinite ease-in-out;
-}
-
-.subagent-badge.status-idle {
-  background: rgba(148, 163, 184, 0.15);
-  color: #94a3b8;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-}
-
-.subagent-badge.status-done {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.subagent-badge.status-error {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.subagent-badge.status-pending {
-  background: rgba(234, 179, 8, 0.15);
-  color: #eab308;
-  border: 1px solid rgba(234, 179, 8, 0.3);
-}
-
-@keyframes pulse-badge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-/* Painel de chat visual OpenCode */
-.opencode-chat-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: var(--bg-card, #0f172a);
-  border: 1px solid var(--border-subtle, #1e293b);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.opencode-chat-panel:not(.active) {
-  display: none;
-}
-
-.opencode-chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--bg-surface, #1e293b);
-  border-bottom: 1px solid var(--border-subtle, #334155);
-}
-
-.opencode-chat-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-primary, #f8fafc);
-}
-
-.opencode-chat-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.opencode-chat-body {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text-primary, #e2e8f0);
-}
-
-.chat-placeholder-msg {
-  color: var(--text-muted, #64748b);
-  font-style: italic;
-  text-align: center;
-  margin: auto;
-}
-
-/* ==========================================================================
-   MODULE: OPENCODE VISUAL CHAT (Issue #18)
-   Interface de chat conversacional em background com cards de pensamento,
-   ações/ferramentas e streaming no tema dark do Agent Cockpit.
-   ========================================================================== */
-
-.opencode-visual-chat-container {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 480px;
-  max-width: calc(100% - 32px);
-  height: calc(100% - 32px);
-  max-height: 780px;
-  background: var(--bg-card, #181b20);
-  border: 1px solid var(--border-strong, #272c35);
-  border-radius: var(--radius-lg, 8px);
-  box-shadow: var(--shadow-floating, 0 10px 24px rgba(0, 0, 0, 0.5));
-  display: flex;
-  flex-direction: column;
-  z-index: 150;
-  overflow: hidden;
-  backdrop-filter: blur(12px);
-  animation: opencodeChatFadeIn 0.2s ease-out;
-}
-
-@keyframes opencodeChatFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.opencode-chat-header-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary, #ffffff);
-}
-
-.opencode-chat-icon {
-  font-size: 16px;
-}
-
-.opencode-chat-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm, 4px);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary, #a1a1aa);
-}
-
-.opencode-chat-badge.status-ready {
-  background: var(--green-dim, rgba(0, 255, 102, 0.1));
-  color: var(--status-success, #00ff66);
-  border: 1px solid rgba(0, 255, 102, 0.2);
-}
-
-.opencode-chat-badge.status-busy {
-  background: var(--amber-dim, rgba(245, 158, 11, 0.12));
-  color: var(--amber-bright, #f59e0b);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  animation: pulseBusy 1.5s infinite ease-in-out;
-}
-
-.opencode-chat-badge.status-error {
-  background: var(--red-dim, rgba(255, 101, 104, 0.12));
-  color: var(--destructive, #ff6568);
-  border: 1px solid rgba(255, 101, 104, 0.25);
-}
-
-@keyframes pulseBusy {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.opencode-chat-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-chat-action {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-secondary, #a1a1aa);
-  border-radius: var(--radius-sm, 4px);
-  padding: 4px 6px;
-  font-size: 12px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.btn-chat-action:hover {
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.05));
-  color: var(--text-primary, #ffffff);
-  border-color: var(--border, #23282f);
-}
-
-.opencode-chat-messages {
-  flex: 1;
-  padding: 14px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: var(--bg-main, #111417);
-  scroll-behavior: smooth;
-}
-
-.opencode-chat-messages::-webkit-scrollbar {
-  width: 6px;
-}
-
-.opencode-chat-messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.opencode-chat-messages::-webkit-scrollbar-thumb {
-  background: var(--border-strong, #272c35);
-  border-radius: 3px;
-}
-
-.opencode-chat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md, 6px);
-  border: 1px solid var(--border, #23282f);
-  background: var(--bg-card, #181b20);
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-primary, #ffffff);
-}
-
-.opencode-chat-card.role-user {
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.25);
-  margin-left: 24px;
-}
-
-.opencode-chat-card.role-assistant {
-  background: var(--bg-card, #181b20);
-  border-color: var(--border-strong, #272c35);
-  margin-right: 12px;
-}
-
-.opencode-chat-card.role-system {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.06);
-  font-style: italic;
-  font-size: 12px;
-  color: var(--text-muted, #71717a);
-}
-
-.opencode-chat-card.role-error {
-  background: var(--red-dim, rgba(255, 101, 104, 0.12));
-  border-color: rgba(255, 101, 104, 0.3);
-  color: var(--red-bright, #ff6568);
-}
-
-.opencode-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-}
-
-.role-badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 3px;
-  text-transform: uppercase;
-}
-
-.role-badge.badge-user {
-  background: rgba(37, 99, 235, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(37, 99, 235, 0.4);
-}
-
-.role-badge.badge-assistant {
-  background: var(--green-dim, rgba(0, 255, 102, 0.1));
-  color: var(--status-success, #00ff66);
-  border: 1px solid rgba(0, 255, 102, 0.25);
-}
-
-.role-badge.badge-system {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-muted, #71717a);
-}
-
-.role-badge.badge-error {
-  background: rgba(255, 101, 104, 0.2);
-  color: var(--destructive, #ff6568);
-  border: 1px solid rgba(255, 101, 104, 0.35);
-}
-
-.card-author {
-  font-weight: 600;
-  color: var(--text-secondary, #a1a1aa);
-}
-
-.card-timestamp {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted, #71717a);
-}
-
-.opencode-thinking-box,
-.thinking-box {
-  margin: 6px 0;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border-left: 2px solid var(--cyan-bright, #38bdf8);
-  border-radius: var(--radius-sm, 4px);
-  font-size: 12px;
-}
-
-.opencode-thinking-box summary,
-.thinking-box summary {
-  cursor: pointer;
-  color: var(--cyan-bright, #38bdf8);
-  font-size: 11px;
-  user-select: none;
-  font-weight: 500;
-}
-
-.thinking-text {
-  margin-top: 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-secondary, #a1a1aa);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.opencode-tools-box,
-.tools-box {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 6px 0;
-}
-
-.tool-item {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border, #23282f);
-  border-radius: 4px;
-  color: var(--text-secondary, #a1a1aa);
-}
-
-.tool-item strong {
-  color: var(--amber-bright, #f59e0b);
-}
-
-.opencode-card-body {
-  font-size: 13px;
-  word-break: break-word;
-}
-
-.opencode-chat-input-area {
-  padding: 10px 14px;
-  background: var(--bg-surface, #0c0e11);
-  border-top: 1px solid var(--border, #23282f);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.opencode-chat-textarea,
-.opencode-chat-input {
-  width: 100%;
-  background: var(--bg-main, #111417);
-  border: 1px solid var(--border-strong, #272c35);
-  border-radius: var(--radius-md, 6px);
-  color: var(--text-primary, #ffffff);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  padding: 8px 10px;
-  resize: vertical;
-  min-height: 48px;
-  max-height: 140px;
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.opencode-chat-textarea:focus,
-.opencode-chat-input:focus {
-  border-color: var(--border-focus, #00ff66);
-}
-
-.opencode-chat-input-actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
 }
 
 /* ── MODAL: TERMINAIS ATIVOS DO PROJETO ────────────────────────────── */

@@ -59,18 +59,29 @@ export function openSubagentTab(subagentInfo = {}) {
   const agentType = subagentInfo.agentType || 'opencode';
   const cwd = subagentInfo.cwd || (typeof terminalWorkspace !== 'undefined' && terminalWorkspace.getSliceCwd ? terminalWorkspace.getSliceCwd(sliceId) : null);
 
+  // Se a aba do subagente já existir, apenas foca e retorna
+  if (activeSubagentTabs.has(subagentId)) {
+    const existingRecord = activeSubagentTabs.get(subagentId);
+    focusSubagentTab(subagentId);
+    return existingRecord;
+  }
+
   // 1. Cria ou recupera a sessão isolada de terminal via TerminalWorkspaceManager
   let session = null;
   if (typeof terminalWorkspace !== 'undefined' && typeof terminalWorkspace.createSession === 'function') {
-    session = terminalWorkspace.createSession({
-      id: `term-${subagentId}`,
-      name: title,
-      role: 'subagent',
-      sliceId: sliceId,
-      agentType: agentType,
-      cwd: cwd,
-      contextKey: `slice:${sliceId}`
-    });
+    if (terminalWorkspace.sessions && terminalWorkspace.sessions.has(`term-${subagentId}`)) {
+      session = terminalWorkspace.sessions.get(`term-${subagentId}`);
+    } else {
+      session = terminalWorkspace.createSession({
+        id: `term-${subagentId}`,
+        name: title,
+        role: 'subagent',
+        sliceId: sliceId,
+        agentType: agentType,
+        cwd: cwd,
+        contextKey: `slice:${sliceId}`
+      });
+    }
   }
 
   // 2. Renderiza ou anexa a aba no container de abas caso disponível
