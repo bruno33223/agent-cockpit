@@ -364,7 +364,11 @@ async def file_watch_loop():
                     last_mtimes["workflow_state.json"] = leg_mtime
                 elif leg_mtime > prev_leg:
                     last_mtimes["workflow_state.json"] = leg_mtime
+                    user_active_pid = db.get_current_project_id()
                     sync_pid = db.sync_from_legacy_if_modified()
+                    # Blindagem anti-hijacking: impede que arquivos legados ou desconhecidos sobrescrevam current_project_id
+                    if db.get_current_project_id() != user_active_pid:
+                        db.switch_current_project(user_active_pid)
                     if sync_pid:
                         await manager._broadcast("PROJECTS_UPDATED", db.list_projects())
                         state = db.get_state(sync_pid)

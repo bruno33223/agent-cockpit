@@ -6,6 +6,8 @@ import inspect
 import threading
 import time
 import tempfile
+import uuid
+import sys
 from contextlib import contextmanager
 try:
     import fcntl
@@ -172,6 +174,10 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
         },
         "project_root": project_root
     }
+
+def _generate_unique_msg_id(prefix: str = "msg") -> str:
+    """Gera identificador único para mensagens imune a colisões pós-prune."""
+    return f"{prefix}-{int(time.time() * 1000)}-{uuid.uuid4().hex[:6]}"
 
 class StateStore:
     def __init__(self, states_dir: str = STATES_DIR):
@@ -614,11 +620,12 @@ class StateStore:
         with self.lock:
             state = self.get_state(target_pid)
             msg = {
-                "id": f"msg-{len(state.get('steering_messages', [])) + 1}",
+                "id": _generate_unique_msg_id("msg"),
                 "sender": "USER",
                 "text": text,
                 "timestamp": time.strftime("%H:%M:%S"),
                 "consumed": False,
+                "consumed_by": [],
                 "slice_id": clean_slice
             }
             state.setdefault("steering_messages", []).append(msg)
@@ -634,19 +641,36 @@ class StateStore:
             state = self.get_state(target_pid)
             all_msgs = state.get("steering_messages", [])
             unconsumed = []
-            for m in all_msgs:
-                if m.get("consumed", False):
-                    continue
-                m_slice = m.get("slice_id")
-                if clean_slice is not None:
-                    if m_slice == clean_slice or m_slice is None:
-                        unconsumed.append(m)
-                else:
-                    unconsumed.append(m)
+            modified = False
 
-            for m in unconsumed:
-                m["consumed"] = True
-            if unconsumed:
+            for m in all_msgs:
+                m_slice = m.get("slice_id")
+                consumed_by = m.setdefault("consumed_by", [])
+
+                if clean_slice is not None:
+                    # Direcionado a uma fatia específica
+                    if m_slice == clean_slice:
+                        if not m.get("consumed", False) and clean_slice not in consumed_by:
+                            unconsumed.append(m)
+                            m["consumed"] = True
+                            consumed_by.append(clean_slice)
+                            modified = True
+                    elif m_slice is None:
+                        # Mensagem global: múltiplos subagentes concorrentes podem consumir sem roubar
+                        if not m.get("consumed", False) and clean_slice not in consumed_by:
+                            unconsumed.append(m)
+                            consumed_by.append(clean_slice)
+                            modified = True
+                else:
+                    # Consulta global (sem fatia): consome apenas mensagens globais,
+                    # mantendo intactas as mensagens destinadas a fatias específicas
+                    if m_slice is None:
+                        if not m.get("consumed", False):
+                            unconsumed.append(m)
+                            m["consumed"] = True
+                            modified = True
+
+            if modified:
                 self._save_state(state, target_pid)
         return unconsumed
 
@@ -656,11 +680,12 @@ class StateStore:
         with self.lock:
             state = self.get_state(target_pid)
             msg = {
-                "id": f"msg-{len(state.get('steering_messages', [])) + 1}",
+                "id": _generate_unique_msg_id("msg"),
                 "sender": sender or "ORCHESTRATOR",
                 "text": text,
                 "timestamp": time.strftime("%H:%M:%S"),
                 "consumed": True,
+                "consumed_by": [clean_slice] if clean_slice else [],
                 "slice_id": clean_slice
             }
             state.setdefault("steering_messages", []).append(msg)
@@ -931,11 +956,7 @@ class StateStore:
                     self._atomic_write_json(pfile, data)
                     epic_name = data.get("epic", {}).get("name", os.path.basename(root) if root else "Projeto")
                     self._update_index_entry(pid, epic_name, root, data)
-                    
-                    index_data = self._read_index()
-                    if index_data.get("current_project_id") != pid:
-                        index_data["current_project_id"] = pid
-                        self._save_index(index_data)
+                    # Não altera o current_project_id para evitar hijacking de projeto
                     return pid
         except Exception as e:
             print(f"[StateStore] Falha ao sincronizar estado legado: {e}", file=sys.stderr)
@@ -1087,11 +1108,13 @@ class StateStore:
 
             # 3. Adiciona mensagem de emergência no steering
             state.setdefault("steering_messages", []).append({
-                "id": f"msg-err-{int(time.time())}",
+                "id": _generate_unique_msg_id("msg-err"),
                 "sender": "ORCHESTRATOR",
                 "text": f"🚨 ALERTA DE SISTEMA [{anomaly_type}]: {details}. Estado congelado em checkpoint.",
                 "timestamp": time.strftime("%H:%M:%S"),
-                "consumed": False
+                "consumed": False,
+                "consumed_by": [target_slice] if target_slice else [],
+                "slice_id": target_slice
             })
 
             # 4. Salva estado e snapshot de checkpoint
