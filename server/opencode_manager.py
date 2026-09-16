@@ -11,6 +11,10 @@ import re
 import shutil
 import urllib.request
 import urllib.error
+import time
+import uuid
+import threading
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -437,4 +441,233 @@ def sync_customizations_to_opencode(
         return manager.sync_with_opencode(target_opencode)
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# =========================================================================
+# OPENCODE HEADLESS & SUBAGENT ENGINE
+# =========================================================================
+
+class OpenCodeManager:
+    """
+    Gerencia sessões headless do OpenCode e rastreamento de ciclo de vida de subagentes.
+    Permite execução em background com streaming assíncrono sem bloquear threads do servidor.
+    """
+    def __init__(self):
+        self._lock = threading.RLock()
+        self._sessions: Dict[str, Dict[str, Any]] = {}
+        self._subagents: Dict[str, Dict[str, Any]] = {}
+
+    def start_headless_session(
+        self,
+        session_id: Optional[str] = None,
+        prompt: Optional[str] = None,
+        cwd: Optional[str] = None,
+        model: Optional[str] = None,
+        project_id: Optional[str] = None,
+        broadcast_callback: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        with self._lock:
+            sid = session_id or f"headless-{uuid.uuid4().hex[:8]}"
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            session = {
+                "session_id": sid,
+                "project_id": project_id,
+                "cwd": cwd or BASE_DIR,
+                "model": model or "auto",
+                "status": "running",
+                "running": True,
+                "created_at": now,
+                "updated_at": now,
+                "messages": [],
+                "subagents": []
+            }
+            if prompt:
+                session["messages"].append({
+                    "id": f"msg-{uuid.uuid4().hex[:6]}",
+                    "role": "user",
+                    "content": prompt,
+                    "timestamp": now
+                })
+            self._sessions[sid] = session
+
+        if broadcast_callback and prompt:
+            try:
+                broadcast_callback("OPENCODE_CHAT_MESSAGE", {
+                    "session_id": sid,
+                    "role": "user",
+                    "message": prompt,
+                    "timestamp": now
+                }, project_id)
+            except Exception:
+                pass
+
+        return {
+            "status": "started",
+            "session_id": sid,
+            "running": True,
+            "model": session["model"],
+            "cwd": session["cwd"],
+            "messages_count": len(session["messages"])
+        }
+
+    def send_headless_message(
+        self,
+        session_id: str,
+        message: str,
+        broadcast_callback: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                self.start_headless_session(session_id=session_id)
+                session = self._sessions[session_id]
+
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            msg_obj = {
+                "id": f"msg-{uuid.uuid4().hex[:6]}",
+                "role": "user",
+                "content": message,
+                "timestamp": now
+            }
+            session["messages"].append(msg_obj)
+            session["updated_at"] = now
+            project_id = session.get("project_id")
+
+        if broadcast_callback:
+            try:
+                broadcast_callback("OPENCODE_CHAT_MESSAGE", {
+                    "session_id": session_id,
+                    "role": "user",
+                    "message": message,
+                    "timestamp": now
+                }, project_id)
+            except Exception:
+                pass
+
+        return {
+            "status": "sent",
+            "session_id": session_id,
+            "message": message,
+            "timestamp": now
+        }
+
+    def get_headless_status(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        with self._lock:
+            if session_id:
+                session = self._sessions.get(session_id)
+                if not session:
+                    return {
+                        "session_id": session_id,
+                        "status": "not_found",
+                        "running": False,
+                        "messages": [],
+                        "subagents": []
+                    }
+                return {
+                    "session_id": session["session_id"],
+                    "status": session.get("status", "running"),
+                    "running": session.get("running", True),
+                    "model": session.get("model"),
+                    "cwd": session.get("cwd"),
+                    "created_at": session.get("created_at"),
+                    "updated_at": session.get("updated_at"),
+                    "messages": list(session.get("messages", [])),
+                    "subagents": list(session.get("subagents", []))
+                }
+            
+            return {
+                "active_sessions": [
+                    {
+                        "session_id": s["session_id"],
+                        "status": s.get("status", "running"),
+                        "running": s.get("running", True),
+                        "model": s.get("model"),
+                        "messages_count": len(s.get("messages", [])),
+                        "subagents_count": len(s.get("subagents", []))
+                    }
+                    for s in self._sessions.values()
+                ],
+                "total_sessions": len(self._sessions),
+                "total_subagents": len(self._subagents)
+            }
+
+    def register_subagent(
+        self,
+        parent_session_id: str,
+        subagent_id: str,
+        role: str,
+        task: Optional[str] = None,
+        terminal_id: Optional[str] = None,
+        stream_id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+        broadcast_callback: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        with self._lock:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            subagent = {
+                "subagent_id": subagent_id,
+                "parent_session_id": parent_session_id,
+                "role": role,
+                "task": task or "",
+                "terminal_id": terminal_id or f"term-{subagent_id}",
+                "stream_id": stream_id or f"stream-{subagent_id}",
+                "status": "active",
+                "created_at": now,
+                "meta": meta or {}
+            }
+            self._subagents[subagent_id] = subagent
+
+            session = self._sessions.get(parent_session_id)
+            if session:
+                if subagent_id not in session.get("subagents", []):
+                    session["subagents"].append(subagent_id)
+                session["updated_at"] = now
+                project_id = session.get("project_id")
+            else:
+                project_id = None
+
+        if broadcast_callback:
+            try:
+                broadcast_callback("SUBAGENT_SPAWNED", subagent, project_id)
+            except Exception:
+                pass
+
+        return subagent
+
+    def list_subagents(self, parent_session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self._lock:
+            if parent_session_id:
+                return [
+                    dict(sub) for sub in self._subagents.values()
+                    if sub.get("parent_session_id") == parent_session_id
+                ]
+            return [dict(sub) for sub in self._subagents.values()]
+
+    def get_subagent(self, subagent_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            sub = self._subagents.get(subagent_id)
+            return dict(sub) if sub else None
+
+
+# Instância global padrão do OpenCodeManager
+default_manager = OpenCodeManager()
+
+def start_headless_session(*args, **kwargs) -> Dict[str, Any]:
+    return default_manager.start_headless_session(*args, **kwargs)
+
+def send_headless_message(*args, **kwargs) -> Dict[str, Any]:
+    return default_manager.send_headless_message(*args, **kwargs)
+
+def get_headless_status(*args, **kwargs) -> Dict[str, Any]:
+    return default_manager.get_headless_status(*args, **kwargs)
+
+def register_subagent(*args, **kwargs) -> Dict[str, Any]:
+    return default_manager.register_subagent(*args, **kwargs)
+
+def list_subagents(*args, **kwargs) -> List[Dict[str, Any]]:
+    return default_manager.list_subagents(*args, **kwargs)
+
+def get_subagent(*args, **kwargs) -> Optional[Dict[str, Any]]:
+    return default_manager.get_subagent(*args, **kwargs)
+
 

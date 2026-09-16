@@ -8,7 +8,7 @@ import asyncio
 import threading
 import mimetypes
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -1031,6 +1031,102 @@ def get_opencode_credentials():
     if opencode_manager:
         return opencode_manager.detect_opencode_credentials()
     return {"omniroute_url": None, "api_key": None, "model": None, "sources": []}
+
+
+# =========================================================================
+# OPENCODE HEADLESS REST ENDPOINTS & SUBAGENT TRACKING
+# =========================================================================
+
+@app.post("/api/opencode/headless/start")
+def post_opencode_headless_start(req: Optional[Dict[str, Any]] = Body(default={})):
+    """Inicia uma sessão headless do OpenCode em segundo plano sem bloquear threads."""
+    req_data = req or {}
+    session_id = req_data.get("session_id")
+    prompt = req_data.get("prompt")
+    cwd = req_data.get("cwd")
+    model = req_data.get("model")
+    project_id = req_data.get("project_id") or db.get_current_project_id()
+
+    if opencode_manager:
+        res = opencode_manager.start_headless_session(
+            session_id=session_id,
+            prompt=prompt,
+            cwd=cwd,
+            model=model,
+            project_id=project_id,
+            broadcast_callback=manager.broadcast_sync
+        )
+        return {
+            "status": "ok",
+            "session_id": res.get("session_id"),
+            "running": res.get("running", True),
+            "data": res
+        }
+    return {"status": "error", "message": "Módulo opencode_manager não disponível"}
+
+
+@app.post("/api/opencode/headless/message")
+def post_opencode_headless_message(req: Dict[str, Any] = Body(...)):
+    """Envia uma mensagem do usuário para a sessão headless e emite OPENCODE_CHAT_MESSAGE."""
+    session_id = req.get("session_id")
+    message = req.get("message", "")
+    if not session_id:
+        return {"status": "error", "message": "session_id é obrigatório"}
+
+    if opencode_manager:
+        res = opencode_manager.send_headless_message(
+            session_id=session_id,
+            message=message,
+            broadcast_callback=manager.broadcast_sync
+        )
+        return {
+            "status": "ok",
+            "session_id": session_id,
+            "message": message,
+            "data": res
+        }
+    return {"status": "error", "message": "Módulo opencode_manager não disponível"}
+
+
+@app.get("/api/opencode/headless/subagents")
+def get_opencode_headless_subagents(session_id: Optional[str] = None):
+    """Lista subagentes ativos e suas respectivas sessões de terminal e stream."""
+    if opencode_manager:
+        subagents = opencode_manager.list_subagents(parent_session_id=session_id)
+        return {
+            "status": "ok",
+            "subagents": subagents,
+            "count": len(subagents)
+        }
+    return {"status": "error", "subagents": [], "count": 0, "message": "Módulo opencode_manager não disponível"}
+
+
+@app.post("/api/opencode/headless/subagents")
+def post_opencode_headless_subagents(req: Dict[str, Any] = Body(...)):
+    """Registra dinamicamente um subagente e emite evento WebSocket SUBAGENT_SPAWNED."""
+    if opencode_manager:
+        subagent = opencode_manager.register_subagent(
+            parent_session_id=req.get("parent_session_id", req.get("session_id", "default")),
+            subagent_id=req.get("subagent_id", req.get("id")),
+            role=req.get("role", "builder"),
+            task=req.get("task", ""),
+            terminal_id=req.get("terminal_id"),
+            stream_id=req.get("stream_id"),
+            meta=req.get("meta"),
+            broadcast_callback=manager.broadcast_sync
+        )
+        return {"status": "ok", "subagent": subagent}
+    return {"status": "error", "message": "Módulo opencode_manager não disponível"}
+
+
+@app.get("/api/opencode/headless/status")
+def get_opencode_headless_status(session_id: Optional[str] = None):
+    """Retorna o status atual da sessão headless ou estatísticas de sessões ativas."""
+    if opencode_manager:
+        status_info = opencode_manager.get_headless_status(session_id)
+        return {"status": "ok", "data": status_info}
+    return {"status": "error", "message": "Módulo opencode_manager não disponível"}
+
 
 
 # =========================================================================
