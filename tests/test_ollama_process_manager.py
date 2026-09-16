@@ -93,7 +93,7 @@ class TestOllamaProcessManager(unittest.TestCase):
     @patch.object(OllamaProcessManager, "get_binary_path")
     @patch("subprocess.Popen")
     def test_start_spawns_process_when_port_closed(self, mock_popen, mock_get_bin, mock_is_port_open):
-        mock_is_port_open.return_value = False
+        mock_is_port_open.side_effect = [False, True]
         mock_get_bin.return_value = "/usr/local/bin/ollama"
 
         mock_proc = MagicMock()

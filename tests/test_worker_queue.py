@@ -13,10 +13,17 @@ if SERVER_DIR not in sys.path:
 from workers.worker_queue import LocalWorkerQueue, local_worker_queue
 
 
+import tempfile
+
 class TestLocalWorkerQueue(unittest.TestCase):
     def setUp(self):
-        # Instância isolada para cada caso de teste
-        self.queue = LocalWorkerQueue()
+        # Instância isolada para cada caso de teste com arquivo de snapshot temporário
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.snapshot_path = os.path.join(self.temp_dir.name, "worker_queue.json")
+        self.queue = LocalWorkerQueue(snapshot_path=self.snapshot_path)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
 
     def test_initial_state(self):
         """Verifica se a fila inicia vazia e com a GPU livre."""
