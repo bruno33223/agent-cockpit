@@ -9,6 +9,7 @@ import shutil
 import socket
 import subprocess
 import threading
+import time
 from collections import deque
 from typing import Dict, List, Any, Optional, Callable
 
@@ -39,6 +40,7 @@ class OllamaProcessManager:
         self._log_callbacks: List[Callable[[str], Any]] = []
         self._reader_thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
 
     def get_binary_path(self) -> Optional[str]:
         """
@@ -125,90 +127,131 @@ class OllamaProcessManager:
         except Exception as e:
             self._append_log(f"[OllamaProcessManager] Erro no fluxo de logs: {e}")
 
-    def start(self) -> Dict[str, Any]:
+    def wait_for_port(
+        self,
+        port: Optional[int] = None,
+        host: Optional[str] = None,
+        timeout: float = 10.0,
+        check_interval: float = 0.1,
+    ) -> bool:
+        """
+        Realiza polling ativo até que a porta TCP esteja aberta ou o timeout expire.
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.is_port_open(port=port, host=host):
+                return True
+            time.sleep(check_interval)
+        return False
+
+    def start(self, startup_timeout: float = 10.0) -> Dict[str, Any]:
         """
         Inicia o servidor Ollama caso não esteja em execução.
         Evita criar processos duplicados se a porta já estiver aberta ou se o
         subprocesso gerenciado já estiver ativo.
+        Protegido por _lifecycle_lock para prevenir concorrência.
         """
-        # Se o subprocesso gerenciado já estiver rodando
-        if self.process is not None and self.process.poll() is None:
+        with self._lifecycle_lock:
+            # Se o subprocesso gerenciado já estiver rodando
+            if self.process is not None and self.process.poll() is None:
+                return {
+                    "status": "already_running",
+                    "running": True,
+                    "managed": True,
+                    "pid": self.process.pid,
+                    "port": self.port,
+                    "message": "Subprocesso Ollama gerenciado já está em execução.",
+                }
+
+            # Se a porta já responder (ex: Ollama iniciado externamente via systemd/docker)
+            if self.is_port_open(self.port, self.host):
+                return {
+                    "status": "already_running",
+                    "running": True,
+                    "managed": False,
+                    "pid": None,
+                    "port": self.port,
+                    "message": f"Ollama já está ouvindo na porta {self.port} (processo externo).",
+                }
+
+            bin_path = self.get_binary_path()
+            if not bin_path:
+                raise RuntimeError(
+                    "Ollama não encontrado no PATH nem nos caminhos padrão (/usr/local/bin/ollama)."
+                )
+
+            proc = subprocess.Popen(
+                [bin_path, "serve"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            self.process = proc
+
+            self._reader_thread = threading.Thread(target=self._stream_logs, daemon=True)
+            self._reader_thread.start()
+
+            # Polling ativo para garantir que o serviço abriu a porta TCP antes de retornar sucesso
+            if not self.wait_for_port(port=self.port, host=self.host, timeout=startup_timeout):
+                # Falha ao abrir porta no prazo esperado: limpa o processo iniciado
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2.0)
+                except Exception:
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=2.0)
+                    except Exception:
+                        pass
+                finally:
+                    self.process = None
+                raise TimeoutError(
+                    f"Ollama foi iniciado (PID {proc.pid}), mas a porta TCP {self.port} "
+                    f"não respondeu após {startup_timeout}s."
+                )
+
             return {
-                "status": "already_running",
+                "status": "started",
                 "running": True,
                 "managed": True,
                 "pid": self.process.pid,
                 "port": self.port,
-                "message": "Subprocesso Ollama gerenciado já está em execução.",
+                "message": f"Subprocesso Ollama iniciado com PID {self.process.pid}.",
             }
-
-        # Se a porta já responder (ex: Ollama iniciado externamente via systemd/docker)
-        if self.is_port_open(self.port, self.host):
-            return {
-                "status": "already_running",
-                "running": True,
-                "managed": False,
-                "pid": None,
-                "port": self.port,
-                "message": f"Ollama já está ouvindo na porta {self.port} (processo externo).",
-            }
-
-        bin_path = self.get_binary_path()
-        if not bin_path:
-            raise RuntimeError(
-                "Ollama não encontrado no PATH nem nos caminhos padrão (/usr/local/bin/ollama)."
-            )
-
-        self.process = subprocess.Popen(
-            [bin_path, "serve"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-
-        self._reader_thread = threading.Thread(target=self._stream_logs, daemon=True)
-        self._reader_thread.start()
-
-        return {
-            "status": "started",
-            "running": True,
-            "managed": True,
-            "pid": self.process.pid,
-            "port": self.port,
-            "message": f"Subprocesso Ollama iniciado com PID {self.process.pid}.",
-        }
 
     def stop(self, timeout: float = 5.0) -> Dict[str, Any]:
         """
         Encerra graciosamente o processo Ollama com SIGTERM, aplicando fallback para
         SIGKILL se o processo não responder dentro do tempo limite.
+        Protegido por _lifecycle_lock para prevenir condições de corrida.
         """
-        if self.process is None or self.process.poll() is not None:
-            self.process = None
+        with self._lifecycle_lock:
+            if self.process is None or self.process.poll() is not None:
+                self.process = None
+                return {
+                    "status": "not_running",
+                    "running": False,
+                    "message": "Nenhum subprocesso Ollama gerenciado em execução.",
+                }
+
+            proc = self.process
+            status = "stopped"
+            try:
+                proc.terminate()
+                proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=timeout)
+                status = "killed"
+            finally:
+                self.process = None
+
             return {
-                "status": "not_running",
+                "status": status,
                 "running": False,
-                "message": "Nenhum subprocesso Ollama gerenciado em execução.",
+                "message": f"Subprocesso Ollama encerrado com sucesso ({status}).",
             }
-
-        proc = self.process
-        status = "stopped"
-        try:
-            proc.terminate()
-            proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=timeout)
-            status = "killed"
-        finally:
-            self.process = None
-
-        return {
-            "status": status,
-            "running": False,
-            "message": f"Subprocesso Ollama encerrado com sucesso ({status}).",
-        }
 
     def get_status(self) -> Dict[str, Any]:
         """
