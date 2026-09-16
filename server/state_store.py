@@ -18,17 +18,38 @@ STATES_DIR = os.getenv("COCKPIT_STATES_DIR") or os.path.join(BASE_DIR, 'states')
 INDEX_FILE = os.path.join(STATES_DIR, 'projects_index.json')
 LEGACY_STATE_FILE = os.getenv("COCKPIT_LEGACY_FILE") or os.path.join(BASE_DIR, 'workflow_state.json')
 
+def normalize_canonical_path(path: str) -> str:
+    """Resolve caminhos canônicos e redireciona pastas worktrees (.worktrees/slice-N) para a raiz do repositório pai."""
+    abs_p = os.path.abspath(os.path.expanduser(path))
+    # Se o caminho apontar para dentro de uma pasta .worktrees (ex: /repo/.worktrees/slice-2 -> /repo)
+    match = re.match(r'^(.*?)[/\\]\.worktrees(?:[/\\]|$)', abs_p)
+    if match:
+        return os.path.abspath(match.group(1))
+    return abs_p
+
 def canonical_project_id(project_path_or_name: Optional[str]) -> str:
     """Gera um identificador estável e canônico para um projeto a partir do seu caminho ou nome."""
     if not project_path_or_name:
         return "default"
     
     val = project_path_or_name.strip()
+    # Se for identificador de slice (ex: slice-1, slice-2), fatias não formam projetos independentes
+    if re.match(r'^slice-\d+$', val):
+        return "default"
+
+    # Se for caminho contendo .worktrees, mapeia de volta para a raiz do repositório pai
+    if ".worktrees" in val:
+        abs_path = normalize_canonical_path(val)
+        basename = os.path.basename(abs_path) or "workspace"
+        slug = re.sub(r'[^a-zA-Z0-9_\-]', '-', basename).strip('-').lower() or "workspace"
+        path_hash = hashlib.sha256(abs_path.encode('utf-8')).hexdigest()[:8]
+        return f"{slug}-{path_hash}"
+
     # Se já é um project_id existente no formato 'default' ou 'slug-8hexchars'
     if val == "default" or bool(re.search(r'-[0-9a-f]{8}$', val)):
         return val
 
-    abs_path = os.path.abspath(os.path.expanduser(val))
+    abs_path = normalize_canonical_path(val)
     basename = os.path.basename(abs_path) or "workspace"
     slug = re.sub(r'[^a-zA-Z0-9_\-]', '-', basename).strip('-').lower() or "workspace"
     path_hash = hashlib.sha256(abs_path.encode('utf-8')).hexdigest()[:8]
@@ -406,12 +427,17 @@ class StateStore:
 
     def resolve_project_id(self, project_id: Optional[str] = None, project_root: Optional[str] = None) -> str:
         if project_id:
+            val = project_id.strip()
+            if re.match(r'^slice-\d+$', val):
+                return self.get_current_project_id()
+            if ".worktrees" in val:
+                return canonical_project_id(val)
             index_data = self._read_index()
-            if project_id in index_data.get("projects", {}) or os.path.exists(self._get_project_file(project_id)):
-                return project_id
-            if "/" not in project_id and "\\" not in project_id:
-                return project_id
-            return canonical_project_id(project_id)
+            if val in index_data.get("projects", {}) or os.path.exists(self._get_project_file(val)):
+                return val
+            if "/" not in val and "\\" not in val:
+                return val
+            return canonical_project_id(val)
         if project_root:
             return canonical_project_id(project_root)
         return self.get_current_project_id()
@@ -843,7 +869,25 @@ class StateStore:
     def reset_state(self, project_id: Optional[str] = None) -> Dict[str, Any]:
         target_pid = self.resolve_project_id(project_id)
         with self.lock:
-            state = default_initial_state("Projeto Resetado")
+            old_state = self.get_state(target_pid)
+            index_data = self._read_index()
+            pmeta = index_data.get("projects", {}).get(target_pid, {})
+
+            saved_root = old_state.get("project_root") or pmeta.get("project_root")
+            epic_name = old_state.get("epic", {}).get("name") or pmeta.get("name") or "Projeto Resetado"
+
+            state = default_initial_state(project_name=epic_name, project_root=saved_root)
+            if saved_root:
+                state["project_root"] = saved_root
+
+            # Preserva metadados estruturais como local_worker, governance_settings e settings
+            if old_state.get("local_worker"):
+                state["local_worker"] = old_state.get("local_worker")
+            if old_state.get("governance_settings"):
+                state["governance_settings"] = old_state.get("governance_settings")
+            if old_state.get("settings"):
+                state["settings"] = old_state.get("settings")
+
             self._save_state(state, target_pid)
         self._notify("STATE_RESET", state, target_pid)
         self._notify("STATE_FULL", state, target_pid)
