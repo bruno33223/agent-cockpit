@@ -213,7 +213,40 @@ class StateStore:
             return {"current_project_id": "default", "projects": {}}
         try:
             with open(self.index_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+            
+            # Saneamento automático: Garante unicidade estrita de projetos por pasta física
+            projects = data.get("projects", {})
+            current_id = data.get("current_project_id", "default")
+            seen_roots = {}
+            cleaned_projects = {}
+            id_mapping = {}
+
+            for pid, pmeta in list(projects.items()):
+                p_root = pmeta.get("project_root")
+                norm_root = os.path.realpath(os.path.abspath(p_root)) if p_root and os.path.exists(p_root) else p_root
+                if norm_root:
+                    if norm_root in seen_roots:
+                        existing_pid = seen_roots[norm_root]
+                        # Se o atual for o selecionado, prefira o atual ou mapeie
+                        if pid == current_id:
+                            id_mapping[existing_pid] = pid
+                            cleaned_projects[pid] = pmeta
+                            cleaned_projects.pop(existing_pid, None)
+                            seen_roots[norm_root] = pid
+                        else:
+                            id_mapping[pid] = existing_pid
+                        continue
+                    seen_roots[norm_root] = pid
+                cleaned_projects[pid] = pmeta
+
+            if len(cleaned_projects) != len(projects):
+                data["projects"] = cleaned_projects
+                if current_id in id_mapping:
+                    data["current_project_id"] = id_mapping[current_id]
+                self._save_index(data)
+
+            return data
         except Exception:
             return {"current_project_id": "default", "projects": {}}
 
@@ -244,10 +277,29 @@ class StateStore:
         index_data = self._read_index()
         projects = index_data.setdefault("projects", {})
         
-        projects[project_id] = {
-            "id": project_id,
-            "name": project_name or (os.path.basename(project_root) if project_root else "Projeto Sem Nome"),
-            "project_root": project_root,
+        norm_root = os.path.realpath(os.path.abspath(project_root)) if project_root and os.path.exists(project_root) else project_root
+        
+        # Unicidade por pasta: se outro ID já aponta para esta mesma pasta física, reutiliza/funde
+        target_id = project_id
+        if norm_root:
+            for existing_id, meta in list(projects.items()):
+                m_root = meta.get("project_root")
+                if m_root:
+                    existing_norm = os.path.realpath(os.path.abspath(m_root)) if os.path.exists(m_root) else m_root
+                    if existing_norm == norm_root and existing_id != project_id:
+                        if existing_id == index_data.get("current_project_id"):
+                            target_id = existing_id
+                        else:
+                            projects.pop(existing_id, None)
+                        break
+
+        folder_name = os.path.basename(norm_root) if norm_root else "Projeto Sem Nome"
+        display_name = folder_name if folder_name else (project_name or "Projeto Sem Nome")
+
+        projects[target_id] = {
+            "id": target_id,
+            "name": display_name,
+            "project_root": norm_root or project_root,
             "epic_name": state_data.get("epic", {}).get("name", "Épico"),
             "epic_status": state_data.get("epic", {}).get("status", "PLANNING"),
             "total_slices": len(nodes),

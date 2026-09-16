@@ -201,25 +201,7 @@
               <span class="worktree-section-count" id="pinned-count">1</span>
             </div>
             <div class="worktree-sidebar-list worktree-pinned-list" id="worktree-pinned-list">
-              <div class="worktree-card active" id="pinned-main-card" data-project-id="default" tabindex="0">
-                <div class="worktree-header">
-                  <span class="worktree-title" id="pinned-worktree-title">agent-cockpit</span>
-                  <span class="agent-state-dot done" title="Status: Online / Conectado"></span>
-                </div>
-                <div class="worktree-meta-row">
-                  <span class="worktree-repo-tag" id="pinned-repo-tag">cockpit</span>
-                  <span class="worktree-branch">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="6" y1="3" x2="6" y2="15"></line>
-                      <circle cx="18" cy="6" r="3"></circle>
-                      <circle cx="6" cy="18" r="3"></circle>
-                      <path d="M18 9a9 9 0 0 1-9 9"></path>
-                    </svg>
-                    main
-                  </span>
-                  <span class="worktree-time">pinned</span>
-                </div>
-              </div>
+              <!-- Renderizado dinamicamente via renderWorktreeSidebar() -->
             </div>
           </div>
 
@@ -245,22 +227,6 @@
 
       <!-- RODAPÉ DA BARRA LATERAL (.sidebar-footer) -->
       <div class="sidebar-footer">
-        <button class="sidebar-action-btn" id="btn-autostart" data-tooltip="Status do Autostart">
-          <svg class="action-svg autostart-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-            <line x1="12" y1="2" x2="12" y2="12"></line>
-          </svg>
-          <span class="autostart-dot"></span>
-          <span class="tab-label autostart-text">Autostart: ...</span>
-        </button>
-        <button class="sidebar-action-btn gate-btn pending" id="btn-human-gate" data-tooltip="Portão Humano Obrigatório">
-          <svg class="action-svg gate-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-          <span class="tab-label gate-text">Gate: Pendente</span>
-        </button>
-
         <!-- Botão de configurações (#nav-footer-settings) e meta -->
         <div class="sidebar-footer-row">
           <button class="sidebar-footer-btn" id="nav-footer-settings" title="Configurações (Settings)" data-tooltip="Configurações">
@@ -901,14 +867,57 @@
             </div>
 
             <div class="terminal-view-actions">
-              <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Instanciar novo Orquestrador (+ Novo Terminal)">
-                <span class="sr-only">+ Novo Terminal</span>
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
+              <button class="action-btn secondary btn-sm" id="btn-active-terminals" title="Ver e organizar terminais ativos do projeto atual">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                  <polyline points="2 12 12 17 22 12"></polyline>
                 </svg>
-                <span>+ Novo Orquestrador</span>
+                <span>Terminais Ativos (<span id="active-terminals-count">0</span>)</span>
               </button>
+              <div class="new-terminal-wrap" style="position: relative; display: inline-block;">
+                <button class="action-btn primary btn-sm" id="btn-new-terminal" title="Abrir novo terminal">
+                  <span>+ Novo Terminal</span>
+                </button>
+                <div class="grid-config-dropdown new-terminal-dropdown" id="new-terminal-dropdown" style="display: none; width: 230px; right: 0; left: auto; top: calc(100% + 6px);">
+                  <div class="grid-config-item" data-terminal-type="opencode" data-role="agent">
+                    <span style="font-size: 14px;">⚡</span>
+                    <div>
+                      <div style="font-weight: 600;">OpenCode</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Agente autônomo OpenCode</div>
+                    </div>
+                  </div>
+                  <div class="grid-config-item" data-terminal-type="claude" data-role="agent">
+                    <span style="font-size: 14px;">🧠</span>
+                    <div>
+                      <div style="font-weight: 600;">Claude Code</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Assistente Claude Code</div>
+                    </div>
+                  </div>
+                  <div class="grid-config-item" data-terminal-type="codex" data-role="agent">
+                    <span style="font-size: 14px;">⚙️</span>
+                    <div>
+                      <div style="font-weight: 600;">Codex</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">CLI Codex de código</div>
+                    </div>
+                  </div>
+                  <div class="grid-config-item" data-terminal-type="bash" data-role="agent">
+                    <span style="font-size: 14px;">💻</span>
+                    <div>
+                      <div style="font-weight: 600;">Terminal Bash</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Shell Linux padrão</div>
+                    </div>
+                  </div>
+                  <div style="height: 1px; background: var(--border-subtle); margin: 4px 0;"></div>
+                  <div class="grid-config-item" data-terminal-type="bash" data-role="orchestrator">
+                    <span style="font-size: 14px;">⚡</span>
+                    <div>
+                      <div style="font-weight: 600;">Orquestrador Zeus</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Staff Orchestrator Blueprint</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- COMPATIBILIDADE DEFENSIVA PARA TESTES E SCRIPTS LEGADOS (OCULTO) -->
@@ -1742,7 +1751,19 @@
           </div>
           <div class="ag-panel-content">
             <div class="ag-setting-section">
-              <span class="ag-section-title">Execution</span>
+              <span class="ag-section-title">Execution & Sistema</span>
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <span class="ag-setting-label">Iniciar com o Sistema Operacional (Autostart)</span>
+                  <span class="ag-setting-desc">Inicializa o Agent Cockpit em background automaticamente no boot do sistema operacional.</span>
+                </div>
+                <div class="ag-setting-control">
+                  <div class="ag-toggle-group" id="ag-group-system-autostart">
+                    <button class="ag-btn-toggle" id="ag-btn-autostart-on">Ativo</button>
+                    <button class="ag-btn-toggle active" id="ag-btn-autostart-off">Desativado</button>
+                  </div>
+                </div>
+              </div>
               <div class="ag-setting-row">
                 <div class="ag-setting-info">
                   <span class="ag-setting-label">Autostart de Fatias</span>
@@ -1758,7 +1779,22 @@
             </div>
 
             <div class="ag-setting-section">
-              <span class="ag-section-title">Agent Settings</span>
+              <span class="ag-section-title">Governança & Human Gate</span>
+              <div class="ag-setting-row">
+                <div class="ag-setting-info">
+                  <span class="ag-setting-label">Portão Humano (Human Gate)</span>
+                  <span class="ag-setting-desc">Status da aprovação do operador humano e liberação manual do portão.</span>
+                </div>
+                <div class="ag-setting-control" style="display: flex; gap: 8px; align-items: center;">
+                  <span class="gatekeeper-badge pending" id="ag-gate-badge">Gate: Pendente</span>
+                  <button class="btn btn-primary btn-sm" id="btn-ag-approve-gate" title="Aprovar gate de entrega manualmente">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Aprovar Gate
+                  </button>
+                </div>
+              </div>
               <div class="ag-setting-row">
                 <div class="ag-setting-info">
                   <span class="ag-setting-label">Security Preset</span>
@@ -1999,6 +2035,50 @@
           </div>
         </div>
       </section>
+    </div>
+  <!-- MODAL: TERMINAIS ATIVOS DO PROJETO -->
+  <div class="modal-backdrop" id="modal-active-terminals" style="display: none;">
+    <div class="active-terminals-dialog" style="max-width: 680px; width: 90%; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh;">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <h3 id="active-terminals-modal-title" style="margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+            Terminais Ativos
+          </h3>
+          <div id="active-terminals-project-path" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-active-terminals" aria-label="Fechar" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary);">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+        <div class="active-terminals-list" id="active-terminals-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Renderizado dinamicamente via terminal_workspace.js -->
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface);">
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" id="btn-active-terminals-show-all">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            Exibir Todos
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btn-active-terminals-hide-all">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Minimizar Todos
+          </button>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-active-terminals-close-footer">Fechar</button>
+      </div>
     </div>
   </div>
 

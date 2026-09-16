@@ -10,13 +10,7 @@ import { escapeHtml } from './ui_utils.js';
 // AUTOSTART LOGIC
 let autostartEnabled = false;
 
-function getBtnAutostart() {
-  return document.getElementById('btn-autostart');
-}
-
 export async function checkAutostartStatus() {
-  const btnAutostart = getBtnAutostart();
-  if (!btnAutostart) return;
   try {
     const res = await apiFetch('/api/autostart');
     if (res.ok) {
@@ -30,18 +24,74 @@ export async function checkAutostartStatus() {
 
 export function updateAutostartUI(enabled) {
   autostartEnabled = !!enabled;
-  const btnAutostart = getBtnAutostart();
-  if (!btnAutostart) return;
-  btnAutostart.classList.remove('loading');
-  const label = btnAutostart.querySelector('.autostart-text');
-  if (autostartEnabled) {
-    btnAutostart.className = 'sidebar-action-btn autostart-btn enabled';
-    if (label) label.textContent = 'Autostart: Ativo';
-    btnAutostart.title = 'Agent Cockpit inicia automaticamente com o sistema operacional. Clique para desativar.';
-  } else {
-    btnAutostart.className = 'sidebar-action-btn autostart-btn disabled';
-    if (label) label.textContent = 'Autostart: Desligado';
-    btnAutostart.title = 'Inicialização com o sistema está desativada. Clique para ativar.';
+  const btnOn = document.getElementById('ag-btn-autostart-on');
+  const btnOff = document.getElementById('ag-btn-autostart-off');
+  if (btnOn && btnOff) {
+    if (autostartEnabled) {
+      btnOn.classList.add('active');
+      btnOff.classList.remove('active');
+    } else {
+      btnOff.classList.add('active');
+      btnOn.classList.remove('active');
+    }
+  }
+}
+
+export async function setSystemAutostart(enable) {
+  try {
+    const res = await apiFetch('/api/autostart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !!enable })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      updateAutostartUI(data.enabled);
+    }
+  } catch (err) {
+    console.error('[Autostart] Falha ao alterar autostart:', err);
+  }
+}
+
+export function updateHumanGateUI(isApproved) {
+  const badge = document.getElementById('ag-gate-badge');
+  const btnApprove = document.getElementById('btn-ag-approve-gate');
+  if (badge) {
+    if (isApproved) {
+      badge.className = 'gatekeeper-badge approved';
+      badge.textContent = 'Gate: Liberado / Aprovado';
+      if (btnApprove) btnApprove.style.display = 'none';
+    } else {
+      badge.className = 'gatekeeper-badge pending';
+      badge.textContent = 'Gate: Pendente';
+      if (btnApprove) btnApprove.style.display = 'inline-flex';
+    }
+  }
+}
+
+export async function approveHumanGate() {
+  try {
+    const btnApprove = document.getElementById('btn-ag-approve-gate');
+    if (btnApprove) {
+      btnApprove.disabled = true;
+      btnApprove.innerHTML = 'Aprovando...';
+    }
+    const res = await apiFetch('/api/gates/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gate_name: 'gate_ship_approved', project_id: currentProjectId })
+    });
+    if (res.ok) {
+      updateHumanGateUI(true);
+    }
+  } catch (err) {
+    console.error('[HumanGate] Falha ao aprovar portão:', err);
+  } finally {
+    const btnApprove = document.getElementById('btn-ag-approve-gate');
+    if (btnApprove) {
+      btnApprove.disabled = false;
+      btnApprove.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Aprovar Gate';
+    }
   }
 }
 
@@ -729,6 +779,27 @@ export async function saveGovernanceSetting(updates) {
 }
 
 export function initGovernanceEvents() {
+  // Autostart com o Sistema Operacional
+  const btnSystemAutoOn = document.getElementById('ag-btn-autostart-on');
+  const btnSystemAutoOff = document.getElementById('ag-btn-autostart-off');
+  if (btnSystemAutoOn && btnSystemAutoOff) {
+    btnSystemAutoOn.addEventListener('click', () => {
+      setSystemAutostart(true);
+    });
+    btnSystemAutoOff.addEventListener('click', () => {
+      setSystemAutostart(false);
+    });
+  }
+
+  // Aprovação Manual de Human Gate
+  const btnApproveGate = document.getElementById('btn-ag-approve-gate');
+  if (btnApproveGate) {
+    btnApproveGate.addEventListener('click', () => {
+      approveHumanGate();
+    });
+  }
+
+  // Autostart de fatias (Orquestrador)
   const btnAutoOn = document.getElementById('ag-toggle-autostart-on');
   const btnAutoOff = document.getElementById('ag-toggle-autostart-off');
   if (btnAutoOn && btnAutoOff) {
@@ -763,6 +834,12 @@ export function initGovernanceEvents() {
     artifactPolicy.addEventListener('change', () => {
       saveGovernanceSetting({ artifact_review_policy: artifactPolicy.value });
     });
+  }
+
+  // Carrega status inicial
+  checkAutostartStatus();
+  if (state && state.human_gates) {
+    updateHumanGateUI(state.human_gates.gate_ship_approved);
   }
 }
 

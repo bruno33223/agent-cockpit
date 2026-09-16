@@ -4228,19 +4228,40 @@ body {
   position: relative;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
   min-height: 0;
   min-width: 0;
 }
 
-.pane-body .xterm {
+.xterm-mount {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   width: 100%;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.pane-body .xterm {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
   font-family: var(--font-mono) !important;
   color: var(--terminal-fg, var(--text-primary)) !important;
 }
 
 .pane-body .xterm-viewport {
   background-color: var(--terminal-bg, var(--bg-card)) !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .pane-body .xterm-rows {
@@ -4249,6 +4270,7 @@ body {
 
 .pane-body .xterm-screen {
   background-color: var(--terminal-bg, var(--bg-card)) !important;
+  width: 100% !important;
 }
 
 .omniroute-feedback.success {
@@ -7602,8 +7624,10 @@ body.sidebar-pinned-hidden .main-content {
 
 .terminal-workspace-grid.layout-free .terminal-pane {
   position: absolute;
-  min-width: 540px;
-  min-height: 420px;
+  width: 580px;
+  height: 440px;
+  min-width: 380px;
+  min-height: 260px;
   resize: both;
 }
 
@@ -8241,87 +8265,46 @@ body.sidebar-pinned-hidden .main-content {
 .ag-feedback-msg {
   font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 1.5;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 6px;
   margin-top: 10px;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  word-break: break-word;
-}
-
-.ag-feedback-msg.testing {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
 }
 
 .ag-feedback-msg.success {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
   color: #34d399;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
 }
 
 .ag-feedback-msg.error {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #f87171;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  color: #fb7185;
 }
 
-/* Container de Conectores OmniRoute & Badges */
-.omniroute-connector-container,
-.ag-omniroute-connector {
+.ag-feedback-msg.testing {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.omniroute-connector-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: 8px;
-  padding: 16px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  gap: 8px;
 }
 
-.omniroute-connector-container:hover,
-.ag-omniroute-connector:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.omniroute-badge,
-.ag-omniroute-badge {
+.omniroute-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
+  font-size: 10px;
+  padding: 2px 6px;
   border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.omniroute-badge.online,
-.ag-omniroute-badge.online {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #34d399;
-}
-
-.omniroute-badge.offline,
-.ag-omniroute-badge.offline {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #f87171;
-}
-
-.omniroute-badge.testing,
-.ag-omniroute-badge.testing {
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #60a5fa;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
 }
 
 .ag-badge-value {

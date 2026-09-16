@@ -198,6 +198,55 @@ export class TerminalWorkspaceManager {
     return list;
   }
 
+  getAgentCommand(agentType) {
+    switch (agentType) {
+      case 'opencode':
+        return 'opencode\n';
+      case 'claude':
+        return 'claude\n';
+      case 'codex':
+        return 'codex\n';
+      case 'bash':
+      default:
+        return '';
+    }
+  }
+
+  findNextFreeSlot() {
+    const activeSessions = this.getActiveContextSessions();
+    const occupied = [];
+    activeSessions.forEach(s => {
+      if (s.elPane && s.elPane.style.display !== 'none') {
+        const x = parseFloat(s.elPane.style.left) || (s.customPos && s.customPos.x) || 0;
+        const y = parseFloat(s.elPane.style.top) || (s.customPos && s.customPos.y) || 0;
+        occupied.push({ x, y });
+      }
+    });
+
+    const slotWidth = 600;
+    const slotHeight = 460;
+    const startX = 24;
+    const startY = 24;
+    const maxCols = 3;
+
+    for (let index = 0; index < 100; index++) {
+      const col = index % maxCols;
+      const row = Math.floor(index / maxCols);
+      const testX = startX + col * slotWidth;
+      const testY = startY + row * slotHeight;
+
+      const collides = occupied.some(pos => {
+        return Math.abs(pos.x - testX) < (slotWidth - 40) && Math.abs(pos.y - testY) < (slotHeight - 40);
+      });
+
+      if (!collides) {
+        return { x: testX, y: testY };
+      }
+    }
+
+    return { x: startX + (activeSessions.length * 30), y: startY + (activeSessions.length * 30) };
+  }
+
   applyDynamicSplit() {
     if (!this.gridContainer) return;
     const count = this.getActiveContextSessions().length;
@@ -280,7 +329,29 @@ export class TerminalWorkspaceManager {
           s.elPane.style.position = '';
           s.elPane.style.left = '';
           s.elPane.style.top = '';
+          s.elPane.style.width = '';
+          s.elPane.style.height = '';
           s.elPane.style.zIndex = '';
+        }
+      });
+    } else {
+      this.getActiveContextSessions().forEach(s => {
+        if (s.elPane) {
+          if (!s.customPos) {
+            const slot = this.findNextFreeSlot();
+            s.elPane.style.position = 'absolute';
+            s.elPane.style.left = `${slot.x}px`;
+            s.elPane.style.top = `${slot.y}px`;
+            s.elPane.style.width = '580px';
+            s.elPane.style.height = '440px';
+            s.customPos = slot;
+          } else {
+            s.elPane.style.position = 'absolute';
+            s.elPane.style.left = `${s.customPos.x}px`;
+            s.elPane.style.top = `${s.customPos.y}px`;
+            s.elPane.style.width = `${s.customWidth || 580}px`;
+            s.elPane.style.height = `${s.customHeight || 440}px`;
+          }
         }
       });
     }
@@ -418,9 +489,42 @@ export class TerminalWorkspaceManager {
       }, { passive: false });
     }
 
-    // Botão novo orquestrador (+ Novo Orquestrador)
+    // Botão e Dropdown Novo Terminal (+ Novo Terminal)
     const btnNewTerm = document.getElementById('btn-new-terminal');
-    if (btnNewTerm) {
+    const newTermDropdown = document.getElementById('new-terminal-dropdown');
+    if (btnNewTerm && newTermDropdown) {
+      btnNewTerm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        newTermDropdown.style.display = (newTermDropdown.style.display === 'none' || !newTermDropdown.style.display) ? 'block' : 'none';
+      });
+
+      newTermDropdown.querySelectorAll('.grid-config-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const agentType = item.getAttribute('data-terminal-type') || 'bash';
+          const role = item.getAttribute('data-role') || 'agent';
+          const name = item.querySelector('div div') ? item.querySelector('div div').textContent.trim() : 'Terminal';
+
+          if (currentProjectId) {
+            recordRecentProject(currentProjectId);
+            renderWorktreeSidebar();
+          }
+
+          this.createSession({
+            agentType,
+            role,
+            name,
+            cwd: this.getActiveProjectRoot()
+          });
+
+          newTermDropdown.style.display = 'none';
+        });
+      });
+
+      document.addEventListener('click', () => {
+        newTermDropdown.style.display = 'none';
+      });
+    } else if (btnNewTerm) {
       btnNewTerm.addEventListener('click', () => {
         if (currentProjectId) {
           recordRecentProject(currentProjectId);
@@ -441,6 +545,36 @@ export class TerminalWorkspaceManager {
           btnToggleSidebar.classList.toggle('active', isCollapsed);
           this.fitAll();
         }
+      });
+    }
+
+    // Botão e Modal de Terminais Ativos
+    const btnActiveTerm = document.getElementById('btn-active-terminals');
+    if (btnActiveTerm) {
+      btnActiveTerm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openActiveTerminalsModal();
+      });
+    }
+
+    const btnCloseModal = document.getElementById('btn-close-active-terminals');
+    const btnCloseFooter = document.getElementById('btn-active-terminals-close-footer');
+    if (btnCloseModal) btnCloseModal.addEventListener('click', () => this.closeActiveTerminalsModal());
+    if (btnCloseFooter) btnCloseFooter.addEventListener('click', () => this.closeActiveTerminalsModal());
+
+    const btnShowAll = document.getElementById('btn-active-terminals-show-all');
+    if (btnShowAll) {
+      btnShowAll.addEventListener('click', () => {
+        this.showAllSessions();
+        this.renderActiveTerminalsList();
+      });
+    }
+
+    const btnHideAll = document.getElementById('btn-active-terminals-hide-all');
+    if (btnHideAll) {
+      btnHideAll.addEventListener('click', () => {
+        this.hideAllSessions();
+        this.renderActiveTerminalsList();
       });
     }
 
@@ -642,16 +776,9 @@ export class TerminalWorkspaceManager {
             <span class="orca-tab-title">${escapeHtml(name)}</span>
           </div>
           ${orchestratorControlHtml}
-          <div class="orca-agent-picker-wrap">
-            <select class="orca-agent-select" title="Trocar tipo de ferramenta no painel">
-              <option value="bash" ${agentType === 'bash' ? 'selected' : ''}>&gt; Bash</option>
-              <option value="opencode" ${agentType === 'opencode' ? 'selected' : ''}>⚡ OpenCode</option>
-              <option value="claude" ${agentType === 'claude' ? 'selected' : ''}>Claude Code</option>
-              <option value="codex" ${agentType === 'codex' ? 'selected' : ''}>&gt;_ Codex</option>
-            </select>
-          </div>
           <div class="orca-pane-controls ml-auto">
             ${role === 'subagent' ? '<button class="orca-pane-btn orca-btn-terminate-subagent danger" title="Encerrar Subagente">Encerrar Subagente</button>' : ''}
+            <button class="orca-pane-btn orca-btn-minimize" title="Minimizar (Ocultar Terminal)">–</button>
             <button class="orca-pane-btn orca-btn-close danger" title="Fechar sessão (×)">×</button>
           </div>
         </div>
@@ -675,6 +802,16 @@ export class TerminalWorkspaceManager {
     }
     this.gridContainer.appendChild(elPane);
 
+    let assignedSlot = null;
+    if (this.layout === 'free' || this.gridContainer.classList.contains('layout-free')) {
+      assignedSlot = this.findNextFreeSlot();
+      elPane.style.position = 'absolute';
+      elPane.style.left = `${assignedSlot.x}px`;
+      elPane.style.top = `${assignedSlot.y}px`;
+      elPane.style.width = '580px';
+      elPane.style.height = '440px';
+    }
+
     const mountEl = elPane.querySelector('.xterm-mount');
     term.open(mountEl);
 
@@ -693,6 +830,11 @@ export class TerminalWorkspaceManager {
       fitAddon,
       socket: null,
       isConnected: false,
+      isMinimized: false,
+      hasLaunchedAgent: false,
+      customPos: assignedSlot,
+      customWidth: 580,
+      customHeight: 440,
       elPane,
       elTab,
       resizeObserver: null
@@ -790,6 +932,14 @@ export class TerminalWorkspaceManager {
       });
     }
 
+    const btnMinimize = elPane.querySelector('.orca-btn-minimize');
+    if (btnMinimize) {
+      btnMinimize.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.minimizeSession(id);
+      });
+    }
+
     const btnClose = elPane.querySelector('.orca-btn-close');
     if (btnClose) {
       btnClose.addEventListener('click', (e) => {
@@ -821,7 +971,7 @@ export class TerminalWorkspaceManager {
         if (session.elPane.offsetParent !== null && session.fitAddon && session.term) {
           try {
             session.fitAddon.fit();
-            if (session.socket && session.socket.readyState === WebSocket.OPEN) {
+            if (session.socket && session.socket.readyState === WebSocket.OPEN && session.term.cols > 0 && session.term.rows > 0) {
               session.socket.send(JSON.stringify({
                 type: 'resize',
                 cols: session.term.cols,
@@ -832,6 +982,7 @@ export class TerminalWorkspaceManager {
         }
       });
       ro.observe(elPane);
+      if (mountEl) ro.observe(mountEl);
       session.resizeObserver = ro;
     }
 
@@ -843,6 +994,7 @@ export class TerminalWorkspaceManager {
       this.fitAll();
     }
 
+    this.updateActiveTerminalsCount();
     return session;
   }
 
@@ -1018,11 +1170,12 @@ export class TerminalWorkspaceManager {
       session.isConnected = true;
       if (dot) dot.className = 'term-tab-dot active';
       this.updateHeaderBadge();
-      setTimeout(() => {
-        if (session.fitAddon && session.term) {
+
+      const doFitAndResize = () => {
+        if (session.fitAddon && session.term && session.elPane && session.elPane.offsetParent !== null) {
           try {
             session.fitAddon.fit();
-            if (ws.readyState === WebSocket.OPEN) {
+            if (ws.readyState === WebSocket.OPEN && session.term.cols > 0 && session.term.rows > 0) {
               ws.send(JSON.stringify({
                 type: 'resize',
                 cols: session.term.cols,
@@ -1031,7 +1184,24 @@ export class TerminalWorkspaceManager {
             }
           } catch (e) {}
         }
-      }, 50);
+      };
+
+      setTimeout(doFitAndResize, 50);
+      setTimeout(doFitAndResize, 200);
+      setTimeout(doFitAndResize, 500);
+
+      // Auto-inicia o comando do agente se especificado (ex: OpenCode, Claude Code, Codex)
+      if (session.agentType && session.agentType !== 'bash' && !session.hasLaunchedAgent) {
+        session.hasLaunchedAgent = true;
+        const cmd = this.getAgentCommand(session.agentType);
+        if (cmd) {
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(cmd);
+            }
+          }, 350);
+        }
+      }
     };
 
     ws.onmessage = (event) => {
@@ -1130,6 +1300,8 @@ export class TerminalWorkspaceManager {
     } else {
       this.fitAll();
     }
+
+    this.updateActiveTerminalsCount();
   }
 
   setLayout(layout, autoSpawn = true) {
@@ -1391,9 +1563,215 @@ export class TerminalWorkspaceManager {
       console.warn('[Terminal] Falha sincronizando sessões persistidas do backend:', err);
     }
   }
+
+  getProjectSessions(targetProjectId = null) {
+    const pid = targetProjectId || currentProjectId || 'default';
+    const list = [];
+    for (const session of this.sessions.values()) {
+      const sPid = session.projectId || currentProjectId || 'default';
+      if (sPid === pid || !targetProjectId) {
+        list.push(session);
+      }
+    }
+    return list;
+  }
+
+  updateActiveTerminalsCount() {
+    const list = this.getProjectSessions();
+    const badge = document.getElementById('active-terminals-count');
+    if (badge) {
+      badge.textContent = String(list.length);
+    }
+  }
+
+  minimizeSession(id) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    session.isMinimized = true;
+    if (session.elPane) {
+      session.elPane.style.display = 'none';
+    }
+    if (session.elTab) {
+      session.elTab.classList.add('tab-minimized');
+      session.elTab.style.opacity = '0.6';
+    }
+    this.updateActiveTerminalsCount();
+    const modal = document.getElementById('modal-active-terminals');
+    if (modal && modal.style.display === 'flex') {
+      this.renderActiveTerminalsList();
+    }
+  }
+
+  restoreSession(id) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    session.isMinimized = false;
+    if (session.elPane) {
+      session.elPane.style.display = 'flex';
+      session.elPane.style.zIndex = '10';
+    }
+    if (session.elTab) {
+      session.elTab.classList.remove('tab-minimized');
+      session.elTab.style.opacity = '1';
+    }
+    this.selectSession(id, true);
+    if (session.fitAddon) {
+      setTimeout(() => session.fitAddon.fit(), 50);
+    }
+    this.updateActiveTerminalsCount();
+    const modal = document.getElementById('modal-active-terminals');
+    if (modal && modal.style.display === 'flex') {
+      this.renderActiveTerminalsList();
+    }
+  }
+
+  toggleSessionVisibility(id) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    if (session.isMinimized) {
+      this.restoreSession(id);
+    } else {
+      this.minimizeSession(id);
+    }
+  }
+
+  showAllSessions() {
+    const list = this.getProjectSessions();
+    list.forEach(s => {
+      s.isMinimized = false;
+      if (s.elPane) s.elPane.style.display = 'flex';
+      if (s.elTab) {
+        s.elTab.classList.remove('tab-minimized');
+        s.elTab.style.opacity = '1';
+      }
+    });
+    this.fitAll();
+    this.updateActiveTerminalsCount();
+  }
+
+  hideAllSessions() {
+    const list = this.getProjectSessions();
+    list.forEach(s => {
+      s.isMinimized = true;
+      if (s.elPane) s.elPane.style.display = 'none';
+      if (s.elTab) {
+        s.elTab.classList.add('tab-minimized');
+        s.elTab.style.opacity = '0.6';
+      }
+    });
+    this.updateActiveTerminalsCount();
+  }
+
+  openActiveTerminalsModal() {
+    const modal = document.getElementById('modal-active-terminals');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    
+    const titleEl = document.getElementById('active-terminals-modal-title');
+    const pathEl = document.getElementById('active-terminals-project-path');
+    const projRoot = this.getActiveProjectRoot();
+    const proj = (knownProjects || []).find(p => p.id === currentProjectId);
+    const projName = proj ? proj.name : (projRoot ? projRoot.split('/').pop() : 'Projeto Atual');
+    
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+        Terminais do Projeto (${escapeHtml(projName)})
+      `;
+    }
+    if (pathEl) {
+      pathEl.textContent = projRoot ? `Pasta: ${projRoot}` : '';
+    }
+
+    this.renderActiveTerminalsList();
+  }
+
+  closeActiveTerminalsModal() {
+    const modal = document.getElementById('modal-active-terminals');
+    if (modal) modal.style.display = 'none';
+  }
+
+  renderActiveTerminalsList() {
+    const container = document.getElementById('active-terminals-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const list = this.getProjectSessions();
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 13px;">
+          Nenhum terminal ativo neste projeto.<br>Clique em <strong>+ Novo Terminal</strong> para abrir uma sessão.
+        </div>
+      `;
+      return;
+    }
+
+    list.forEach(session => {
+      const item = document.createElement('div');
+      item.className = 'active-terminal-card';
+      item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; gap: 12px;';
+
+      const isMin = !!session.isMinimized;
+      const statusBadge = isMin
+        ? `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted); font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-subtle);">Oculto</span>`
+        : `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #16a34a; font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(34, 197, 94, 0.3);">Visível</span>`;
+
+      const icon = this.getRoleIcon(session.role);
+      const agentLabel = (session.agentType || 'bash').toUpperCase();
+
+      item.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
+          <span style="font-size: 16px;">${icon}</span>
+          <div style="min-width: 0;">
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${escapeHtml(session.name)}
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; align-items: center;">
+              <span>[${agentLabel}]</span>
+              <span>PID: ${session.id.slice(0, 10)}</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${statusBadge}
+          <button class="btn btn-secondary btn-sm btn-toggle-vis" title="${isMin ? 'Exibir no canvas' : 'Ocultar do canvas'}" style="font-size: 11px; padding: 4px 10px;">
+            ${isMin ? '👁️ Exibir' : '🙈 Ocultar'}
+          </button>
+          <button class="btn btn-secondary btn-sm btn-focus-term" title="Focar e trazer para frente" style="font-size: 11px; padding: 4px 10px;">
+            Focar
+          </button>
+          <button class="btn btn-danger btn-sm btn-close-term" title="Encerrar terminal" style="font-size: 11px; padding: 4px 8px;">
+            ×
+          </button>
+        </div>
+      `;
+
+      item.querySelector('.btn-toggle-vis').addEventListener('click', () => {
+        this.toggleSessionVisibility(session.id);
+      });
+      item.querySelector('.btn-focus-term').addEventListener('click', () => {
+        if (session.isMinimized) this.restoreSession(session.id);
+        this.selectSession(session.id, true);
+        this.closeActiveTerminalsModal();
+      });
+      item.querySelector('.btn-close-term').addEventListener('click', () => {
+        this.closeSession(session.id);
+        this.renderActiveTerminalsList();
+      });
+
+      container.appendChild(item);
+    });
+  }
 }
 
 export const terminalWorkspace = new TerminalWorkspaceManager();
+if (typeof window !== 'undefined') {
+  window.terminalWorkspace = terminalWorkspace;
+}
 
 export function initOrFitTerminal() {
   terminalWorkspace.init();

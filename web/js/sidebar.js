@@ -149,10 +149,21 @@ export function renderWorktreeSidebar() {
   const pinnedIds = getPinnedProjectIds();
   const recentIds = getRecentProjectIds();
 
+  // Deduplicação estrita de projetos por pasta física (project_root)
+  const dedupedProjects = [];
+  const seenFolders = new Set();
+  (knownProjects || []).forEach(p => {
+    const folderKey = (p.project_root ? p.project_root.trim().toLowerCase() : (p.id || '').toLowerCase());
+    if (folderKey && !seenFolders.has(folderKey)) {
+      seenFolders.add(folderKey);
+      dedupedProjects.push(p);
+    }
+  });
+
   // 1. Renderiza lista Pinned
   if (pinnedList) {
     pinnedList.innerHTML = '';
-    const pinnedProjects = (knownProjects || []).filter(p => pinnedIds.includes(p.id));
+    const pinnedProjects = dedupedProjects.filter(p => pinnedIds.includes(p.id));
 
     if (pinnedCountBadge) {
       pinnedCountBadge.textContent = String(pinnedProjects.length);
@@ -167,8 +178,10 @@ export function renderWorktreeSidebar() {
 
       const dotClass = getProjectDotClass(proj);
       const dotTitle = getProjectDotTitle(dotClass);
-      const repoTag = (proj.id || 'cockpit').toLowerCase().slice(0, 10);
+      const repoTag = (proj.name || proj.id || 'cockpit').toLowerCase().slice(0, 14);
       const slicesInfo = proj.total_slices > 0 ? `${proj.approved_slices}/${proj.total_slices}` : 'pinned';
+      const termCount = (typeof window !== 'undefined' && window.terminalWorkspace) ? window.terminalWorkspace.getProjectSessions(proj.id).length : 0;
+      const termBadge = termCount > 0 ? `<span class="worktree-term-badge" title="${termCount} terminal(is) ativo(s)" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--text-secondary); margin-left: 6px;"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg> ${termCount}</span>` : '';
 
       card.innerHTML = `
         <div class="worktree-header">
@@ -193,7 +206,7 @@ export function renderWorktreeSidebar() {
             </svg>
             main
           </span>
-          <span class="worktree-time">${slicesInfo}</span>
+          <span class="worktree-time">${slicesInfo}${termBadge}</span>
         </div>
       `;
 
@@ -213,7 +226,7 @@ export function renderWorktreeSidebar() {
   let progressCount = 0;
 
   // Projetos não fixados ordenados por histórico recente
-  const unpinnedProjects = (knownProjects || []).filter(p => !pinnedIds.includes(p.id));
+  const unpinnedProjects = dedupedProjects.filter(p => !pinnedIds.includes(p.id));
   unpinnedProjects.sort((a, b) => {
     const idxA = recentIds.indexOf(a.id);
     const idxB = recentIds.indexOf(b.id);
@@ -235,8 +248,10 @@ export function renderWorktreeSidebar() {
 
     const dotClass = getProjectDotClass(proj);
     const dotTitle = getProjectDotTitle(dotClass);
-    const repoTag = (proj.id || 'proj').toLowerCase().slice(0, 10);
+    const repoTag = (proj.name || proj.id || 'proj').toLowerCase().slice(0, 14);
     const timeText = proj.total_slices > 0 ? `${proj.approved_slices}/${proj.total_slices}` : 'idle';
+    const termCount = (typeof window !== 'undefined' && window.terminalWorkspace) ? window.terminalWorkspace.getProjectSessions(proj.id).length : 0;
+    const termBadge = termCount > 0 ? `<span class="worktree-term-badge" title="${termCount} terminal(is) ativo(s)" style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--text-secondary); margin-left: 6px;"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg> ${termCount}</span>` : '';
 
     card.innerHTML = `
       <div class="worktree-header">
