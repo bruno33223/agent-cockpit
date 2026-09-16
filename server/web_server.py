@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import time
 import socket
@@ -584,8 +585,13 @@ def get_handoff(root: Optional[str] = None, project_id: Optional[str] = None):
 @app.get("/api/vault/note")
 def get_vault_note(file: str, root: Optional[str] = None, project_id: Optional[str] = None):
     from code_graph import get_file_vault_note
+    if ".." in file or file.startswith("/") or file.startswith("\\"):
+        raise HTTPException(status_code=403, detail="Acesso negado: tentativa de path traversal")
     target_root = root or db.get_project_root(project_id) or "."
-    return get_file_vault_note(target_root, file)
+    try:
+        return get_file_vault_note(target_root, file)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 class VaultNotePayload(BaseModel):
     file: str
@@ -596,8 +602,13 @@ class VaultNotePayload(BaseModel):
 @app.post("/api/vault/note")
 def post_vault_note(payload: VaultNotePayload):
     from code_graph import save_file_vault_note
+    if ".." in payload.file or payload.file.startswith("/") or payload.file.startswith("\\"):
+        raise HTTPException(status_code=403, detail="Acesso negado: tentativa de path traversal")
     target_root = payload.root or db.get_project_root(payload.project_id) or "."
-    return save_file_vault_note(target_root, payload.file, payload.content)
+    try:
+        return save_file_vault_note(target_root, payload.file, payload.content)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 @app.post("/api/vault/sync")
 def post_vault_sync(payload: Optional[ProjectRootPayload] = None):
@@ -1013,6 +1024,30 @@ async def websocket_terminal(
     agent_name: Optional[str] = Query(None),
     slice_id: Optional[str] = Query(None)
 ):
+    target_slice = slice_id or task_id
+    if target_slice:
+        if ".." in target_slice or "/" in target_slice or "\\" in target_slice or not re.match(r"^[a-zA-Z0-9_\-]+$", target_slice):
+            await websocket.close(code=1008)
+            return
+
+    target_pid = project_id or db.get_current_project_id()
+    root_path, _, _ = _resolve_project_fs_root(target_pid)
+    if cwd:
+        if not os.path.isabs(cwd):
+            real_cwd = os.path.realpath(os.path.join(root_path, cwd))
+        else:
+            real_cwd = os.path.realpath(cwd)
+        real_root = os.path.realpath(root_path)
+        try:
+            common = os.path.commonpath([real_root, real_cwd])
+            if common != real_root:
+                await websocket.close(code=1008)
+                return
+            cwd = real_cwd
+        except Exception:
+            await websocket.close(code=1008)
+            return
+
     await websocket.accept()
     
     if not pty_session_manager:
@@ -1020,11 +1055,8 @@ async def websocket_terminal(
         await websocket.close()
         return
 
-    target_pid = project_id or db.get_current_project_id()
     # Determina diretório de trabalho do projeto ativo se não fornecido
     if not cwd:
-        root_path, _, _ = _resolve_project_fs_root(target_pid)
-        target_slice = slice_id or task_id
         if target_slice and root_path:
             worktree_dir = os.path.join(root_path, ".worktrees", target_slice)
             if os.path.isdir(worktree_dir):
@@ -1097,8 +1129,26 @@ def create_terminal_session(data: Dict[str, Any]):
     slice_id = data.get("slice_id") or task_id
     cwd = data.get("cwd")
 
-    if not cwd:
-        root_path, _, _ = _resolve_project_fs_root(project_id)
+    # Validação de segurança: slice_id
+    if slice_id:
+        if ".." in slice_id or "/" in slice_id or "\\" in slice_id or not re.match(r"^[a-zA-Z0-9_\-]+$", slice_id):
+            raise HTTPException(status_code=403, detail=f"Acesso negado: slice_id inválido ou tentativa de path traversal ({slice_id})")
+
+    root_path, _, _ = _resolve_project_fs_root(project_id)
+    if cwd:
+        if not os.path.isabs(cwd):
+            real_cwd = os.path.realpath(os.path.join(root_path, cwd))
+        else:
+            real_cwd = os.path.realpath(cwd)
+        real_root = os.path.realpath(root_path)
+        try:
+            common = os.path.commonpath([real_root, real_cwd])
+        except ValueError:
+            raise HTTPException(status_code=403, detail=f"Acesso negado: cwd fora dos limites do projeto ({cwd})")
+        if common != real_root:
+            raise HTTPException(status_code=403, detail=f"Acesso negado: cwd fora dos limites do projeto ({cwd})")
+        cwd = real_cwd
+    else:
         if slice_id and root_path:
             worktree_dir = os.path.join(root_path, ".worktrees", slice_id)
             if os.path.isdir(worktree_dir):

@@ -428,10 +428,22 @@ tags:
 
     return vault_dir
 
+def _validate_vault_file_path(root_dir: str, file_path: str) -> str:
+    """Valida se o caminho da nota markdown reside estritamente sob cockpit-agent/vault."""
+    root_dir = os.path.realpath(os.path.abspath(root_dir))
+    vault_dir = os.path.realpath(os.path.join(root_dir, "cockpit-agent", "vault"))
+    target_path = os.path.realpath(os.path.join(vault_dir, f"{file_path}.md"))
+    try:
+        common = os.path.commonpath([vault_dir, target_path])
+    except ValueError:
+        raise ValueError(f"Path traversal detectado: '{file_path}' escapa do diretório do vault")
+    if common != vault_dir or target_path == vault_dir:
+        raise ValueError(f"Path traversal detectado: '{file_path}' escapa do diretório do vault")
+    return target_path
+
 def get_file_vault_note(root_dir: str, file_path: str) -> Dict[str, Any]:
     """Retorna o conteúdo da nota Markdown no vault para o arquivo especificado."""
-    root_dir = os.path.abspath(root_dir)
-    md_path = os.path.join(root_dir, "cockpit-agent", "vault", f"{file_path}.md")
+    md_path = _validate_vault_file_path(root_dir, file_path)
     if not os.path.exists(md_path):
         return {"found": False, "content": "", "path": md_path}
     try:
@@ -452,8 +464,7 @@ def get_file_vault_note(root_dir: str, file_path: str) -> Dict[str, Any]:
 
 def save_file_vault_note(root_dir: str, file_path: str, notes_content: str) -> Dict[str, Any]:
     """Atualiza a seção de anotações do arquivo no vault preservando o esqueleto."""
-    root_dir = os.path.abspath(root_dir)
-    md_path = os.path.join(root_dir, "cockpit-agent", "vault", f"{file_path}.md")
+    md_path = _validate_vault_file_path(root_dir, file_path)
     if not os.path.exists(md_path):
         return {"status": "error", "message": f"Nota não encontrada em {md_path}"}
     try:

@@ -1,7 +1,33 @@
 import os
+import re
 import subprocess
 import shutil
 from typing import Dict, Any, Optional
+
+SLICE_ID_REGEX = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+def _validate_slice_worktree_path(slice_id: str, repo_root: str) -> str:
+    """Valida slice_id contra regex e path traversal, confinando ao repo_root/.worktrees."""
+    if not slice_id or not isinstance(slice_id, str):
+        raise ValueError("slice_id inválido: deve ser uma string não vazia")
+    if ".." in slice_id or "/" in slice_id or "\\" in slice_id:
+        raise ValueError(f"slice_id contém caracteres proibidos de path traversal: {slice_id}")
+    if not SLICE_ID_REGEX.match(slice_id):
+        raise ValueError(f"slice_id inválido ({slice_id}): deve conter apenas caracteres alfanuméricos, hífen e underscore")
+
+    repo_root = os.path.realpath(os.path.abspath(repo_root))
+    worktrees_base = os.path.realpath(os.path.join(repo_root, ".worktrees"))
+    worktree_dir = os.path.realpath(os.path.join(worktrees_base, slice_id))
+
+    try:
+        common = os.path.commonpath([worktrees_base, worktree_dir])
+    except ValueError:
+        raise ValueError(f"Path traversal detectado em slice_id: {slice_id}")
+
+    if common != worktrees_base or worktree_dir == worktrees_base:
+        raise ValueError("Path traversal detectado: worktree_dir escapa de .worktrees")
+
+    return worktree_dir
 
 def is_inside_worktree(repo_root: str = ".") -> bool:
     """Verifica se já estamos dentro de um worktree vinculado."""
@@ -53,8 +79,8 @@ def create_slice_worktree(
     Inspirado na diretriz using-git-worktrees do Superpowers.
     """
     repo_root = os.path.abspath(repo_root)
+    worktree_dir = _validate_slice_worktree_path(slice_id, repo_root)
     branch_name = f"cockpit/{slice_id}"
-    worktree_dir = os.path.join(repo_root, ".worktrees", slice_id)
 
     # 1. Se já estiver em worktree, avisa e usa o caminho atual
     if is_inside_worktree(repo_root):
@@ -143,8 +169,8 @@ def cleanup_slice_worktree(
 ) -> Dict[str, Any]:
     """Remove a git worktree e opcionalmente a branch associada."""
     repo_root = os.path.abspath(repo_root)
+    worktree_dir = _validate_slice_worktree_path(slice_id, repo_root)
     branch_name = f"cockpit/{slice_id}"
-    worktree_dir = os.path.join(repo_root, ".worktrees", slice_id)
 
     res_log = []
 
