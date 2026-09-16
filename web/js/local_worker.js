@@ -8,6 +8,10 @@ import { escapeHtml } from './ui_utils.js';
 import { apiFetch, currentProjectId } from './state.js';
 
 export let isOllamaAutoScrollEnabled = true;
+export const MAX_LOG_LINES = 200;
+const MAX_DEDUP_CACHE_SIZE = 500;
+const recentLogsCache = new Set();
+
 
 export let localWorkerStatus = {
   online: false,
@@ -718,6 +722,29 @@ export function renderOllamaLogLine(line) {
   const inpageTerminal = document.getElementById('inpage-ollama-logs');
   if (!terminal && !inpageTerminal) return;
 
+  let text = '';
+  let timestamp = '';
+
+  if (typeof line === 'string') {
+    text = line;
+  } else if (line && typeof line === 'object') {
+    text = line.message || line.text || line.line || JSON.stringify(line);
+    timestamp = line.timestamp || line.time || '';
+  }
+
+  // Deduplicação: evita inserções redundantes simultâneas entre WebSocket e polling
+  const dedupKey = `${timestamp}::${text}`;
+  if (recentLogsCache.has(dedupKey)) {
+    return;
+  }
+  recentLogsCache.add(dedupKey);
+  if (recentLogsCache.size > MAX_DEDUP_CACHE_SIZE) {
+    const oldestKey = recentLogsCache.values().next().value;
+    if (oldestKey !== undefined) {
+      recentLogsCache.delete(oldestKey);
+    }
+  }
+
   const removePlaceholder = (term) => {
     if (!term) return;
     const placeholder = term.querySelector('.terminal-placeholder');
@@ -730,16 +757,6 @@ export function renderOllamaLogLine(line) {
   const createLineElem = () => {
     const lineElem = document.createElement('div');
     lineElem.className = 'ollama-log-line';
-
-    let text = '';
-    let timestamp = '';
-
-    if (typeof line === 'string') {
-      text = line;
-    } else if (line && typeof line === 'object') {
-      text = line.message || line.text || line.line || JSON.stringify(line);
-      timestamp = line.timestamp || line.time || '';
-    }
 
     if (/error|err|fail|fatal/i.test(text)) {
       lineElem.classList.add('error');
@@ -766,6 +783,14 @@ export function renderOllamaLogLine(line) {
 
   if (terminal) {
     terminal.appendChild(createLineElem());
+    // Poda FIFO no container de logs para garantir buffer circular estrito de 200 linhas
+    while (terminal.childElementCount > MAX_LOG_LINES) {
+      if (terminal.firstElementChild) {
+        terminal.firstElementChild.remove();
+      } else {
+        break;
+      }
+    }
     const counter = document.getElementById('terminal-log-counter');
     if (counter) {
       const totalLines = terminal.querySelectorAll('.ollama-log-line').length;
@@ -778,6 +803,14 @@ export function renderOllamaLogLine(line) {
 
   if (inpageTerminal) {
     inpageTerminal.appendChild(createLineElem());
+    // Poda FIFO no container de logs da página do worker
+    while (inpageTerminal.childElementCount > MAX_LOG_LINES) {
+      if (inpageTerminal.firstElementChild) {
+        inpageTerminal.firstElementChild.remove();
+      } else {
+        break;
+      }
+    }
     if (isOllamaAutoScrollEnabled) {
       inpageTerminal.scrollTop = inpageTerminal.scrollHeight;
     }
@@ -839,6 +872,7 @@ export function initLocalWorkerEvents() {
 
   if (btnClearOllamaLogs) {
     btnClearOllamaLogs.addEventListener('click', () => {
+      recentLogsCache.clear();
       if (ollamaTerminalLogs) {
         ollamaTerminalLogs.innerHTML = '<div class="terminal-placeholder">Console limpo. Aguardando novos logs...</div>';
       }
@@ -868,6 +902,7 @@ export function initLocalWorkerEvents() {
   const btnClearInpageLogs = document.getElementById('btn-clear-inpage-logs');
   if (btnClearInpageLogs) {
     btnClearInpageLogs.addEventListener('click', () => {
+      recentLogsCache.clear();
       const term = document.getElementById('inpage-ollama-logs');
       if (term) {
         term.innerHTML = '<div class="terminal-placeholder">Logs limpos. Aguardando novos registros...</div>';
