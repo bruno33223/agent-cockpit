@@ -41,6 +41,10 @@ let terminalProcessStatus = null;
 let terminalLogCounter = null;
 let modalOllamaConsole = null;
 let ollamaTerminalLogs = null;
+let inputHfSearch = null;
+let hfSearchResults = null;
+let hfSearchSpinner = null;
+let hfDebounceTimer = null;
 
 export function resolveLocalWorkerElements() {
   if (typeof document === 'undefined') return;
@@ -65,6 +69,9 @@ export function resolveLocalWorkerElements() {
   terminalLogCounter = document.getElementById('terminal-log-counter');
   modalOllamaConsole = document.getElementById('modal-ollama-console');
   ollamaTerminalLogs = document.getElementById('ollama-terminal-logs');
+  inputHfSearch = document.getElementById('input-hf-search') || document.getElementById('hf-search-input');
+  hfSearchResults = document.getElementById('hf-search-results');
+  hfSearchSpinner = document.getElementById('hf-search-spinner');
 }
 
 export async function loadLocalWorker() {
@@ -478,6 +485,153 @@ export function closeModelModal() {
   }
 }
 
+/**
+ * Formata números de métricas para visualização simplificada (ex: 1.2k, 450k, 1.5M).
+ */
+function formatMetricNumber(num) {
+  if (!num && num !== 0) return '0';
+  const val = Number(num);
+  if (isNaN(val)) return String(num);
+  if (val >= 1000000) return (val / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (val >= 1000) return (val / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(val);
+}
+
+/**
+ * Realiza pesquisa de modelos no Hugging Face através do endpoint /api/local-worker/hf-search.
+ */
+export async function searchHuggingFaceModels(query) {
+  const q = (query || '').trim();
+  if (!hfSearchResults) {
+    hfSearchResults = document.getElementById('hf-search-results');
+  }
+  if (!hfSearchResults) return;
+
+  if (!q) {
+    hfSearchResults.innerHTML = `
+      <div class="hf-search-placeholder">
+        <p>Digite o nome de um modelo ou repositório para pesquisar no Hugging Face (ex: Qwen, DeepSeek, Llama)...</p>
+      </div>
+    `;
+    return;
+  }
+
+  hfSearchResults.innerHTML = `
+    <div class="hf-search-loading">
+      <span class="pull-spinner">⏳</span> Buscando modelos "${escapeHtml(q)}" no Hugging Face...
+    </div>
+  `;
+
+  try {
+    const res = await apiFetch(`/api/local-worker/hf-search?query=${encodeURIComponent(q)}&project_id=${encodeURIComponent(currentProjectId)}`);
+    if (!res.ok) {
+      throw new Error(`Erro ${res.status}: Não foi possível consultar o Hugging Face`);
+    }
+    const data = await res.json();
+    const models = Array.isArray(data) ? data : (data.models || data.results || []);
+    renderHfSearchResults(models);
+  } catch (err) {
+    console.error('[LocalWorker] Erro ao buscar modelos no Hugging Face:', err);
+    if (hfSearchResults) {
+      hfSearchResults.innerHTML = `
+        <div class="hf-search-error">
+          <p>⚠️ Falha na busca Hugging Face: ${escapeHtml(err.message || 'Erro de rede')}</p>
+        </div>
+      `;
+    }
+  }
+}
+
+/**
+ * Renderiza os cards de resultados do Hugging Face no container #hf-search-results.
+ * Exibe título, autor, métricas (downloads, likes), badges de quantização (GGUF, Q4_K_M, etc.)
+ * e botão de ação 'Baixar Modelo' chamando pullLocalModel(tag).
+ */
+export function renderHfSearchResults(models) {
+  if (!hfSearchResults) {
+    hfSearchResults = document.getElementById('hf-search-results');
+  }
+  if (!hfSearchResults) return;
+
+  if (!models || models.length === 0) {
+    hfSearchResults.innerHTML = `
+      <div class="hf-search-empty">
+        <p>Nenhum modelo encontrado no Hugging Face para os critérios informados.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const cardsHtml = models.map(m => {
+    const modelId = m.id || m.name || m.model_id || 'unknown/model';
+    const parts = modelId.split('/');
+    const author = m.author || (parts.length > 1 ? parts[0] : 'Hugging Face');
+    const title = m.title || (parts.length > 1 ? parts.slice(1).join('/') : modelId);
+    const downloads = formatMetricNumber(m.downloads || m.download_count || 0);
+    const likes = formatMetricNumber(m.likes || m.likes_count || 0);
+    const desc = m.description || m.summary || m.pipeline_tag || '';
+
+    // Quantizações e tags
+    let quants = m.quantizations || m.quants || [];
+    if (typeof quants === 'string') {
+      quants = [quants];
+    } else if (!Array.isArray(quants)) {
+      quants = [];
+    }
+    if (quants.length === 0 && (modelId.toLowerCase().includes('gguf') || (m.tags && m.tags.includes('gguf')))) {
+      quants = ['GGUF', 'Q4_K_M'];
+    }
+
+    const quantBadges = quants.length > 0
+      ? quants.map(q => `<span class="hf-badge quant" title="Quantização ${escapeHtml(q)}">${escapeHtml(q)}</span>`).join('')
+      : `<span class="hf-badge quant default">GGUF</span>`;
+
+    // Identificador para Ollama pull
+    const modelTag = m.ollama_tag || m.tag || (modelId.startsWith('hf.co/') ? modelId : `hf.co/${modelId}`);
+
+    return `
+      <div class="hf-model-card" data-model="${escapeHtml(modelTag)}">
+        <div class="hf-model-card-header">
+          <div class="hf-model-title-box">
+            <span class="hf-model-author">${escapeHtml(author)}</span>
+            <h5 class="hf-model-title" title="${escapeHtml(modelId)}">${escapeHtml(title)}</h5>
+          </div>
+          <div class="hf-model-metrics">
+            <span class="hf-metric downloads" title="${downloads} downloads">📥 ${escapeHtml(downloads)} downloads</span>
+            <span class="hf-metric likes" title="${likes} likes">❤️ ${escapeHtml(likes)} likes</span>
+          </div>
+        </div>
+        ${desc ? `<p class="hf-model-desc">${escapeHtml(desc)}</p>` : ''}
+        <div class="hf-model-card-footer">
+          <div class="hf-quant-badges">
+            ${quantBadges}
+          </div>
+          <button class="action-btn primary btn-sm btn-hf-pull" data-model="${escapeHtml(modelTag)}">
+            Baixar Modelo
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  hfSearchResults.innerHTML = `
+    <div class="hf-cards-grid">
+      ${cardsHtml}
+    </div>
+  `;
+
+  // Vincula evento de clique no botão 'Baixar Modelo' de cada card
+  hfSearchResults.querySelectorAll('.btn-hf-pull').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tag = btn.getAttribute('data-model');
+      if (tag) {
+        pullLocalModel(tag);
+      }
+    });
+  });
+}
+
 export async function startOllamaServer() {
   const btnStart = document.getElementById('btn-start-ollama');
   if (btnStart) {
@@ -772,5 +926,33 @@ export function initLocalWorkerEvents() {
       pullLocalModel(model);
     });
   });
+
+  // Hugging Face: busca de modelos com debounce
+  if (inputHfSearch) {
+    inputHfSearch.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (hfDebounceTimer) {
+        clearTimeout(hfDebounceTimer);
+      }
+      hfDebounceTimer = setTimeout(() => {
+        searchHuggingFaceModels(val);
+      }, 350);
+    });
+  }
+
+  // Hugging Face: delegação de clique em 'Baixar Modelo' nos cards
+  if (hfSearchResults) {
+    hfSearchResults.addEventListener('click', (e) => {
+      const pullBtn = e.target.closest('.btn-hf-pull');
+      if (pullBtn) {
+        e.preventDefault();
+        const modelTag = pullBtn.getAttribute('data-model');
+        if (modelTag) {
+          pullLocalModel(modelTag);
+        }
+      }
+    });
+  }
 }
+
 
