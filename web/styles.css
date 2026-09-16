@@ -8567,3 +8567,178 @@ body.sidebar-pinned-hidden .main-content {
   padding: 2px 8px;
   border-radius: 4px;
 }
+
+/* ==========================================================================
+   SUBAGENT DEDICATED TABS & OPENCODE VISUAL CHAT ISOLATION (ISSUE #18)
+   ========================================================================== */
+
+.subagent-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-subtle, #334155);
+  border-radius: 6px 6px 0 0;
+  color: var(--text-secondary, #94a3b8);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+
+.subagent-tab:hover {
+  background: var(--bg-card-hover, #334155);
+  color: var(--text-primary, #f8fafc);
+  border-color: var(--border-default, #475569);
+}
+
+.subagent-tab.active {
+  background: var(--bg-card, #0f172a);
+  color: var(--text-primary, #ffffff);
+  border-color: var(--accent-primary, #38bdf8);
+  border-bottom-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.15);
+}
+
+.subagent-tab-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.subagent-tab-title {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-tab-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 3px;
+}
+
+.subagent-tab-close:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Badge de status para subagentes */
+.subagent-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.subagent-badge.status-running {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  animation: pulse-badge 2s infinite ease-in-out;
+}
+
+.subagent-badge.status-idle {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.subagent-badge.status-done {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.subagent-badge.status-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.subagent-badge.status-pending {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Painel de chat visual OpenCode */
+.opencode-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-card, #0f172a);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.opencode-chat-panel:not(.active) {
+  display: none;
+}
+
+.opencode-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface, #1e293b);
+  border-bottom: 1px solid var(--border-subtle, #334155);
+}
+
+.opencode-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #f8fafc);
+}
+
+.opencode-chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opencode-chat-body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.chat-placeholder-msg {
+  color: var(--text-muted, #64748b);
+  font-style: italic;
+  text-align: center;
+  margin: auto;
+}
