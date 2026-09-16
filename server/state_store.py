@@ -172,6 +172,7 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
             "human_gate_policy": "manual",
             "artifact_review_policy": "strict"
         },
+        "project_settings_overrides": {},
         "project_root": project_root
     }
 
@@ -911,11 +912,17 @@ class StateStore:
                 state["governance_settings"] = old_state.get("governance_settings")
             if old_state.get("settings"):
                 state["settings"] = old_state.get("settings")
+            if old_state.get("project_settings_overrides"):
+                state["project_settings_overrides"] = old_state.get("project_settings_overrides")
 
             self._save_state(state, target_pid)
         self._notify("STATE_RESET", state, target_pid)
         self._notify("STATE_FULL", state, target_pid)
         return state
+
+    def reset_project(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Reseta o estado do projeto preservando metadados estruturais e configurações de overrides."""
+        return self.reset_state(project_id=project_id)
 
     def delete_project(self, project_id: str) -> bool:
         """Remove o arquivo de estado e registro do índice (não permite deletar 'default' se for o único)."""
@@ -1330,6 +1337,74 @@ class StateStore:
         self._notify("LOCAL_WORKER_CONFIG_UPDATED", cfg, target_pid)
         self._notify("STATE_FULL", state, target_pid)
         return updated
+
+    def get_general_defaults(self) -> Dict[str, Any]:
+        """Retorna as configurações padrão globais (General) agregadas de governança e local worker."""
+        gov = self.get_governance_settings("default")
+        st = self.get_settings("default")
+        return {
+            "autostart_slices": bool(gov.get("autostart_slices", False)),
+            "security_preset": str(gov.get("security_preset", "standard")),
+            "human_gate_policy": str(gov.get("human_gate_policy", "manual")),
+            "artifact_review_policy": str(gov.get("artifact_review_policy", "strict")),
+            "enable_local_ai": bool(st.get("enable_local_ai", False)),
+            "delegate_styles_to_cloud": bool(st.get("delegate_styles_to_cloud", True)),
+            "model": str(st.get("model", "deepseek-coder-v2:16b-q3_k_m")),
+            "endpoint": str(st.get("endpoint", "http://127.0.0.1:11434")),
+            "auto_start_ollama": bool(st.get("auto_start_ollama", False)),
+            "circuit_breaker_threshold": int(st.get("circuit_breaker_threshold", 2)),
+        }
+
+    def get_project_settings(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Calcula effective_settings herdando os valores gerais (governance_settings e defaults de General)
+        e aplicando os overrides específicos daquele projeto."""
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            raw_overrides = state.get("project_settings_overrides")
+            overrides = dict(raw_overrides) if isinstance(raw_overrides, dict) else {}
+            gen_defaults = self.get_general_defaults()
+            effective = dict(gen_defaults)
+            for k, v in overrides.items():
+                if v is not None:
+                    effective[k] = v
+            return {
+                "project_id": target_pid,
+                "overrides": overrides,
+                "general_defaults": gen_defaults,
+                "effective_settings": effective
+            }
+
+    def set_project_settings(self, project_id: Optional[str], overrides: Dict[str, Any]) -> Dict[str, Any]:
+        """Persiste overrides pontuais apenas no projeto alvo, sem alterar outros projetos nem defaults gerais."""
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            if not isinstance(state.get("project_settings_overrides"), dict):
+                state["project_settings_overrides"] = {}
+            curr_overrides = state["project_settings_overrides"]
+            for k, v in overrides.items():
+                if v is None:
+                    curr_overrides.pop(k, None)
+                else:
+                    curr_overrides[k] = v
+            self._save_state(state, target_pid)
+            result = self.get_project_settings(project_id=target_pid)
+        self._notify("PROJECT_SETTINGS_UPDATED", result, target_pid)
+        self._notify("STATE_FULL", state, target_pid)
+        return result
+
+    def clear_project_settings_overrides(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Limpa todos os overrides, fazendo o projeto voltar a herdar 100% de General."""
+        target_pid = self.resolve_project_id(project_id)
+        with self.lock:
+            state = self.get_state(target_pid)
+            state["project_settings_overrides"] = {}
+            self._save_state(state, target_pid)
+            result = self.get_project_settings(project_id=target_pid)
+        self._notify("PROJECT_SETTINGS_UPDATED", result, target_pid)
+        self._notify("STATE_FULL", state, target_pid)
+        return result
 
     def get_local_worker_attempts(self, slice_id: str, project_id: Optional[str] = None) -> int:
         target_pid = self.resolve_project_id(project_id)
