@@ -23,7 +23,8 @@ class PTYSession:
                  project_id: Optional[str] = None, task_id: Optional[str] = None,
                  role: str = "orchestrator", name: Optional[str] = None,
                  agent_type: str = "bash", agent_name: Optional[str] = None,
-                 slice_id: Optional[str] = None, log_path: Optional[str] = None):
+                 slice_id: Optional[str] = None, log_path: Optional[str] = None,
+                 lazy: bool = False):
         self.session_id = session_id
         self.project_id = project_id
         self.task_id = task_id
@@ -36,11 +37,17 @@ class PTYSession:
         self.env = env
         self.cols = cols
         self.rows = rows
+        self.lazy = lazy
         self.created_at = time.time()
         self.last_active = time.time()
         self.history = deque(maxlen=4000)
         self.active_websockets: Set[WebSocket] = set()
         self.is_alive = False
+        self.is_spawned = False
+        self.pid: Optional[int] = None
+        self.master_fd: Optional[int] = None
+        self.slave_fd: Optional[int] = None
+        self.reader_task: Optional[asyncio.Task] = None
         self.log_path = log_path
 
         # Se houver log salvo anteriormente, carrega o buffer prévio do disco
@@ -60,6 +67,14 @@ class PTYSession:
                         self.history.append("\r\n\x1b[36m─── [Sessão restaurada após reinicialização - histórico preservado] ───\x1b[0m\r\n")
             except Exception:
                 pass
+
+        if not self.lazy:
+            self.spawn()
+
+    def spawn(self):
+        """Bifurca o processo da shell sob demanda se ainda não estiver instanciado."""
+        if self.is_spawned and self.is_alive:
+            return
 
         self.master_fd, self.slave_fd = os.openpty()
         self._set_winsize(self.cols, self.rows)
@@ -86,33 +101,39 @@ class PTYSession:
             flags = fcntl.fcntl(self.master_fd, fcntl.F_GETFL)
             fcntl.fcntl(self.master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
             self.is_alive = True
-            self.reader_task: Optional[asyncio.Task] = None
+            self.is_spawned = True
+            self.reader_task = None
 
     def _set_winsize(self, cols: int, rows: int):
-        try:
-            winsize = struct.pack("HHHH", int(rows), int(cols), 0, 0)
-            fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
-            self.cols = cols
-            self.rows = rows
-        except Exception:
-            pass
+        self.cols = cols
+        self.rows = rows
+        if self.master_fd is not None:
+            try:
+                winsize = struct.pack("HHHH", int(rows), int(cols), 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+            except Exception:
+                pass
 
     def resize(self, cols: int, rows: int):
         self._set_winsize(cols, rows)
 
     def write(self, data: str):
-        if self.is_alive:
+        if not self.is_spawned:
+            self.spawn()
+        if self.is_alive and self.master_fd is not None:
             try:
                 os.write(self.master_fd, data.encode("utf-8"))
             except Exception:
                 pass
 
     async def start_reader_if_needed(self):
+        if not self.is_spawned:
+            self.spawn()
         if self.reader_task is None or self.reader_task.done():
             self.reader_task = asyncio.create_task(self._async_read_loop())
 
     async def _async_read_loop(self):
-        while self.is_alive:
+        while self.is_alive and self.master_fd is not None:
             await asyncio.sleep(0.015)
             try:
                 data = os.read(self.master_fd, 4096)
@@ -147,6 +168,8 @@ class PTYSession:
         self.close()
 
     def attach(self, websocket: WebSocket) -> str:
+        if not self.is_spawned:
+            self.spawn()
         self.active_websockets.add(websocket)
         return "".join(self.history)
 
@@ -155,18 +178,66 @@ class PTYSession:
             self.active_websockets.remove(websocket)
 
     def close(self):
-        if not self.is_alive:
+        """Encerra o descritor PTY e realiza reaping robusto do processo filho para evitar zombies."""
+        if not self.is_alive and not self.is_spawned:
             return
         self.is_alive = False
-        try:
-            os.close(self.master_fd)
-        except Exception:
-            pass
-        try:
-            os.kill(self.pid, signal.SIGTERM)
-            os.waitpid(self.pid, os.WNOHANG)
-        except Exception:
-            pass
+        self.is_spawned = False
+        if self.master_fd is not None:
+            try:
+                os.close(self.master_fd)
+            except Exception:
+                pass
+            self.master_fd = None
+
+        if self.pid is not None:
+            pid = self.pid
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                self.pid = None
+                return
+            except Exception:
+                pass
+
+            # Loop não-bloqueante de espera para coleta graciosa
+            reaped = False
+            for _ in range(5):
+                try:
+                    wpid, status = os.waitpid(pid, os.WNOHANG)
+                    if wpid == pid:
+                        reaped = True
+                        break
+                except (ChildProcessError, ProcessLookupError):
+                    reaped = True
+                    break
+                except Exception:
+                    pass
+                time.sleep(0.05)
+
+            # Fallback escalonando para SIGKILL caso o processo ainda esteja ativo
+            if not reaped:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    reaped = True
+                except Exception:
+                    pass
+
+                for _ in range(5):
+                    try:
+                        wpid, status = os.waitpid(pid, os.WNOHANG)
+                        if wpid == pid:
+                            reaped = True
+                            break
+                    except (ChildProcessError, ProcessLookupError):
+                        reaped = True
+                        break
+                    except Exception:
+                        pass
+                    time.sleep(0.02)
+
+            self.pid = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -183,6 +254,7 @@ class PTYSession:
             "cols": self.cols,
             "rows": self.rows,
             "is_alive": self.is_alive,
+            "is_spawned": self.is_spawned,
             "created_at": self.created_at,
             "last_active": getattr(self, "last_active", self.created_at),
             "active_clients": len(self.active_websockets)
@@ -262,7 +334,8 @@ class PTYSessionManager:
                         agent_type=meta.get("agent_type", "bash"),
                         agent_name=meta.get("agent_name"),
                         slice_id=meta.get("slice_id"),
-                        log_path=log_path
+                        log_path=log_path,
+                        lazy=True
                     )
                     session.created_at = meta.get("created_at", time.time())
                     session.last_active = meta.get("last_active", time.time())
@@ -288,7 +361,7 @@ class PTYSessionManager:
                       project_id: Optional[str] = None, task_id: Optional[str] = None,
                       role: str = "orchestrator", name: Optional[str] = None,
                       agent_type: str = "bash", agent_name: Optional[str] = None,
-                      slice_id: Optional[str] = None) -> PTYSession:
+                      slice_id: Optional[str] = None, lazy: bool = False) -> PTYSession:
         session = self._sessions.get(session_id)
         if session and session.is_alive:
             if project_id and not session.project_id:
@@ -318,7 +391,8 @@ class PTYSessionManager:
             session_id=session_id, cwd=cwd, env=env, cols=cols, rows=rows,
             project_id=project_id, task_id=task_id,
             role=role, name=name, agent_type=agent_type,
-            agent_name=agent_name, slice_id=slice_id, log_path=log_path
+            agent_name=agent_name, slice_id=slice_id, log_path=log_path,
+            lazy=lazy
         )
         self._sessions[session_id] = new_session
         self._save_index()
@@ -381,13 +455,13 @@ class PTYSessionManager:
 
     def stop_all(self):
         """Encerra os processos PTY em memória mantendo a persistência em disco intacta (ex: shutdown do servidor)."""
-        for s in self._sessions.values():
+        for s in list(self._sessions.values()):
             s.close()
         self._sessions.clear()
 
     def cleanup_all(self):
         """Limpeza completa para testes (encerra processos e remove arquivos de estado)."""
-        for s in self._sessions.values():
+        for s in list(self._sessions.values()):
             s.close()
         self._sessions.clear()
         if os.path.exists(self.index_file):
