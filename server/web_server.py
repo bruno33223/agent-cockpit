@@ -906,6 +906,28 @@ def post_local_worker_pull(payload: LocalWorkerPullPayload):
         "message": f"Download de '{model_name}' iniciado em segundo plano no Ollama. Acompanhe o progresso no Console de Logs."
     }
 
+try:
+    from workers.hf_hub_client import HFHubClient
+except ImportError:
+    try:
+        from server.workers.hf_hub_client import HFHubClient
+    except ImportError:
+        HFHubClient = None
+
+@app.get("/api/local-worker/hf-search")
+def get_local_worker_hf_search(query: str = "", limit: int = 20):
+    """Busca modelos GGUF no Hugging Face Hub para instalacao no Ollama / Local Worker."""
+    if HFHubClient:
+        client = HFHubClient()
+        results = client.search_models(query=query, limit=limit)
+    else:
+        results = []
+    return {
+        "query": query,
+        "count": len(results),
+        "models": results
+    }
+
 # =========================================================================
 # ROTAS DE INTEGRAÇÃO: OMNIROUTE & OPENCODE
 # =========================================================================
