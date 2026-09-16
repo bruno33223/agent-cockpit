@@ -4,9 +4,9 @@
  */
 
 // Base URLs unificadas (Suporte híbrido: Navegador local ou Tauri Desktop)
-export const IS_HOSTED_SERVER = (window.location.port === '8765' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+export const IS_HOSTED_SERVER = (typeof window !== 'undefined' && window.location && window.location.port === '8765' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
 export const API_BASE = IS_HOSTED_SERVER ? '' : 'http://127.0.0.1:8765';
-export const WS_BASE = IS_HOSTED_SERVER 
+export const WS_BASE = (typeof window !== 'undefined' && window.location && IS_HOSTED_SERVER) 
   ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
   : 'ws://127.0.0.1:8765/ws';
 
@@ -37,11 +37,13 @@ export function setActiveSliceId(sliceId) {
   notifySubscribers('slice', activeSliceId);
 }
 
-export let currentProjectId = localStorage.getItem('cockpit_project_id') || 'default';
+export let currentProjectId = (typeof localStorage !== 'undefined' && localStorage.getItem('cockpit_project_id')) || 'default';
 
 export function setCurrentProjectId(pid) {
   currentProjectId = pid;
-  localStorage.setItem('cockpit_project_id', currentProjectId);
+  if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
+    localStorage.setItem('cockpit_project_id', currentProjectId);
+  }
   notifySubscribers('project', currentProjectId);
 }
 
@@ -213,6 +215,33 @@ export function renderProjectSelectOptions() {
     }
     projectSelect.appendChild(opt);
   });
+}
+
+// Resolução canônica da raiz do projeto ativo (Single Source of Truth)
+export function getActiveProjectRoot(projectId = null, projectsMap = null) {
+  const pid = projectId || (typeof currentProjectId !== 'undefined' ? currentProjectId : 'default');
+  if (projectsMap) {
+    if (Array.isArray(projectsMap)) {
+      const p = projectsMap.find(item => item && item.id === pid);
+      if (p && p.project_root) return p.project_root;
+    } else if (typeof projectsMap === 'object') {
+      const p = projectsMap[pid] || (typeof projectsMap.get === 'function' ? projectsMap.get(pid) : null);
+      if (p && p.project_root) return p.project_root;
+    }
+  }
+  if (typeof knownProjects !== 'undefined' && Array.isArray(knownProjects)) {
+    const activeProj = knownProjects.find(p => p && p.id === pid);
+    if (activeProj && activeProj.project_root) return activeProj.project_root;
+  }
+  if (typeof state !== 'undefined' && state) {
+    if (state.project_root) return state.project_root;
+    if (state.config && state.config.project_root) return state.config.project_root;
+  }
+  if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
+    const stored = localStorage.getItem('cockpit_target_project');
+    if (stored) return stored;
+  }
+  return '';
 }
 
 // Troca de Projeto Concorrente (Context Isolation)
