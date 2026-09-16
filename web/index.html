@@ -1814,6 +1814,176 @@
             </div>
           </div>
         </div>
+
+        <!-- PANEL: PROJECT SETTINGS (Issue #17) -->
+        <div class="ag-tab-panel" id="ag-panel-project-settings">
+          <div class="ag-panel-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <h2 id="project-settings-title">Project Settings</h2>
+              <p id="project-settings-subtitle">Gerencie overrides específicos e herança de configurações gerais para este projeto.</p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn btn-secondary btn-sm" id="btn-restore-project-defaults" title="Restaurar todos os campos para os padrões gerais definidos em General">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+                Restaurar Padrões Gerais
+              </button>
+            </div>
+          </div>
+          <div class="ag-panel-content">
+            <div class="project-settings-banner" id="project-settings-banner" style="margin-bottom: 16px; padding: 12px 16px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <span style="font-weight: 600; font-size: 13px;" id="project-settings-current-name">Projeto: -</span>
+                <div style="font-size: 11px; color: var(--text-muted);" id="project-settings-current-id">ID: -</div>
+              </div>
+              <div id="project-settings-global-badge" class="inheritance-badge" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 500; background: var(--bg-card); border: 1px solid var(--border-subtle);">
+                Status Geral: <span id="project-inheritance-summary">HERDADO</span>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px; font-size: 11px; color: var(--text-muted); display: flex; gap: 12px; align-items: center;">
+              <span>Legenda:</span>
+              <span class="inheritance-tag tag-inherited" style="padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 10px; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+              <span class="inheritance-tag tag-custom" style="padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 10px; background: rgba(245, 158, 11, 0.15); color: #f59e0b;">CUSTOMIZADO</span>
+            </div>
+
+            <!-- Formulário de campos com herança e overrides -->
+            <form id="form-project-settings" onsubmit="return false;">
+              <!-- Seção IA & Modelo -->
+              <div class="ag-setting-section">
+                <span class="ag-section-title">IA Local & Modelo</span>
+                
+                <!-- Enable Local AI -->
+                <div class="ag-setting-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+                  <div style="flex: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="ag-setting-label">Habilitar Local AI Worker</span>
+                      <span class="inheritance-tag" id="tag-proj-enable_local_ai" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+                    </div>
+                    <span class="ag-setting-desc">Permite execução autônoma via worker Ollama local neste projeto.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="switch">
+                      <input type="checkbox" id="proj-toggle-enable-local-ai">
+                      <span class="slider round"></span>
+                    </label>
+                    <button type="button" class="btn-toggle-override" data-field="enable_local_ai" title="Alternar entre Herdar Padrão ou Customizar" style="background: none; border: 1px dashed var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+                      Personalizar
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Modelo LLM -->
+                <div class="ag-setting-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+                  <div style="flex: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="ag-setting-label">Modelo LLM</span>
+                      <span class="inheritance-tag" id="tag-proj-model" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+                    </div>
+                    <span class="ag-setting-desc">Modelo Ollama utilizado pelo worker local neste projeto.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <input type="text" id="proj-input-model" class="ag-input" placeholder="ex: deepseek-coder-v2:16b" style="width: 220px; font-size: 12px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main);">
+                    <button type="button" class="btn-toggle-override" data-field="model" title="Alternar entre Herdar Padrão ou Customizar" style="background: none; border: 1px dashed var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+                      Personalizar
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Delegate Styles to Cloud -->
+                <div class="ag-setting-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+                  <div style="flex: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="ag-setting-label">Delegar Estilos/Frontend para Nuvem</span>
+                      <span class="inheritance-tag" id="tag-proj-delegate_styles_to_cloud" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+                    </div>
+                    <span class="ag-setting-desc">Fatia de front e CSS vai para LLM de nuvem em vez do worker local.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="switch">
+                      <input type="checkbox" id="proj-toggle-delegate-styles">
+                      <span class="slider round"></span>
+                    </label>
+                    <button type="button" class="btn-toggle-override" data-field="delegate_styles_to_cloud" title="Alternar entre Herdar Padrão ou Customizar" style="background: none; border: 1px dashed var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+                      Personalizar
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Circuit Breaker Threshold -->
+                <div class="ag-setting-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+                  <div style="flex: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="ag-setting-label">Limite do Circuit Breaker</span>
+                      <span class="inheritance-tag" id="tag-proj-circuit_breaker_threshold" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+                    </div>
+                    <span class="ag-setting-desc">Número máximo de falhas locais consecutivas antes de escalar para nuvem.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <input type="number" id="proj-input-breaker-threshold" min="1" max="10" class="ag-input" style="width: 70px; font-size: 12px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main);">
+                    <button type="button" class="btn-toggle-override" data-field="circuit_breaker_threshold" title="Alternar entre Herdar Padrão ou Customizar" style="background: none; border: 1px dashed var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+                      Personalizar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Seção Governança do Projeto -->
+              <div class="ag-setting-section" style="margin-top: 20px;">
+                <span class="ag-section-title">Governança & Políticas</span>
+
+                <!-- Security Preset -->
+                <div class="ag-setting-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+                  <div style="flex: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="ag-setting-label">Preset de Segurança</span>
+                      <span class="inheritance-tag" id="tag-proj-security_preset" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+                    </div>
+                    <span class="ag-setting-desc">Nível de isolamento e validação de comandos para o projeto.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <select id="proj-select-security-preset" class="ag-input" style="width: 150px; font-size: 12px; padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-main);">
+                      <option value="balanced">Balanced</option>
+                      <option value="strict">Strict</option>
+                      <option value="turbo">Turbo</option>
+                    </select>
+                    <button type="button" class="btn-toggle-override" data-field="security_preset" title="Alternar entre Herdar Padrão ou Customizar" style="background: none; border: 1px dashed var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+                      Personalizar
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Autostart Slices -->
+                <div class="ag-setting-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+                  <div style="flex: 1; margin-right: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="ag-setting-label">Autostart Slices</span>
+                      <span class="inheritance-tag" id="tag-proj-autostart_slices" style="font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6;">HERDADO</span>
+                    </div>
+                    <span class="ag-setting-desc">Execução imediata automática de fatias orquestradas.</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <label class="switch">
+                      <input type="checkbox" id="proj-toggle-autostart-slices">
+                      <span class="slider round"></span>
+                    </label>
+                    <button type="button" class="btn-toggle-override" data-field="autostart_slices" title="Alternar entre Herdar Padrão ou Customizar" style="background: none; border: 1px dashed var(--border-subtle); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary);">
+                      Personalizar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Rodapé de Ações de Projeto -->
+              <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; align-items: center;">
+                <span id="proj-settings-feedback" style="display: none; font-size: 12px; padding: 6px 12px; border-radius: 4px;"></span>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-save-project-settings">Salvar Overrides</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </section>
     </div>
   <!-- MODAL: TERMINAIS ATIVOS DO PROJETO -->
