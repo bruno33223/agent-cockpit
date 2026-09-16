@@ -2,6 +2,8 @@ import sys
 import json
 import os
 import warnings
+import asyncio
+import concurrent.futures
 
 # Suprime warnings para proteger o pipe stdio JSON-RPC 2.0
 warnings.filterwarnings("ignore")
@@ -400,7 +402,7 @@ def resolve_context_project(args: dict) -> str:
 
 _resolve_target_project = resolve_context_project
 
-def handle_tool_call(name: str, args: dict) -> dict:
+async def handle_call_tool(name: str, args: dict) -> dict:
     target_pid = resolve_context_project(args)
 
     if name == "list_cockpit_projects":
@@ -533,7 +535,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
             import workflow_lock
             found = workflow_lock.find_latest_blueprint_dir(cwd)
             log_dir = found if found else cwd
-        res = run_distilled_tests(
+        res = await asyncio.to_thread(
+            run_distilled_tests,
             cmd,
             working_dir=cwd,
             timeout_sec=timeout,
@@ -767,7 +770,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
     elif name == "execute_local_builder":
         from tools.local_builder_tool import execute_local_builder
-        res = execute_local_builder(
+        res = await asyncio.to_thread(
+            execute_local_builder,
             slice_id=args.get("slice_id", ""),
             instruction=args.get("instruction", ""),
             target_file=args.get("target_file", ""),
@@ -780,7 +784,8 @@ def handle_tool_call(name: str, args: dict) -> dict:
 
     elif name == "manage_local_model":
         from tools.local_builder_tool import manage_local_model
-        res = manage_local_model(
+        res = await asyncio.to_thread(
+            manage_local_model,
             action=args.get("action", "status"),
             model_name=args.get("model_name"),
             endpoint=args.get("endpoint"),
@@ -799,97 +804,132 @@ def handle_tool_call(name: str, args: dict) -> dict:
     else:
         return {"isError": True, "content": [{"type": "text", "text": f"Ferramenta desconhecida: {name}"}]}
 
+def handle_tool_call(name: str, args: dict) -> dict:
+    """Compatibilidade síncrona com o despachante assíncrono handle_call_tool."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, handle_call_tool(name, args))
+            return future.result()
+    else:
+        return asyncio.run(handle_call_tool(name, args))
+
+async def async_process_request(line: str, write_lock: asyncio.Lock):
+    line = line.strip()
+    if not line:
+        return
+    try:
+        req = json.loads(line)
+        req_id = req.get("id")
+        method = req.get("method")
+        params = req.get("params", {})
+
+        if method == "initialize":
+            res = {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {
+                        "name": "agent-cockpit",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+            async with write_lock:
+                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+
+        elif method == "notifications/initialized":
+            # Apenas acknowledge
+            pass
+
+        elif method == "ping":
+            res = {"jsonrpc": "2.0", "id": req_id, "result": {}}
+            async with write_lock:
+                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+
+        elif method == "tools/list":
+            res = {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {"tools": TOOLS_DEFINITIONS}
+            }
+            async with write_lock:
+                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+
+        elif method == "tools/call":
+            tool_name = params.get("name")
+            tool_args = params.get("arguments", {})
+            try:
+                tool_result = await handle_call_tool(tool_name, tool_args)
+            except Exception as ex:
+                tool_result = {
+                    "isError": True,
+                    "content": [{"type": "text", "text": f"Erro executando {tool_name}: {str(ex)}"}]
+                }
+            res = {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": tool_result
+            }
+            async with write_lock:
+                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+
+        else:
+            if req_id is not None:
+                res = {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32601, "message": f"Método não suportado: {method}"}
+                }
+                async with write_lock:
+                    sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
+                    sys.stdout.flush()
+
+    except Exception as e:
+        err = {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": -32603, "message": f"Erro interno do servidor: {str(e)}"}
+        }
+        async with write_lock:
+            sys.stdout.write(json.dumps(err, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+
+async def async_stdio_server():
+    """Loop JSON-RPC 2.0 assíncrono para o protocolo MCP sobre stdin/stdout."""
+    write_lock = asyncio.Lock()
+    tasks = set()
+
+    while True:
+        line = await asyncio.to_thread(sys.stdin.readline)
+        if not line:
+            break
+        task = asyncio.create_task(async_process_request(line, write_lock))
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
 def run_stdio_server():
-    """Loop JSON-RPC 2.0 padrão MCP sobre stdin/stdout unbuffered."""
+    """Loop JSON-RPC 2.0 padrão MCP sobre stdin/stdout assíncrono."""
     try:
         sys.stdin.reconfigure(encoding='utf-8')
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:
         pass
 
-    while True:
-        line = sys.stdin.readline()
-        if not line:
-            break
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-            req_id = req.get("id")
-            method = req.get("method")
-            params = req.get("params", {})
-
-            if method == "initialize":
-                res = {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": {
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {"tools": {}},
-                        "serverInfo": {
-                            "name": "agent-cockpit",
-                            "version": "1.0.0"
-                        }
-                    }
-                }
-                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
-                sys.stdout.flush()
-
-            elif method == "notifications/initialized":
-                # Apenas acknowledge
-                pass
-
-            elif method == "ping":
-                res = {"jsonrpc": "2.0", "id": req_id, "result": {}}
-                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
-                sys.stdout.flush()
-
-            elif method == "tools/list":
-                res = {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": {"tools": TOOLS_DEFINITIONS}
-                }
-                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
-                sys.stdout.flush()
-
-            elif method == "tools/call":
-                tool_name = params.get("name")
-                tool_args = params.get("arguments", {})
-                try:
-                    tool_result = handle_tool_call(tool_name, tool_args)
-                except Exception as ex:
-                    tool_result = {
-                        "isError": True,
-                        "content": [{"type": "text", "text": f"Erro executando {tool_name}: {str(ex)}"}]
-                    }
-                res = {
-                    "jsonrpc": "2.0",
-                    "id": req_id,
-                    "result": tool_result
-                }
-                sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
-                sys.stdout.flush()
-
-            else:
-                if req_id is not None:
-                    res = {
-                        "jsonrpc": "2.0",
-                        "id": req_id,
-                        "error": {"code": -32601, "message": f"Método não suportado: {method}"}
-                    }
-                    sys.stdout.write(json.dumps(res, ensure_ascii=False) + "\n")
-                    sys.stdout.flush()
-
-        except Exception as e:
-            err = {
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {"code": -32603, "message": f"Erro interno do servidor: {str(e)}"}
-            }
-            sys.stdout.write(json.dumps(err, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+    asyncio.run(async_stdio_server())
 
 if __name__ == "__main__":
     run_stdio_server()
