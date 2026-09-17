@@ -927,7 +927,8 @@ export class ZeusChatUI {
   }
 
   // ==========================================
-  // DISPARO & FLUXO DE MENSAGENS
+  // ==========================================
+  // DISPARO & FLUXO DE MENSAGENS COM STREAMING SSE & TRAVAMENTO DE CHAT
   // ==========================================
 
   async sendMessage() {
@@ -950,6 +951,14 @@ export class ZeusChatUI {
     this.attachedImages = [];
     this.renderAttachmentsPreview();
 
+    // 1. Trava o input e o botão de envio
+    this.chatInput.disabled = true;
+    this.chatInput.placeholder = '⚡ Zeus pensando e gerando resposta...';
+    if (this.btnSend) {
+      this.btnSend.disabled = true;
+      this.btnSend.classList.add('loading');
+    }
+
     // Renderiza mensagem do usuário
     const timestamp = new Date().toLocaleTimeString();
     this.renderMessage({
@@ -963,10 +972,55 @@ export class ZeusChatUI {
     this.isProcessing = true;
     this.setStatus('Pensando...', 'busy');
 
+    // Cria card de mensagem do assistente ao vivo para streaming
+    let liveMsg = null;
+    if (this.messagesContainer) {
+      const card = document.createElement('div');
+      card.className = 'zeus-msg-card zeus-msg-assistant live-streaming';
+
+      const header = document.createElement('div');
+      header.className = 'zeus-msg-header';
+      header.innerHTML = `
+        <span class="zeus-msg-avatar">⚡</span>
+        <strong class="zeus-msg-author">ZEUS Agent</strong>
+        <span class="zeus-msg-time">${new Date().toLocaleTimeString()}</span>
+      `;
+      card.appendChild(header);
+
+      const thinkBox = document.createElement('details');
+      thinkBox.className = 'zeus-thinking-box';
+      thinkBox.open = true;
+      thinkBox.style.display = 'none';
+      thinkBox.innerHTML = `
+        <summary class="zeus-thinking-summary">
+          <span>💭 Raciocínio & Reflexão</span>
+          <span class="think-badge">STREAMING</span>
+        </summary>
+        <div class="zeus-thinking-content thinking-text"></div>
+      `;
+      card.appendChild(thinkBox);
+
+      const toolsContainer = document.createElement('div');
+      toolsContainer.className = 'zeus-tools-container';
+      toolsContainer.style.display = 'none';
+      card.appendChild(toolsContainer);
+
+      const body = document.createElement('div');
+      body.className = 'zeus-msg-body';
+      body.innerHTML = '<span class="typing-indicator" style="opacity:0.7; font-style:italic;">⚡ Processando instrução...</span>';
+      card.appendChild(body);
+
+      this.messagesContainer.appendChild(card);
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+
+      liveMsg = { card, thinkBox, thinkContent: thinkBox.querySelector('.zeus-thinking-content'), toolsContainer, body, startedContent: false };
+    }
+
     try {
       const payload = {
         message: text,
-        model: this.selectedModel,
+        session_id: 'zeus-chat',
+        model_id: this.selectedModel || 'auto',
         skills: Array.from(this.selectedSkills),
         mcp_servers: Array.from(this.selectedMcps),
         images: msgImages,
@@ -974,51 +1028,120 @@ export class ZeusChatUI {
         timestamp: new Date().toISOString()
       };
 
-      const response = await safeApiFetch('/api/opencode/headless/message', {
+      const response = await fetch('/api/zeus-chat/message', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
         body: JSON.stringify(payload)
       });
 
-      const data = typeof response.json === 'function' ? await response.json() : response;
-
-      if (data && (data.reply || data.message)) {
-        this.renderMessage({
-          role: 'assistant',
-          author: data.author || 'ZEUS Agent',
-          content: data.reply || data.message,
-          thinking: data.thinking || null,
-          tools: data.tools || [],
-          timestamp: new Date().toLocaleTimeString()
-        });
-      } else if (data && data.error) {
-        this.renderMessage({
-          role: 'error',
-          author: 'Erro Zeus',
-          content: `❌ Erro: ${data.error}`,
-          timestamp: new Date().toLocaleTimeString()
-        });
-      } else {
-        this.renderMessage({
-          role: 'assistant',
-          author: 'ZEUS Agent',
-          content: 'Instrução recebida e processada com sucesso.',
-          timestamp: new Date().toLocaleTimeString()
-        });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Erro HTTP ${response.status}: ${response.statusText}`);
       }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let fullContent = '';
+      let fullThinking = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const jsonStr = trimmed.substring(5).trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'thinking') {
+              if (liveMsg) {
+                liveMsg.thinkBox.style.display = 'block';
+                liveMsg.thinkContent.textContent += event.text || '';
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+              }
+              fullThinking += event.text || '';
+            } else if (event.type === 'tool_call') {
+              if (liveMsg) {
+                liveMsg.toolsContainer.style.display = 'flex';
+                const toolCard = document.createElement('div');
+                toolCard.className = 'zeus-tool-card type-exec';
+                toolCard.innerHTML = `
+                  <div class="zeus-tool-header">
+                    <span class="zeus-tool-name">🔧 ${escapeHtml(event.tool || 'Ação')}</span>
+                    <span class="zeus-tool-badge badge-exec">EXEC</span>
+                    <span class="zeus-tool-status status-running">OK</span>
+                  </div>
+                  <div class="zeus-tool-detail"><code>${escapeHtml(JSON.stringify(event.params || {}))}</code></div>
+                `;
+                liveMsg.toolsContainer.appendChild(toolCard);
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+              }
+            } else if (event.type === 'content') {
+              if (liveMsg) {
+                if (!liveMsg.startedContent) {
+                  liveMsg.body.innerHTML = '';
+                  liveMsg.startedContent = true;
+                }
+                liveMsg.body.innerHTML += escapeHtml(event.text || '').replace(/\n/g, '<br>');
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+              }
+              fullContent += event.text || '';
+            } else if (event.type === 'done') {
+              if (liveMsg) {
+                const badge = liveMsg.thinkBox.querySelector('.think-badge');
+                if (badge) badge.textContent = 'CONCLUÍDO';
+                if (liveMsg.thinkContent.textContent.trim()) {
+                  liveMsg.thinkBox.open = false;
+                }
+                const metricsDiv = document.createElement('div');
+                metricsDiv.className = 'zeus-msg-metrics';
+                metricsDiv.style.cssText = 'font-size: 11px; color: var(--text-muted, #71717a); margin-top: 8px; opacity: 0.85; font-family: monospace;';
+                metricsDiv.textContent = `⚡ Concluído em ${event.duration_seconds || '0.1'}s · ${event.tokens || 0} tokens · backend: ${event.backend || 'zeus'}`;
+                liveMsg.card.appendChild(metricsDiv);
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+              }
+            } else if (event.type === 'error') {
+              if (liveMsg) {
+                liveMsg.body.innerHTML += `<div style="color: var(--destructive, #ff6568); font-weight: 600; margin-top: 6px;">❌ ${escapeHtml(event.message || 'Erro no processamento.')}</div>`;
+              }
+            }
+          } catch (e) {
+            console.warn('[ZeusChatUI] Falha ao processar chunk SSE:', e, jsonStr);
+          }
+        }
+      }
+
+      if (liveMsg) {
+        liveMsg.card.classList.remove('live-streaming');
+      }
+
     } catch (err) {
       console.warn('[ZeusChatUI] Erro ao enviar mensagem:', err);
-      this.renderMessage({
-        role: 'error',
-        author: 'Falha de Comunicação',
-        content: `Não foi possível conectar ao motor Zeus: ${err.message}`,
-        timestamp: new Date().toLocaleTimeString()
-      });
+      if (liveMsg) {
+        liveMsg.body.innerHTML = `<span style="color: var(--destructive, #ff6568);">❌ Falha: ${escapeHtml(err.message)}</span>`;
+      }
     } finally {
       this.isProcessing = false;
       this.setStatus('Pronto', 'ready');
       if (this.chatInput) {
+        this.chatInput.disabled = false;
+        this.chatInput.placeholder = 'Digite uma instrução para o ZEUS Agent... (Enter para enviar, Shift+Enter para nova linha, Ctrl+V para colar imagens)';
         this.chatInput.focus();
+      }
+      if (this.btnSend) {
+        this.btnSend.disabled = false;
+        this.btnSend.classList.remove('loading');
       }
     }
   }

@@ -1,6 +1,6 @@
 /**
  * Módulo do Zeus Chat Workspace (ZeusChatWorkspaceManager)
- * Issue #24 - Fatia 2
+ * Issue #24 - Fatia 2 & Melhoria de Streaming Real e Travamento
  *
  * O Zeus Chat é um painel nativo de terminal integrado ao TerminalWorkspaceManager
  * (role: 'visual-chat'), ocupando a mesma área dos terminais no grid (podendo ficar
@@ -31,6 +31,19 @@ export class ZeusChatWorkspaceManager {
     this.chatInput = null;
     this.btnSend = null;
     this.btnClear = null;
+
+    // Controles ricos contextuais
+    this.modelSelect = null;
+    this.btnAttach = null;
+    this.fileInput = null;
+    this.btnMic = null;
+    this.attachmentsPreview = null;
+    this.btnSkills = null;
+    this.attachedImages = [];
+    this.selectedModel = 'auto';
+    this.isRecording = false;
+    this.mediaRecorder = null;
+    this.audioChunks = [];
   }
 
   /**
@@ -95,6 +108,14 @@ export class ZeusChatWorkspaceManager {
     this.btnSend = elPane.querySelector('.btn-send-zeus-chat');
     this.btnClear = elPane.querySelector('.zeus-btn-clear-history') || elPane.querySelector('#btn-clear-zeus-chat');
 
+    // Controles contextuais adicionais
+    this.modelSelect = elPane.querySelector('.zeus-pane-model-select') || elPane.querySelector('.zeus-model-select');
+    this.btnAttach = elPane.querySelector('.zeus-btn-attach');
+    this.fileInput = elPane.querySelector('.zeus-file-input');
+    this.btnMic = elPane.querySelector('.zeus-btn-mic');
+    this.attachmentsPreview = elPane.querySelector('.zeus-attachments-preview');
+    this.btnSkills = elPane.querySelector('.zeus-pane-btn-skills') || elPane.querySelector('.zeus-btn-skills');
+
     if (this.btnSend) {
       this.btnSend.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -109,6 +130,22 @@ export class ZeusChatWorkspaceManager {
           this.sendMessage();
         }
       });
+
+      // Suporte a colar imagens (Ctrl+V)
+      this.chatInput.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+              const file = items[i].getAsFile();
+              if (file) {
+                e.preventDefault();
+                this.addAttachedImage(file);
+              }
+            }
+          }
+        }
+      });
     }
 
     if (this.btnClear) {
@@ -118,17 +155,193 @@ export class ZeusChatWorkspaceManager {
       });
     }
 
+    // Seletor de modelos
+    if (this.modelSelect) {
+      this.initModelSelector();
+      this.modelSelect.addEventListener('change', () => {
+        this.selectedModel = this.modelSelect.value;
+      });
+    }
+
+    // Anexo de arquivos
+    if (this.btnAttach && this.fileInput) {
+      this.btnAttach.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.fileInput.click();
+      });
+      this.fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+          Array.from(e.target.files).forEach(file => this.addAttachedImage(file));
+          e.target.value = '';
+        }
+      });
+    }
+
+    // Microfone STT
+    if (this.btnMic) {
+      this.btnMic.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleRecording();
+      });
+    }
+
+    // Botão Skills & MCPs
+    if (this.btnSkills) {
+      this.btnSkills.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const globalBtn = document.getElementById('btn-zeus-skills-mcps');
+        if (globalBtn) globalBtn.click();
+      });
+    }
+
     // Renderiza mensagem de boas-vindas inicial se o histórico estiver vazio
     if (this.messages.length === 0) {
       this.renderMessage({
         role: 'assistant',
         author: 'Orquestrador Zeus',
-        content: '⚡ **Zeus Master Chat Online.** Orquestração de alto nível, controle de blueprints e despacho em lote de subagentes.',
+        content: '⚡ **Zeus Master Chat Online.** Orquestração de alto nível, streaming em tempo real e controle de subagentes.',
         timestamp: new Date().toLocaleTimeString()
       });
     } else {
-      // Re-renderiza mensagens acumuladas
       this.renderAllMessages();
+    }
+  }
+
+  async initModelSelector() {
+    if (!this.modelSelect) return;
+    try {
+      const [omniRes, localRes] = await Promise.all([
+        fetch('/api/omniroute/connectors').then(r => r.json()).catch(() => ({ models: [] })),
+        fetch('/api/local-worker/models').then(r => r.json()).catch(() => ({ models: [] }))
+      ]);
+
+      const models = [];
+      if (omniRes && Array.isArray(omniRes.models)) {
+        omniRes.models.forEach(m => models.push({ id: m.id || m.name, name: m.name || m.id, group: 'Cloud' }));
+      }
+      if (localRes && Array.isArray(localRes.models)) {
+        localRes.models.forEach(m => models.push({ id: m.name || m.id, name: m.name || m.id, group: 'Local' }));
+      }
+
+      if (models.length === 0) {
+        models.push(
+          { id: 'gpt-4o', name: 'GPT-4o (OpenAI)', group: 'Cloud' },
+          { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', group: 'Cloud' },
+          { id: 'deepseek-coder:6.7b', name: 'DeepSeek Coder 6.7B (Local)', group: 'Local' }
+        );
+      }
+
+      this.modelSelect.innerHTML = '';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `[${m.group}] ${m.name}`;
+        this.modelSelect.appendChild(opt);
+      });
+      this.selectedModel = this.modelSelect.value;
+    } catch (e) {
+      console.warn('[ZeusChat] Erro ao carregar modelos para o seletor:', e);
+    }
+  }
+
+  addAttachedImage(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.attachedImages.push(e.target.result);
+      this.renderAttachmentsPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  renderAttachmentsPreview() {
+    if (!this.attachmentsPreview) return;
+    if (!this.attachedImages || this.attachedImages.length === 0) {
+      this.attachmentsPreview.style.display = 'none';
+      this.attachmentsPreview.innerHTML = '';
+      return;
+    }
+    this.attachmentsPreview.style.display = 'flex';
+    this.attachmentsPreview.innerHTML = '';
+    this.attachedImages.forEach((dataUrl, idx) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'zeus-attachment-thumb';
+      thumb.innerHTML = `
+        <img src="${dataUrl}" alt="Anexo" />
+        <button type="button" class="zeus-thumb-remove" title="Remover imagem">&times;</button>
+      `;
+      thumb.querySelector('.zeus-thumb-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.attachedImages.splice(idx, 1);
+        this.renderAttachmentsPreview();
+      });
+      this.attachmentsPreview.appendChild(thumb);
+    });
+  }
+
+  async toggleRecording() {
+    if (this.isRecording) {
+      this.stopRecording();
+    } else {
+      this.startRecording();
+    }
+  }
+
+  async startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Navegador não suporta gravação de áudio.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioChunks = [];
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this.audioChunks.push(e.data);
+      };
+      this.mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        await this.sendAudioToSTT(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      this.mediaRecorder.start();
+      this.isRecording = true;
+      if (this.btnMic) this.btnMic.classList.add('recording');
+    } catch (e) {
+      console.warn('[ZeusChat] Falha ao acessar microfone:', e);
+    }
+  }
+
+  stopRecording() {
+    if (this.mediaRecorder && this.isRecording) {
+      this.mediaRecorder.stop();
+      this.isRecording = false;
+      if (this.btnMic) this.btnMic.classList.remove('recording');
+    }
+  }
+
+  async sendAudioToSTT(blob) {
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Audio = reader.result.split(',')[1];
+        const res = await fetch('/api/audio/transcribe-and-optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio_base64: base64Audio })
+        });
+        const data = await res.json();
+        if (data && (data.optimized_prompt || data.transcription)) {
+          const val = data.optimized_prompt || data.transcription;
+          if (this.chatInput) {
+            this.chatInput.value = this.chatInput.value ? `${this.chatInput.value} ${val}` : val;
+            this.focusInput();
+          }
+        }
+      };
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.warn('[ZeusChat] Erro no STT:', err);
     }
   }
 
@@ -212,13 +425,13 @@ export class ZeusChatWorkspaceManager {
     if (msg.thinking) {
       const thinkDetails = document.createElement('details');
       thinkDetails.className = 'zeus-thinking-box';
-      const thinkSummary = document.createElement('summary');
-      thinkSummary.innerHTML = '💭 <em>Raciocínio & Blueprint Staff</em>';
-      const thinkContent = document.createElement('div');
-      thinkContent.className = 'zeus-thinking-content';
-      thinkContent.innerHTML = escapeHtml(msg.thinking).replace(/\n/g, '<br>');
-      thinkDetails.appendChild(thinkSummary);
-      thinkDetails.appendChild(thinkContent);
+      thinkDetails.innerHTML = `
+        <summary class="zeus-thinking-summary">
+          <span>💭 Raciocínio & Reflexão</span>
+          <span class="think-badge">CONCLUÍDO</span>
+        </summary>
+        <div class="zeus-thinking-content thinking-text">${escapeHtml(msg.thinking).replace(/\n/g, '<br>')}</div>
+      `;
       card.appendChild(thinkDetails);
     }
 
@@ -228,11 +441,31 @@ export class ZeusChatWorkspaceManager {
       toolsContainer.className = 'zeus-tools-container';
       msg.tools.forEach(tool => {
         const item = document.createElement('div');
-        item.className = 'zeus-tool-item';
-        item.innerHTML = `🔧 <strong>${escapeHtml(tool.name || 'Tool')}:</strong> ${escapeHtml(tool.detail || '')}`;
+        item.className = 'zeus-tool-card type-exec';
+        item.innerHTML = `
+          <div class="zeus-tool-header">
+            <span class="zeus-tool-name">🔧 ${escapeHtml(tool.name || 'Tool')}</span>
+            <span class="zeus-tool-badge badge-exec">EXEC</span>
+            <span class="zeus-tool-status status-success">OK</span>
+          </div>
+          <div class="zeus-tool-detail"><code>${escapeHtml(tool.detail || '')}</code></div>
+        `;
         toolsContainer.appendChild(item);
       });
       card.appendChild(toolsContainer);
+    }
+
+    // Imagens se houver
+    if (Array.isArray(msg.images) && msg.images.length > 0) {
+      const grid = document.createElement('div');
+      grid.className = 'zeus-message-images-grid';
+      msg.images.forEach(dataUrl => {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.className = 'zeus-message-image-preview';
+        grid.appendChild(img);
+      });
+      card.appendChild(grid);
     }
 
     // Corpo de texto
@@ -246,7 +479,9 @@ export class ZeusChatWorkspaceManager {
   }
 
   /**
-   * Envia a mensagem do usuário para o backend e processa a resposta.
+   * Envia a mensagem do usuário via streaming Server-Sent Events (SSE) real.
+   * Trava o chat e o botão de envio durante o processamento, renderizando
+   * blocos expansíveis de pensamento e ações de ferramentas em tempo real.
    */
   async sendMessage() {
     if (!this.chatInput) {
@@ -255,91 +490,262 @@ export class ZeusChatWorkspaceManager {
     if (!this.chatInput) return;
 
     const text = this.chatInput.value.trim();
-    if (!text || this.isProcessing) return;
+    if (!text && (!this.attachedImages || this.attachedImages.length === 0)) return;
+    if (this.isProcessing) return;
 
+    const attachedImgs = Array.isArray(this.attachedImages) ? [...this.attachedImages] : [];
+    this.attachedImages = [];
+    this.renderAttachmentsPreview();
+
+    // 1. Trava o input e altera placeholder
     this.chatInput.value = '';
+    this.chatInput.disabled = true;
+    this.chatInput.placeholder = '⚡ Zeus pensando e orquestrando resposta...';
+
+    // 2. Trava o botão de envio com spinner/indicador
+    this.isProcessing = true;
+    if (this.btnSend) {
+      this.btnSend.disabled = true;
+      this.btnSend.innerHTML = '<span>Pensando...</span> <span>⏳</span>';
+    }
+
     const timestamp = new Date().toLocaleTimeString();
 
+    // 3. Renderiza mensagem do usuário no chat
     this.renderMessage({
       role: 'user',
       author: 'Você',
       content: text,
+      images: attachedImgs,
       timestamp
     });
 
-    this.isProcessing = true;
-    if (this.btnSend) {
-      this.btnSend.disabled = true;
-      this.btnSend.innerHTML = '<span>...</span>';
-    }
+    // 4. Cria o card do assistente em streaming ao vivo
+    const liveMsg = this._createLiveAssistantCard();
 
     try {
+      const selectedModel = this.selectedModel ||
+        (this.modelSelect ? this.modelSelect.value : null) ||
+        (typeof window !== 'undefined' && window.zeusChatUI ? window.zeusChatUI.selectedModel : 'auto') ||
+        'auto';
+
       const payload = {
         message: text,
-        project_id: currentProjectId || null,
+        session_id: this.sessionId || 'zeus-chat',
+        model_id: selectedModel,
+        images: attachedImgs,
+        project_id: (typeof currentProjectId !== 'undefined' ? currentProjectId : null) || 'default',
         timestamp: new Date().toISOString()
       };
 
-      let response = null;
-      try {
-        response = await apiFetch('/api/opencode/headless/message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) {
-        // Fallback orquestrador
-        response = await apiFetch('/api/orchestrator/message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }).catch(() => null);
+      const response = await fetch('/api/zeus-chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Erro HTTP ${response.status}: ${response.statusText}`);
       }
 
-      if (response && (response.reply || response.content)) {
-        this.renderMessage({
-          role: 'assistant',
-          author: response.author || 'Orquestrador Zeus',
-          content: response.reply || response.content,
-          thinking: response.thinking || null,
-          tools: response.tools || [],
-          timestamp: new Date().toLocaleTimeString()
-        });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let fullContent = '';
+      let fullThinking = '';
 
-        if (response.subagent_spawn) {
-          this.handleSubagentSpawn(response.subagent_spawn);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const jsonStr = trimmed.substring(5).trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            this._handleLiveStreamEvent(event, liveMsg, {
+              onThinking: (chunk) => { fullThinking += chunk; },
+              onContent: (chunk) => { fullContent += chunk; }
+            });
+          } catch (err) {
+            console.warn('[ZeusChat] Falha ao processar chunk SSE:', err, jsonStr);
+          }
         }
-      } else if (response && response.error) {
-        this.renderMessage({
-          role: 'error',
-          author: 'Zeus Error',
-          content: `❌ ${response.error}`,
-          timestamp: new Date().toLocaleTimeString()
-        });
-      } else {
-        this.renderMessage({
-          role: 'assistant',
-          author: 'Orquestrador Zeus',
-          content: response?.message || 'Comando recebido e registrado na telemetria.',
-          timestamp: new Date().toLocaleTimeString()
-        });
       }
+
+      this._finalizeLiveAssistantCard(liveMsg, fullContent, fullThinking);
+
     } catch (e) {
-      console.warn('[ZeusChat] Falha na comunicação:', e);
-      this.renderMessage({
-        role: 'system',
-        author: 'Zeus Telemetry',
-        content: `⚡ Notificação local: Comando processado no workspace. (${escapeHtml(e.message)})`,
+      console.warn('[ZeusChat] Falha no streaming:', e);
+      if (liveMsg && liveMsg.body) {
+        liveMsg.body.innerHTML = `<span style="color: var(--destructive, #ff6568); font-weight: 500;">❌ Erro: ${escapeHtml(e.message)}</span>`;
+      }
+      this.messages.push({
+        role: 'error',
+        author: 'Zeus Error',
+        content: `❌ ${e.message}`,
         timestamp: new Date().toLocaleTimeString()
       });
     } finally {
+      // 5. Destrava o chat e restaura o botão de envio
       this.isProcessing = false;
+      if (this.chatInput) {
+        this.chatInput.disabled = false;
+        this.chatInput.placeholder = 'Comunique-se com o Orquestrador Zeus ou despache subagentes...';
+      }
       if (this.btnSend) {
         this.btnSend.disabled = false;
         this.btnSend.innerHTML = '<span>Enviar</span> <span>⚡</span>';
       }
       this.focusInput();
     }
+  }
+
+  _createLiveAssistantCard() {
+    if (!this.messagesContainer) {
+      if (this.paneEl) this.messagesContainer = this.paneEl.querySelector('.zeus-chat-messages');
+      if (!this.messagesContainer) return null;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'zeus-chat-msg role-assistant live-streaming';
+
+    const header = document.createElement('div');
+    header.className = 'zeus-msg-header';
+
+    const authorWrap = document.createElement('div');
+    authorWrap.className = 'zeus-msg-author-wrap';
+
+    const iconImg = document.createElement('img');
+    iconImg.src = '/zeus_terminal_god.svg';
+    iconImg.className = 'zeus-msg-god-icon';
+    iconImg.alt = 'Zeus';
+    authorWrap.appendChild(iconImg);
+
+    const authorSpan = document.createElement('strong');
+    authorSpan.className = 'zeus-msg-author';
+    authorSpan.textContent = 'Orquestrador Zeus';
+    authorWrap.appendChild(authorSpan);
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'zeus-msg-time';
+    timeSpan.textContent = new Date().toLocaleTimeString();
+
+    header.appendChild(authorWrap);
+    header.appendChild(timeSpan);
+    card.appendChild(header);
+
+    // Bloco retrátil de reflexão (Thinking)
+    const thinkDetails = document.createElement('details');
+    thinkDetails.className = 'zeus-thinking-box';
+    thinkDetails.open = true;
+    thinkDetails.style.display = 'none';
+
+    const thinkSummary = document.createElement('summary');
+    thinkSummary.className = 'zeus-thinking-summary';
+    thinkSummary.innerHTML = `<span>💭 Raciocínio & Reflexão</span> <span class="think-badge">STREAMING</span>`;
+
+    const thinkContent = document.createElement('div');
+    thinkContent.className = 'zeus-thinking-content thinking-text';
+
+    thinkDetails.appendChild(thinkSummary);
+    thinkDetails.appendChild(thinkContent);
+    card.appendChild(thinkDetails);
+
+    // Container de Tools
+    const toolsContainer = document.createElement('div');
+    toolsContainer.className = 'zeus-tools-container';
+    toolsContainer.style.display = 'none';
+    card.appendChild(toolsContainer);
+
+    // Corpo da mensagem
+    const body = document.createElement('div');
+    body.className = 'zeus-msg-body';
+    body.innerHTML = '<span class="typing-indicator" style="opacity:0.7; font-style:italic;">⚡ Processando instrução...</span>';
+    card.appendChild(body);
+
+    this.messagesContainer.appendChild(card);
+    this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+
+    return { card, thinkDetails, thinkSummary, thinkContent, toolsContainer, body, startedContent: false, toolsList: [] };
+  }
+
+  _handleLiveStreamEvent(event, liveMsg, callbacks) {
+    if (!liveMsg || !event) return;
+
+    if (event.type === 'thinking') {
+      liveMsg.thinkDetails.style.display = 'block';
+      liveMsg.thinkContent.textContent += event.text || '';
+      if (callbacks.onThinking) callbacks.onThinking(event.text || '');
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    } else if (event.type === 'tool_call') {
+      liveMsg.toolsContainer.style.display = 'flex';
+      liveMsg.toolsContainer.style.flexDirection = 'column';
+      liveMsg.toolsContainer.style.gap = '6px';
+      liveMsg.toolsContainer.style.margin = '6px 0';
+
+      const toolEl = document.createElement('div');
+      toolEl.className = 'zeus-tool-card type-exec';
+      toolEl.innerHTML = `
+        <div class="zeus-tool-header">
+          <span class="zeus-tool-name">🔧 ${escapeHtml(event.tool || 'Ação')}</span>
+          <span class="zeus-tool-badge badge-exec">EXEC</span>
+          <span class="zeus-tool-status status-running">OK</span>
+        </div>
+        <div class="zeus-tool-detail"><code>${escapeHtml(JSON.stringify(event.params || {}))}</code></div>
+      `;
+      liveMsg.toolsContainer.appendChild(toolEl);
+      liveMsg.toolsList.push({ name: event.tool, detail: JSON.stringify(event.params || {}) });
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    } else if (event.type === 'subagent_spawn') {
+      this.handleSubagentSpawn(event);
+    } else if (event.type === 'content') {
+      if (!liveMsg.startedContent) {
+        liveMsg.body.innerHTML = '';
+        liveMsg.startedContent = true;
+      }
+      liveMsg.body.innerHTML += escapeHtml(event.text || '').replace(/\n/g, '<br>');
+      if (callbacks.onContent) callbacks.onContent(event.text || '');
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    } else if (event.type === 'done') {
+      const badge = liveMsg.thinkSummary.querySelector('.think-badge');
+      if (badge) badge.textContent = 'CONCLUÍDO';
+      if (liveMsg.thinkContent.textContent.trim()) {
+        liveMsg.thinkDetails.open = false;
+      }
+      const metricsDiv = document.createElement('div');
+      metricsDiv.className = 'zeus-msg-metrics';
+      metricsDiv.style.cssText = 'font-size: 11px; color: var(--text-muted, #71717a); margin-top: 8px; opacity: 0.85; font-family: monospace;';
+      metricsDiv.textContent = `⚡ Concluído em ${event.duration_seconds || '0.1'}s · ${event.tokens || 0} tokens · backend: ${event.backend || 'zeus'}`;
+      liveMsg.card.appendChild(metricsDiv);
+      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    } else if (event.type === 'error') {
+      liveMsg.body.innerHTML += `<div style="color: var(--destructive, #ff6568); font-weight: 600; margin-top: 6px;">❌ ${escapeHtml(event.message || 'Erro no processamento.')}</div>`;
+    }
+  }
+
+  _finalizeLiveAssistantCard(liveMsg, fullContent, fullThinking) {
+    if (!liveMsg) return;
+    liveMsg.card.classList.remove('live-streaming');
+    this.messages.push({
+      role: 'assistant',
+      author: 'Orquestrador Zeus',
+      content: fullContent || (liveMsg.body ? liveMsg.body.textContent : ''),
+      thinking: fullThinking || (liveMsg.thinkContent ? liveMsg.thinkContent.textContent : null),
+      tools: liveMsg.toolsList || [],
+      timestamp: new Date().toLocaleTimeString()
+    });
   }
 
   /**
@@ -371,80 +777,60 @@ export class ZeusChatWorkspaceManager {
       status,
       agentType,
       title,
-      description
+      description,
+      meta,
+      timestamp: new Date().toLocaleTimeString()
     };
 
     this.subagents.set(subagentId, normalized);
 
-    // Garante que o painel do chat esteja montado
-    if (!this.messagesContainer) {
-      if (this.paneEl) {
-        this.messagesContainer = this.paneEl.querySelector('.zeus-chat-messages');
-      }
-    }
-
-    // Se o chat ainda não foi aberto no workspace, abre-o
-    if (!this.messagesContainer && typeof terminalWorkspace !== 'undefined') {
-      this.openOrCreateChatSession(terminalWorkspace);
-    }
-
-    // Renderiza card interativo no chat
-    const card = document.createElement('div');
-    card.className = 'zeus-chat-card zeus-subagent-card';
-    card.id = `card-subagent-${subagentId}`;
-    card.setAttribute('data-subagent-id', subagentId);
-    card.setAttribute('data-slice-id', sliceId);
-
-    const statusBadgeClass = `status-${status.toLowerCase()}`;
-
-    card.innerHTML = `
-      <div class="zeus-subagent-card-header">
-        <div class="zeus-subagent-title-row">
-          <span class="zeus-subagent-icon">${meta.icon}</span>
-          <strong class="zeus-subagent-name">${escapeHtml(title)}</strong>
-          <span class="subagent-badge ${statusBadgeClass}" id="chat-badge-${escapeHtml(subagentId)}">${escapeHtml(status)}</span>
-        </div>
-      </div>
-      <div class="zeus-subagent-card-body">
-        <div class="zeus-subagent-meta">
-          <span class="zeus-meta-pill role-pill"><strong>Papel:</strong> ${escapeHtml(meta.label)}</span>
-          <span class="zeus-meta-pill slice-pill"><strong>Fatia:</strong> ${escapeHtml(sliceId)}</span>
-          <span class="zeus-meta-pill engine-pill"><strong>Engine:</strong> ${escapeHtml(agentType)}</span>
-        </div>
-        <p class="zeus-subagent-desc">${escapeHtml(description)}</p>
-      </div>
-      <div class="zeus-subagent-card-actions">
-        <button class="action-btn primary btn-sm btn-open-subagent-terminal" data-subagent-id="${escapeHtml(subagentId)}" title="Abrir terminal dedicado deste subagente">
-          <span class="btn-icon">🖥️</span>
-          <span>Abrir Terminal do Subagente</span>
-        </button>
-      </div>
-    `;
-
-    const btnOpenTerminal = card.querySelector('.btn-open-subagent-terminal');
-    if (btnOpenTerminal) {
-      btnOpenTerminal.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.openSubagentTerminal(normalized);
-      });
-    }
-
     if (this.messagesContainer) {
-      this.messagesContainer.appendChild(card);
+      let existingCard = document.getElementById(`subagent-card-${subagentId}`);
+      if (!existingCard) {
+        existingCard = document.createElement('div');
+        existingCard.id = `subagent-card-${subagentId}`;
+        existingCard.className = 'zeus-subagent-card';
+        this.messagesContainer.appendChild(existingCard);
+      }
+
+      existingCard.innerHTML = `
+        <div class="zeus-subagent-card-header">
+          <div class="subagent-title-wrap">
+            <span class="subagent-icon">${meta.icon}</span>
+            <strong class="subagent-name">${escapeHtml(title)}</strong>
+            <span class="subagent-badge role-${roleType}">${escapeHtml(roleType.toUpperCase())}</span>
+          </div>
+          <span class="subagent-status status-${status.toLowerCase()}" id="chat-badge-${subagentId}">${status}</span>
+        </div>
+        <div class="zeus-subagent-card-body">
+          <p class="subagent-task-desc">${escapeHtml(description)}</p>
+          <div class="subagent-meta-info">
+            <span class="meta-tag">⚡ Fatia: <code>${escapeHtml(sliceId)}</code></span>
+            <span class="meta-tag">🛠️ Motor: <code>${escapeHtml(agentType)}</code></span>
+          </div>
+        </div>
+        <div class="zeus-subagent-card-actions">
+          <button type="button" class="action-btn primary btn-sm btn-open-subagent-terminal" data-subagent-id="${subagentId}" title="Focar ou abrir aba dedicada do subagente sem fechar a sessão de chat">
+            <span>Terminal do Subagente</span>
+            <span>↗</span>
+          </button>
+        </div>
+      `;
+
+      const btnOpen = existingCard.querySelector('.btn-open-subagent-terminal');
+      if (btnOpen) {
+        btnOpen.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.navigateToSubagentTab(normalized);
+        });
+      }
+
       this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
-
-    return card;
   }
 
-  /**
-   * Aciona a abertura e foco do terminal do subagente mantendo o chat ativo no workspace.
-   * @param {Object} subagentData 
-   */
-  openSubagentTerminal(subagentData) {
+  navigateToSubagentTab(subagentData) {
     const subagentId = subagentData.id || subagentData.subagentId;
-
-    // 1. Invoca openSubagentTab de subagent_tabs.js
     let record = null;
     if (typeof openSubagentTab === 'function') {
       record = openSubagentTab(subagentData);
@@ -452,7 +838,6 @@ export class ZeusChatWorkspaceManager {
       record = window.openSubagentTab(subagentData);
     }
 
-    // 2. Foca a aba do subagente sem fechar a sessão de chat
     const targetId = (record && record.id) || subagentId;
     if (typeof focusSubagentTab === 'function') {
       focusSubagentTab(targetId);
@@ -462,7 +847,6 @@ export class ZeusChatWorkspaceManager {
       terminalWorkspace.selectSession(record.session.id, true);
     }
 
-    // 3. Feedback visual no card do chat
     const badge = document.getElementById(`chat-badge-${subagentId}`);
     if (badge) {
       badge.classList.add('focused-pulse');
@@ -478,7 +862,6 @@ export function openOrCreateChatSession(terminalManager = terminalWorkspace) {
 }
 
 export function initZeusChatWorkspace() {
-  // Escuta eventos globais de subagent_spawn via DOM
   if (typeof window !== 'undefined') {
     window.addEventListener('subagent_spawn', (e) => {
       if (e && e.detail) {
@@ -495,7 +878,6 @@ export function initZeusChatWorkspace() {
   }
 }
 
-// Expõe no escopo global para retrocompatibilidade com scripts e testes
 if (typeof window !== 'undefined') {
   window.zeusChatWorkspace = zeusChatWorkspace;
   window.openOrCreateChatSession = openOrCreateChatSession;
