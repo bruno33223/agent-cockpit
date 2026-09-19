@@ -937,6 +937,9 @@
               <!-- Badge de Aviso de Incompatibilidade Multimodal -->
               <div id="zeus-model-warning" class="zeus-model-warning" style="display: none;"></div>
 
+              <!-- Dock do Avatar Tático Holográfico 3D (Issues #45 & #46) -->
+              <div id="zeus-avatar-dock" class="avatar-3d-dock avatar-dock-top" style="height: 140px; margin: 0 0 8px 0; border-radius: 8px;"></div>
+
               <div class="opencode-chat-messages zeus-chat-messages" id="opencode-chat-messages" role="log" aria-live="polite">
                 <!-- Mensagens renderizadas dinamicamente via zeus_chat_ui.js / opencode_chat.js -->
               </div>
@@ -951,7 +954,8 @@
                   <button type="button" id="btn-zeus-attach-img" class="zeus-btn-attach" title="Anexar imagem (ou arraste/solte ou cole com Ctrl+V)">📷</button>
                   <input type="file" id="zeus-file-input" accept="image/*" multiple style="display: none;">
                   
-                  <!-- Microfone STT com Gravação -->
+                  <!-- Modo de Voz VAD / PTT e Microfone (Issue #46) -->
+                  <button type="button" id="btn-zeus-voice-mode" class="zeus-btn-voice-mode badge badge-info" title="Alternar Modo de Voz (Hands-free VAD / Push-to-Talk)">VAD</button>
                   <button type="button" id="btn-zeus-mic" class="zeus-btn-mic" title="Gravar áudio (STT)">🎙️</button>
 
                   <button type="button" class="btn btn-primary btn-sm" id="btn-send-opencode-chat">
@@ -2413,6 +2417,8 @@ description: Minha skill personalizada
   <script type="module" src="js/settings.js"></script>
   <!-- Avatar Tático Holográfico 3D (Issue #45) -->
   <script type="module" src="js/avatar_3d.js"></script>
+  <!-- Voice Controller com VAD e PTT (Issue #46) -->
+  <script type="module" src="js/voice_controller.js"></script>
   <script type="module" src="app.js?v=3.4"></script>
 </body>
 </html>

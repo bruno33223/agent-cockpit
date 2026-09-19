@@ -10506,3 +10506,28 @@ body.sidebar-pinned-hidden .main-content {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.015); }
 }
+
+/* Controles de Voz & PTT (Issue #46) */
+.zeus-btn-voice-mode {
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  color: #00e5ff;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+}
+.zeus-btn-voice-mode.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+}
+.zeus-btn-mic.recording {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+  animation: avatarPulseListening 1s infinite alternate ease-in-out;
+}

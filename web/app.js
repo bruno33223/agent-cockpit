@@ -47,6 +47,8 @@ import { initWebSocket, socket } from './js/websocket_client.js';
 import { openCodeChat, initOpenCodeChat } from './js/opencode_chat.js';
 import { zeusChatWorkspace, openOrCreateChatSession, initZeusChatWorkspace } from './js/zeus_chat_workspace.js';
 import { zeusChatUI, initZeusChatUI } from './js/zeus_chat_ui.js';
+import { avatar3D, initAvatar3D } from './js/avatar_3d.js';
+import { voiceController, VoiceController, initAvatarAndVoice } from './js/voice_controller.js';
 
 
 // 2. Exportação para Escopo Global (window) para Retrocompatibilidade com DOM e Testes
@@ -196,7 +198,13 @@ Object.assign(window, {
   openOrCreateChatSession,
   openZeusChat: () => openOrCreateChatSession(),
   zeusChatUI,
-  initZeusChatUI
+  initZeusChatUI,
+
+  // Avatar 3D e Voice Controller (Issues #45 & #46)
+  avatar3D,
+  initAvatar3D,
+  voiceController,
+  VoiceController
 });
 
 // 3. Inicialização e Bootstrapping da Aplicação
@@ -226,7 +234,10 @@ async function bootstrapCockpit() {
   safeInit("initOpenCodeChat", initOpenCodeChat);
   safeInit("initZeusChatUI", initZeusChatUI);
 
-  // 3. Inicializa conexão WebSocket em tempo real
+  // 3. Inicializa Avatar 3D e Voice Controller (Issues #45 & #46)
+  safeInit("initAvatarAndVoice", initAvatarAndVoice);
+
+  // 4. Inicializa conexão WebSocket em tempo real
   safeInit("initWebSocket", initWebSocket);
 
   // 4. Carrega projetos e sincroniza estado dos subsistemas

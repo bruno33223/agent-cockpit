@@ -135,6 +135,30 @@ async def post_audio_transcribe_and_optimize_endpoint(request: Request):
     return zeus_chat_engine.zeus_engine.transcribe_and_optimize(audio_bytes=audio_bytes, hint=hint)
 
 
+@router.post("/api/audio/synthesize")
+async def post_audio_synthesize_endpoint(req: Dict[str, Any] = Body(...)):
+    """Sintetiza texto em áudio via Edge-TTS / sintetizador acústico com streaming."""
+    text = (req.get("text") or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Parâmetro 'text' não pode ser vazio.")
+    voice = req.get("voice") or "pt-BR-FranciscaNeural"
+    try:
+        from server.chat.audio_synthesizer import AudioSynthesizer
+    except ImportError:
+        from chat.audio_synthesizer import AudioSynthesizer
+    synth = AudioSynthesizer(default_voice=voice)
+
+    async def _audio_stream():
+        async for chunk, _ in synth.synthesize_stream(text, voice):
+            yield chunk
+
+    return StreamingResponse(
+        _audio_stream(),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-cache", "X-Audio-Voice": voice}
+    )
+
+
 @router.post("/api/chat/validate-multimodal")
 def post_chat_validate_multimodal_endpoint(payload: Dict[str, Any] = Body(...)):
     if not zeus_chat_engine:
