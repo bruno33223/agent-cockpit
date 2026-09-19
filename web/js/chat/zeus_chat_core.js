@@ -220,6 +220,25 @@ export class ZeusChatCore {
       }
     }
   }
+
+  async loadHistory(sessionId, fetchFn = fetch) {
+    if (!sessionId) return [];
+    try {
+      const res = await fetchFn(`/api/zeus-chat/session/${encodeURIComponent(sessionId)}/history`);
+      const data = typeof res.json === 'function' ? await res.json() : res;
+      return Array.isArray(data?.history) ? data.history : [];
+    } catch (_) { return []; }
+  }
+
+  async fetchHistory(sessionId, fetchFn = fetch) { return this.loadHistory(sessionId, fetchFn); }
+
+  async clearHistory(sessionId, fetchFn = fetch) {
+    if (!sessionId) return false;
+    try {
+      const res = await fetchFn(`/api/zeus-chat/session/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+      return Boolean(res?.ok || (res?.status >= 200 && res?.status < 300));
+    } catch (_) { return false; }
+  }
 }
 
 export const zeusChatCore = new ZeusChatCore();

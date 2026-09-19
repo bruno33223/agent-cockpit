@@ -24,58 +24,28 @@ export let localWorkerStatus = {
 };
 
 // Elementos DOM do Local Worker & Ollama
-let lwPillLed = null;
-let lwTopbarSelect = null;
-let btnTopbarPullModal = null;
-let lwStatusBadge = null;
-let lwSidebarSelect = null;
-let lwEndpointDisplay = null;
-let btnOpenPullModal = null;
-let modalModelDownload = null;
-let btnCloseModelModal = null;
-let formCustomPull = null;
-let inputCustomModel = null;
-let btnStartPull = null;
-let pullStatusBox = null;
-let pullStatusMessage = null;
-let pullFeedbackMsg = null;
-let lwProcessStatus = null;
-let lwProcessPid = null;
-let terminalProcessStatus = null;
-let terminalLogCounter = null;
-let modalOllamaConsole = null;
-let ollamaTerminalLogs = null;
-let inputHfSearch = null;
-let hfSearchResults = null;
-let hfSearchSpinner = null;
-let hfDebounceTimer = null;
+let lwPillLed = null, lwTopbarSelect = null, btnTopbarPullModal = null, lwStatusBadge = null, lwSidebarSelect = null, lwEndpointDisplay = null;
+let btnOpenPullModal = null, btnOpenHfHub = null, modalModelDownload = null, btnCloseModelModal = null, formCustomPull = null, inputCustomModel = null;
+let btnStartPull = null, pullStatusBox = null, pullStatusMessage = null, pullFeedbackMsg = null, lwProcessStatus = null, lwProcessPid = null;
+let terminalProcessStatus = null, terminalLogCounter = null, modalOllamaConsole = null, ollamaTerminalLogs = null;
+let inputHfSearch = null, hfSearchResults = null, hfSearchSpinner = null, hfDebounceTimer = null;
 
 export function resolveLocalWorkerElements() {
   if (typeof document === 'undefined') return;
-  lwPillLed = document.getElementById('lw-pill-led');
-  lwTopbarSelect = document.getElementById('lw-topbar-select');
-  btnTopbarPullModal = document.getElementById('btn-topbar-pull-modal');
-  lwStatusBadge = document.getElementById('lw-status-badge');
-  lwSidebarSelect = document.getElementById('lw-sidebar-select');
-  lwEndpointDisplay = document.getElementById('lw-endpoint-display');
-  btnOpenPullModal = document.getElementById('btn-open-pull-modal');
-  modalModelDownload = document.getElementById('modal-model-download');
-  btnCloseModelModal = document.getElementById('btn-close-model-modal');
-  formCustomPull = document.getElementById('form-custom-pull');
-  inputCustomModel = document.getElementById('input-custom-model');
-  btnStartPull = document.getElementById('btn-start-pull');
-  pullStatusBox = document.getElementById('pull-status-box');
-  pullStatusMessage = document.getElementById('pull-status-message');
-  pullFeedbackMsg = document.getElementById('pull-feedback-msg');
-  lwProcessStatus = document.getElementById('lw-process-status');
-  lwProcessPid = document.getElementById('lw-process-pid');
-  terminalProcessStatus = document.getElementById('terminal-process-status');
-  terminalLogCounter = document.getElementById('terminal-log-counter');
-  modalOllamaConsole = document.getElementById('modal-ollama-console');
-  ollamaTerminalLogs = document.getElementById('ollama-terminal-logs');
-  inputHfSearch = document.getElementById('input-hf-search') || document.getElementById('hf-search-input');
-  hfSearchResults = document.getElementById('hf-search-results');
-  hfSearchSpinner = document.getElementById('hf-search-spinner');
+  const el = (id) => document.getElementById(id);
+  lwPillLed = el('lw-pill-led'); lwTopbarSelect = el('lw-topbar-select');
+  btnTopbarPullModal = el('btn-topbar-pull-modal'); lwStatusBadge = el('lw-status-badge');
+  lwSidebarSelect = el('lw-sidebar-select'); lwEndpointDisplay = el('lw-endpoint-display');
+  btnOpenPullModal = el('btn-open-pull-modal'); btnOpenHfHub = el('btn-open-hf-hub');
+  modalModelDownload = el('modal-model-download'); btnCloseModelModal = el('btn-close-model-modal');
+  formCustomPull = el('form-custom-pull'); inputCustomModel = el('input-custom-model');
+  btnStartPull = el('btn-start-pull'); pullStatusBox = el('pull-status-box');
+  pullStatusMessage = el('pull-status-message'); pullFeedbackMsg = el('pull-feedback-msg');
+  lwProcessStatus = el('lw-process-status'); lwProcessPid = el('lw-process-pid');
+  terminalProcessStatus = el('terminal-process-status'); terminalLogCounter = el('terminal-log-counter');
+  modalOllamaConsole = el('modal-ollama-console'); ollamaTerminalLogs = el('ollama-terminal-logs');
+  inputHfSearch = el('input-hf-search') || el('hf-search-input');
+  hfSearchResults = el('hf-search-results'); hfSearchSpinner = el('hf-search-spinner');
 }
 
 export async function loadLocalWorker() {
@@ -482,6 +452,20 @@ export function openModelModal() {
   }
 }
 
+export function openHfHubShortcut() {
+  openModelModal();
+  setTimeout(() => {
+    const hfSection = modalModelDownload?.querySelector('.hf-hub-section') || document.querySelector('.hf-hub-section');
+    if (hfSection && typeof hfSection.scrollIntoView === 'function') {
+      hfSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    const hfInput = inputHfSearch || document.getElementById('hf-search-input') || document.getElementById('input-hf-search');
+    if (hfInput && typeof hfInput.focus === 'function') {
+      hfInput.focus();
+    }
+  }, 60);
+}
+
 export function closeModelModal() {
   if (!modalModelDownload) resolveLocalWorkerElements();
   if (modalModelDownload) {
@@ -839,6 +823,9 @@ export function initLocalWorkerEvents() {
   }
   if (btnOpenPullModal) {
     btnOpenPullModal.addEventListener('click', openModelModal);
+  }
+  if (btnOpenHfHub) {
+    btnOpenHfHub.addEventListener('click', openHfHubShortcut);
   }
   if (btnCloseModelModal) {
     btnCloseModelModal.addEventListener('click', closeModelModal);
