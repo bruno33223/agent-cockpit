@@ -13,7 +13,8 @@ import {
 } from './js/state.js';
 import {
   initSidebar, switchTab, renderWorktreeSidebar, togglePinProject, toggleShowMoreProjects,
-  initOrcaNavigationAndModals, openQuickSearch, closeQuickSearch, renderQuickSearchResults
+  initOrcaNavigationAndModals, openQuickSearch, closeQuickSearch, renderQuickSearchResults,
+  openSettingsModal, closeSettingsModal, switchAgSettingsTab
 } from './js/sidebar.js';
 import {
   TerminalWorkspaceManager, terminalWorkspace, initOrFitTerminal, sendTerminalCommand
@@ -39,7 +40,8 @@ import {
 } from './js/local_worker.js';
 import {
   checkAutostartStatus, updateAutostartUI, loadSettings, applySettingsToUI, saveSettingUpdate,
-  initSettingsEvents, checkOmniRouteStatus, loadOmniRouteSettings, initTerminalAndOmniEvents
+  initSettingsEvents, checkOmniRouteStatus, loadOmniRouteSettings, initTerminalAndOmniEvents,
+  checkOmniRouteDaemon, loadOmniRouteAccounts, loadOmniRouteModels, openOmniRouteAccountModal, closeOmniRouteAccountModal
 } from './js/settings.js';
 import { initWebSocket, socket } from './js/websocket_client.js';
 import { openCodeChat, initOpenCodeChat } from './js/opencode_chat.js';
@@ -108,6 +110,9 @@ Object.assign(window, {
   openQuickSearch,
   closeQuickSearch,
   renderQuickSearchResults,
+  openSettingsModal,
+  closeSettingsModal,
+  switchAgSettingsTab,
 
   // Terminal Workspace
   TerminalWorkspaceManager,
@@ -174,6 +179,11 @@ Object.assign(window, {
   checkOmniRouteStatus,
   loadOmniRouteSettings,
   initTerminalAndOmniEvents,
+  checkOmniRouteDaemon,
+  loadOmniRouteAccounts,
+  loadOmniRouteModels,
+  openOmniRouteAccountModal,
+  closeOmniRouteAccountModal,
 
   // WebSocket
   initWebSocket,

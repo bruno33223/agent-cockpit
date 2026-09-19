@@ -434,6 +434,9 @@ export function openSettingsModal() {
     modal.style.display = 'flex';
     renderSettingsProjects();
     syncSettingsValues();
+    if (typeof window.loadOmniRouteSettings === 'function') {
+      window.loadOmniRouteSettings();
+    }
   }
 }
 
@@ -449,6 +452,9 @@ export function switchAgSettingsTab(tabName) {
   document.querySelectorAll('.ag-tab-panel').forEach(panel => {
     panel.classList.toggle('active', panel.id === `ag-panel-${tabName}`);
   });
+  if (tabName === 'models' && typeof window.loadOmniRouteSettings === 'function') {
+    window.loadOmniRouteSettings();
+  }
 }
 
 export function renderSettingsProjects() {

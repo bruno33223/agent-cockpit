@@ -5,7 +5,7 @@
   <title>ZEUS AGENT - Telemetria & Orquestração Multiagente</title>
   <meta name="application-name" content="AGENT COCKPIT">
   <link rel="icon" type="image/svg+xml" href="zeus_terminal_god.svg">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3.4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -803,7 +803,7 @@
                 <span>Terminais Ativos (<span id="active-terminals-count">0</span>)</span>
               </button>
               <div class="new-terminal-wrap split-btn-group" id="split-new-terminal-wrap" style="position: relative; display: inline-flex; align-items: stretch;">
-                <button class="action-btn primary btn-sm btn-split-main" id="btn-new-terminal" title="Abrir ou focar Zeus Chat">
+                <button class="action-btn primary btn-sm btn-split-main" id="btn-new-terminal" title="Abrir novo Zeus Chat (Orquestrador)">
                   <img src="/zeus_terminal_god.svg" class="zeus-btn-icon" alt="" style="width: 14px; height: 14px; margin-right: 4px; vertical-align: middle;" />
                   <span>+ Novo Terminal</span>
                 </button>
@@ -814,15 +814,8 @@
                   <div class="grid-config-item" data-terminal-type="zeus-chat" data-role="visual-chat" data-action="open-zeus-chat">
                     <img src="/zeus_terminal_god.svg" style="width: 15px; height: 15px; vertical-align: middle;" />
                     <div>
-                      <div style="font-weight: 600;">Zeus Chat (Visual)</div>
-                      <div style="font-size: 10px; color: var(--text-muted);">Painel do Orquestrador Zeus</div>
-                    </div>
-                  </div>
-                  <div class="grid-config-item" data-terminal-type="opencode-visual" data-role="agent" data-action="open-visual-chat">
-                    <span style="font-size: 14px;">💬</span>
-                    <div>
-                      <div style="font-weight: 600;">Chat Visual (OpenCode)</div>
-                      <div style="font-size: 10px; color: var(--text-muted);">Interface conversacional headless</div>
+                      <div style="font-weight: 600;">Zeus Chat (Orquestrador)</div>
+                      <div style="font-size: 10px; color: var(--text-muted);">Orquestrador Zeus &amp; Assistente Multimodal</div>
                     </div>
                   </div>
                   <div class="grid-config-item" data-terminal-type="opencode" data-role="agent">
@@ -853,20 +846,14 @@
                       <div style="font-size: 10px; color: var(--text-muted);">Shell Linux padrão</div>
                     </div>
                   </div>
-                  <div style="height: 1px; background: var(--border-subtle); margin: 4px 0;"></div>
-                  <div class="grid-config-item" data-terminal-type="bash" data-role="orchestrator">
-                    <span style="font-size: 14px;">⚡</span>
-                    <div>
-                      <div style="font-weight: 600;">Orquestrador Zeus</div>
-                      <div style="font-size: 10px; color: var(--text-muted);">Staff Orchestrator Blueprint</div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
 
             <!-- COMPATIBILIDADE DEFENSIVA PARA TESTES E SCRIPTS LEGADOS (OCULTO) -->
             <div class="sr-only" style="display: none;" aria-hidden="true">
+              <div data-terminal-type="opencode-visual" data-action="open-visual-chat">Chat Visual (OpenCode)</div>
+              <div data-terminal-type="bash" data-role="orchestrator">Orquestrador Zeus</div>
               <div class="terminal-header-info">
                 <div class="zeus-workbench-emblem-wrap" title="ZEUS AGENT - Deus Olímpico">
                   <img src="zeus_terminal_god.svg" class="zeus-workbench-emblem" alt="ZEUS AGENT" width="34" height="34" />
@@ -1678,44 +1665,139 @@
         <!-- PANEL: MODELS & OMNIROUTE -->
         <div class="ag-tab-panel" id="ag-panel-models">
           <div class="ag-panel-header">
-            <h2>Models & OmniRoute</h2>
-            <p>Configuração do Gateway OmniRoute e modelos LLM para o OpenCode.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <div>
+                <h2>Models & OmniRoute</h2>
+                <p>Gateway unificado de modelos e contas de provedores para o Agent Cockpit e OpenCode.</p>
+              </div>
+              <div id="ag-omniroute-daemon-badge-container">
+                <span class="lw-badge" id="ag-omniroute-daemon-badge" style="display: inline-flex; align-items: center; gap: 6px;">
+                  <span class="status-indicator-dot offline" id="ag-omniroute-daemon-dot"></span>
+                  <span id="ag-omniroute-daemon-text">Verificando...</span>
+                </span>
+              </div>
+            </div>
           </div>
           <div class="ag-panel-content">
-            <div class="ag-setting-section">
-              <span class="ag-section-title">OmniRoute Gateway</span>
-              <div class="ag-setting-row vertical">
-                <label class="ag-field-label" for="ag-omniroute-url">Endpoint Base do OmniRoute (OpenAI Compatible):</label>
-                <input type="text" id="ag-omniroute-url" class="ag-input-styled" value="http://localhost:20128/v1">
-                <span class="ag-field-hint">URL padrão do proxy OmniRoute rodando localmente na máquina.</span>
+            <!-- 1. CARD DE STATUS DO DAEMON / SERVIÇO -->
+            <div class="ag-omni-daemon-card" id="ag-omni-daemon-card">
+              <div class="ag-omni-daemon-info">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="ag-omni-daemon-title">Serviço OmniRoute Daemon</span>
+                  <span class="ag-omni-daemon-endpoint" id="ag-omni-daemon-endpoint">http://localhost:20128</span>
+                </div>
+                <span class="ag-omni-daemon-msg" id="ag-omni-daemon-msg">Verificando status do serviço local...</span>
               </div>
-              <div class="ag-setting-row vertical">
-                <label class="ag-field-label" for="ag-omniroute-key">Chave de API (OmniRoute API Key):</label>
-                <input type="password" id="ag-omniroute-key" class="ag-input-styled" value="omniroute-local">
-                <span class="ag-field-hint">Chave de autenticação utilizada pelo OpenCode para se conectar ao OmniRoute.</span>
+              <div class="ag-omni-daemon-actions">
+                <button class="action-btn secondary btn-sm" id="btn-omni-refresh-status" title="Atualizar status do OmniRoute">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  Atualizar
+                </button>
+                <button class="action-btn primary btn-sm" id="btn-omni-start-daemon" style="display: none;">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  Iniciar OmniRoute
+                </button>
               </div>
-              <div class="ag-setting-row vertical">
-                <label class="ag-field-label" for="ag-omniroute-model">Modelo Ativo para o OpenCode:</label>
-                <input type="text" id="ag-omniroute-model" class="ag-input-styled" value="auto">
-                <span class="ag-field-hint">Modelo padrão configurado no opencode.json.</span>
-              </div>
-              <div class="ag-buttons-row">
-                <button class="action-btn primary btn-sm" id="btn-ag-save-omniroute">Salvar & Sincronizar opencode.json</button>
-                <button class="action-btn secondary btn-sm" id="btn-ag-test-omniroute">Testar Conexão OmniRoute</button>
-              </div>
-              <div class="ag-feedback-msg" id="ag-omniroute-feedback" style="display: none;"></div>
             </div>
 
-            <!-- SEÇÃO: CONECTORES & PROVEDORES OMNIROUTE -->
-            <div class="ag-setting-section" id="ag-omniroute-connectors-section">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span class="ag-section-title" style="margin-bottom: 0;">Conectores & Provedores OmniRoute</span>
-                <span class="lw-badge" id="ag-omniroute-connectors-count">0 conectores</span>
+            <!-- 2. SEÇÃO: CONTAS E CONEXÕES DE PROVEDORES -->
+            <div class="ag-setting-section ag-omniroute-connectors-section" id="ag-omniroute-accounts-section">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <div>
+                  <span class="ag-section-title" style="margin-bottom: 0;">Contas & Provedores Conectados</span>
+                  <span class="lw-badge" id="ag-omniroute-accounts-count" style="margin-left: 8px;">0 contas</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <a href="http://localhost:20128/dashboard/providers" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" id="btn-open-omniroute-hub" title="Abrir Central OmniRoute com suporte a 347 provedores" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                    Central OmniRoute
+                  </a>
+                  <button class="btn btn-primary btn-sm" id="btn-add-omniroute-account" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Conectar Conta
+                  </button>
+                </div>
               </div>
-              <p class="ag-setting-desc" style="margin-bottom: 12px;">Lista de provedores LLM conectados via gateway unificado OmniRoute com status e modelos disponíveis.</p>
-              <div class="ag-connectors-list" id="ag-omniroute-connectors-list">
-                <!-- Renderizado dinamicamente via JS -->
+              <p class="ag-setting-desc" style="margin-bottom: 12px;">Conecte contas diretamente (OAuth, Device Flow ou importação local) ou cadastre chaves de API para roteamento unificado.</p>
+              
+              <div class="ag-omni-accounts-grid" id="ag-omniroute-accounts-list">
+                <!-- Preenchido dinamicamente via settings.js -->
               </div>
+              <div id="ag-omniroute-connectors-list" style="display: none;" aria-hidden="true"></div>
+            </div>
+
+            <!-- 3. SEÇÃO: SELEÇÃO DE MODELOS VIVOS E ATIVO -->
+            <div class="ag-setting-section" id="ag-omniroute-models-section">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <div>
+                  <span class="ag-section-title" style="margin-bottom: 0;">Seleção de Modelos & Roteamento</span>
+                  <span class="lw-badge" id="ag-omniroute-models-count" style="margin-left: 8px;">0 modelos disponíveis</span>
+                </div>
+              </div>
+              <p class="ag-setting-desc" style="margin-bottom: 12px;">Escolha o modelo ativo que será utilizado pelo Agent Cockpit e sincronizado com o OpenCode.</p>
+              
+              <div class="ag-omni-model-picker-card">
+                <div class="ag-setting-row vertical" style="border: none; padding: 0 0 12px 0;">
+                  <label class="ag-field-label" for="ag-omniroute-model-search">Buscar Modelo no Catálogo:</label>
+                  <input type="text" id="ag-omniroute-model-search" class="ag-input-styled" placeholder="Filtrar modelos (ex: gpt-4o, claude-3-5, gemini, llama)...">
+                </div>
+
+                <div class="ag-setting-row vertical" style="border: none; padding: 0 0 12px 0;">
+                  <label class="ag-field-label" for="ag-omniroute-active-model-select">Modelo Ativo Selecionado:</label>
+                  <div style="display: flex; gap: 8px; width: 100%;">
+                    <select id="ag-omniroute-active-model-select" class="ag-select-styled" style="flex: 1; font-size: 13px;">
+                      <option value="auto">auto (Roteamento Automático OmniRoute)</option>
+                    </select>
+                    <button class="action-btn primary btn-sm" id="btn-ag-apply-model" style="white-space: nowrap;">
+                      Aplicar Modelo Ativo
+                    </button>
+                  </div>
+                  <span class="ag-field-hint" id="ag-omniroute-active-model-hint">Modelo atual configurado para OpenCode e agentes de execução.</span>
+                </div>
+
+                <div class="ag-feedback-msg" id="ag-omniroute-model-feedback" style="display: none;"></div>
+              </div>
+            </div>
+
+            <!-- 4. SEÇÃO AVANÇADA: ENDPOINT GATEWAY & OPENCODE CONFIG (COLAPSÁVEL) -->
+            <div class="ag-setting-section" id="ag-omniroute-advanced-section">
+              <details class="ag-details-advanced">
+                <summary class="ag-summary-title">Configurações Avançadas do Gateway & opencode.json</summary>
+                <div style="padding-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+                  <div class="ag-setting-row vertical">
+                    <label class="ag-field-label" for="ag-omniroute-url">Endpoint Base do OmniRoute (OpenAI Compatible):</label>
+                    <input type="text" id="ag-omniroute-url" class="ag-input-styled" value="http://localhost:20128/v1">
+                    <span class="ag-field-hint">URL padrão do proxy OmniRoute rodando localmente na máquina.</span>
+                  </div>
+                  <div class="ag-setting-row vertical">
+                    <label class="ag-field-label" for="ag-omniroute-key">Chave de API (OmniRoute API Key):</label>
+                    <input type="password" id="ag-omniroute-key" class="ag-input-styled" value="omniroute-local">
+                    <span class="ag-field-hint">Chave de autenticação utilizada pelo OpenCode para se conectar ao OmniRoute.</span>
+                  </div>
+                  <div class="ag-setting-row vertical">
+                    <label class="ag-field-label" for="ag-omniroute-model">Modelo Ativo no Arquivo de Configuração:</label>
+                    <input type="text" id="ag-omniroute-model" class="ag-input-styled" value="auto">
+                  </div>
+                  <div class="ag-buttons-row">
+                    <button class="action-btn primary btn-sm" id="btn-ag-save-omniroute">Salvar & Sincronizar opencode.json</button>
+                    <button class="action-btn secondary btn-sm" id="btn-ag-test-omniroute">Testar Conexão OmniRoute</button>
+                  </div>
+                  <div class="ag-feedback-msg" id="ag-omniroute-feedback" style="display: none;"></div>
+                </div>
+              </details>
             </div>
           </div>
         </div>
@@ -2031,6 +2113,8 @@
         <button class="btn btn-primary btn-sm" id="btn-active-terminals-close-footer">Fechar</button>
       </div>
     </div>
+  </div>
+
   <!-- MODAL: CONFIGURAÇÃO / EDIÇÃO DE SERVIDOR MCP -->
   <div class="modal-backdrop" id="modal-mcp-server" style="display: none;">
     <div class="active-terminals-dialog" style="max-width: 600px; width: 90%; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column;">
@@ -2144,6 +2228,123 @@ description: Minha skill personalizada
     </div>
   </div>
 
-  <script type="module" src="app.js?v=3.1"></script>
+  <!-- MODAL: CONECTAR CONTA DE PROVEDOR OMNIROUTE -->
+  <div class="modal-backdrop omni-account-backdrop" id="modal-omniroute-account" style="display: none;">
+    <div class="active-terminals-dialog" style="max-width: 660px; width: 92%; max-height: 88vh; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column;">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <h3 id="modal-omni-account-title" style="margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          Conectar Conta no OmniRoute
+        </h3>
+        <button class="modal-close-btn" id="btn-close-omni-account-modal" aria-label="Fechar" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary);">&times;</button>
+      </div>
+
+      <!-- Abas de Alternância: Conexão Direta (Sem Chave) vs Chave de API Manual -->
+      <div class="omni-modal-tabs" id="omni-modal-tabs" style="display: flex; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface);">
+        <button type="button" class="omni-modal-tab active" id="tab-omni-direct" data-mode="direct" style="flex: 1; padding: 10px 14px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; color: var(--text-primary); border-bottom: 2px solid var(--color-brand, #38bdf8); display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>✨ Conexão Direta (Sem Chave)</span>
+        </button>
+        <button type="button" class="omni-modal-tab" id="tab-omni-apikey" data-mode="apikey" style="flex: 1; padding: 10px 14px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>🔑 Chave de API Manual</span>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; max-height: 72vh; overflow-y: auto;">
+        
+        <!-- PAINEL 1: CONEXÃO DIRETA / OAUTH (SEM CHAVE DE API) -->
+        <div id="omni-panel-direct" class="omni-modal-panel" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+            Conecte suas contas diretamente com OAuth no navegador, Device Code ou importação automática local da máquina, sem precisar digitar chaves secretas de API.
+          </p>
+
+          <!-- Grid com cartões visuais de provedores suportados -->
+          <div class="omni-direct-grid" id="ag-omni-direct-cards" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;">
+            <!-- Renderizado dinamicamente via settings.js -->
+          </div>
+
+          <!-- Caixa de ação interativa (OAuth / Device / Import) -->
+          <div class="omni-direct-action-box" id="omni-direct-action-box" style="display: none; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px; flex-direction: column; gap: 10px;">
+            <div id="omni-direct-action-content">
+              <!-- Conteúdo da ação contextual injetado dinamicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL 2: CHAVE DE API MANUAL -->
+        <div id="omni-panel-apikey" class="omni-modal-panel" style="display: none; flex-direction: column; gap: 14px;">
+          <!-- Pílulas de seleção rápida de provedor -->
+          <div class="ag-form-group">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">Escolha o Provedor *</label>
+            <div class="ag-omni-provider-pills" id="ag-omni-provider-pills">
+              <!-- Pílulas renderizadas dinamicamente via JS -->
+            </div>
+          </div>
+
+          <input type="hidden" id="omni-account-provider-id" value="openai">
+
+          <div class="ag-form-group">
+            <label for="omni-account-name" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Nome / Identificador da Conta *</label>
+            <input type="text" id="omni-account-name" class="ag-input" placeholder="ex: OpenAI Principal, Claude Pessoal" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+          </div>
+
+          <!-- Campo API Key (com toggle de revelar/ocultar) -->
+          <div class="ag-form-group" id="omni-account-key-group">
+            <label for="omni-account-key" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Chave de API (API Key) *</label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="password" id="omni-account-key" class="ag-input" placeholder="sk-..." style="width: 100%; padding: 8px 36px 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+              <button type="button" id="btn-omni-toggle-key-vis" style="position: absolute; right: 8px; background: none; border: none; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center;" title="Mostrar / Ocultar Chave">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+            <span style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">A chave é criptografada e gerenciada com segurança no banco local do OmniRoute.</span>
+          </div>
+
+          <!-- Campo Base URL (para Custom / Ollama) -->
+          <div class="ag-form-group" id="omni-account-baseurl-group" style="display: none;">
+            <label for="omni-account-baseurl" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Endpoint Base URL *</label>
+            <input type="url" id="omni-account-baseurl" class="ag-input" placeholder="http://localhost:11434/v1" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+          </div>
+
+          <!-- Campo Modelo Padrão da Conta -->
+          <div class="ag-form-group">
+            <label for="omni-account-default-model" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Modelo Padrão Recomendado (Opcional)</label>
+            <input type="text" id="omni-account-default-model" class="ag-input" placeholder="ex: gpt-4o, claude-3-5-sonnet-20241022" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary); font-size: 13px;">
+          </div>
+        </div>
+
+        <div class="ag-feedback-msg" id="modal-omni-account-feedback" style="display: none; padding: 8px 12px; border-radius: 6px; font-size: 12px;"></div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 8px; background: rgba(0,0,0,0.1);">
+        <button class="action-btn secondary btn-sm" id="btn-cancel-omni-account">Fechar</button>
+        <button class="action-btn primary btn-sm" id="btn-save-omni-account" style="display: none;">Conectar Conta com Chave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Módulos Modulares do Zeus Chat (Issue #34) -->
+  <script type="module" src="js/chat/zeus_chat_core.js"></script>
+  <script type="module" src="js/chat/message_renderer.js"></script>
+  <script type="module" src="js/chat/subagent_card_renderer.js"></script>
+
+  <!-- Módulos Modulares de Configurações (Issue #35) -->
+  <script type="module" src="js/settings/appearance_controller.js"></script>
+  <script type="module" src="js/settings/local_ai_controller.js"></script>
+  <script type="module" src="js/settings/governance_controller.js"></script>
+  <script type="module" src="js/settings/customizations_controller.js"></script>
+  <script type="module" src="js/settings/omniroute_connectors.js"></script>
+  <script type="module" src="js/settings/omniroute_oauth.js"></script>
+  <script type="module" src="js/settings/omniroute_accounts.js"></script>
+  <script type="module" src="js/settings/omniroute_models.js"></script>
+  <script type="module" src="js/settings/omniroute_controller.js"></script>
+  <script type="module" src="js/settings/settings_main.js"></script>
+  <script type="module" src="js/settings.js"></script>
+  <script type="module" src="app.js?v=3.4"></script>
 </body>
 </html>

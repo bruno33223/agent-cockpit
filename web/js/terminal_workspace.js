@@ -758,7 +758,7 @@ export class TerminalWorkspaceManager {
     }
 
     this.counter++;
-    const id = options.id || (isVisualChat ? 'zeus-chat' : `term-${Date.now()}-${this.counter}`);
+    const id = options.id || (isVisualChat ? `zeus-chat-${Date.now()}-${this.counter}` : `term-${Date.now()}-${this.counter}`);
     const contextKey = options.contextKey || this.activeContextKey || (currentProjectId ? `project:${currentProjectId}` : 'global');
     let projectId = options.projectId;
     let taskId = options.taskId;
@@ -778,8 +778,16 @@ export class TerminalWorkspaceManager {
     const role = options.role || (options.taskId ? 'agent' : 'orchestrator');
     const sliceId = options.sliceId || (role === 'agent' ? (activeSliceId || options.taskId) : null);
     const agentType = options.agentType || (isVisualChat ? 'zeus' : (options.name && options.name.toLowerCase().includes('claude') ? 'claude' : (options.name && options.name.toLowerCase().includes('opencode') ? 'opencode' : 'bash')));
+
+    let visualChatCount = 0;
+    for (const [, s] of this.sessions) {
+      if (s.role === 'visual-chat' || (s.name && s.name.includes('Zeus Chat'))) {
+        visualChatCount++;
+      }
+    }
+
     const defaultName = isVisualChat
-      ? 'Zeus Chat'
+      ? (visualChatCount === 0 ? 'Zeus Chat' : `Zeus Chat #${visualChatCount + 1}`)
       : (role === 'orchestrator'
         ? (this.counter === 1 ? 'Orquestrador' : `Orquestrador #${this.counter}`)
         : (role === 'agent'
@@ -878,27 +886,28 @@ export class TerminalWorkspaceManager {
               <span class="orca-tab-icon">${iconHtml}</span>
               <span class="orca-tab-title">${escapeHtml(name)}</span>
             </div>
-            <span class="orca-role-badge role-visual-chat" title="Zeus Master Chat">
-              <img src="/zeus_terminal_god.svg" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 4px;" alt="" /> Zeus Chat
-            </span>
             <select class="zeus-model-select zeus-pane-model-select" style="margin-left: 8px; height: 24px; font-size: 11px; padding: 0 6px;" title="Selecionar modelo de IA"></select>
-            <div class="orca-pane-controls ml-auto" style="display: flex; align-items: center; gap: 4px;">
-              <button type="button" class="zeus-btn-skills zeus-pane-btn-skills action-btn btn-sm" style="height: 24px; padding: 0 8px; font-size: 10px;" title="Configurar Skills e MCPs">⚡ Skills & MCPs</button>
-              <button class="orca-pane-btn zeus-btn-clear-history" id="btn-clear-zeus-chat" title="Limpar Mensagens">🗑️</button>
+            <div class="orca-pane-controls ml-auto" style="display: flex; align-items: center; gap: 4px; position: relative;">
+              <button type="button" class="zeus-btn-skills zeus-pane-btn-skills action-btn btn-sm" style="height: 24px; padding: 0 8px; font-size: 10px; display: inline-flex; align-items: center; gap: 4px;" title="Configurar Skills e MCPs">
+                <span>⚡ Skills & MCPs</span>
+                <span class="zeus-pane-skills-badge-count" style="display: none; font-size: 9px; padding: 1px 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); color: #cbd5e1;">0</span>
+              </button>
+              <div class="zeus-skills-popover zeus-pane-skills-popover" style="display: none;"></div>
+              <button class="orca-pane-btn zeus-btn-clear-history" id="btn-clear-${id}" title="Limpar Mensagens">🗑️</button>
               <button class="orca-pane-btn orca-btn-minimize" title="Minimizar (Ocultar Terminal)">–</button>
               <button class="orca-pane-btn orca-btn-close danger" title="Fechar sessão (×)">×</button>
             </div>
           </div>
         </div>
         <div class="pane-body zeus-chat-pane-body" style="width: 100%; height: calc(100% - 35px); display: flex; flex-direction: column; overflow: hidden; background: var(--bg-void, #0c0e11);">
-          <div class="zeus-chat-messages" id="zeus-chat-messages" style="flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;"></div>
+          <div class="zeus-chat-messages" id="zeus-chat-messages-${id}" style="flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;"></div>
           <div class="zeus-attachments-preview" style="display: none; padding: 6px 14px; background: rgba(0,0,0,0.2); gap: 8px; flex-wrap: wrap;"></div>
           <div class="zeus-chat-input-bar" style="border-top: 1px solid var(--border-subtle, #23282f); padding: 10px 14px; display: flex; gap: 8px; background: var(--bg-surface, #111417); align-items: flex-end;">
             <button type="button" class="zeus-btn-attach" title="Anexar imagem (ou cole com Ctrl+V)" style="height: 38px; width: 38px; min-width: 38px;">📷</button>
             <input type="file" class="zeus-file-input" accept="image/*" multiple style="display: none;" />
             <button type="button" class="zeus-btn-mic" title="Gravar áudio (STT em RAM)" style="height: 38px; width: 38px; min-width: 38px;">🎙️</button>
-            <textarea class="zeus-chat-input" id="zeus-chat-input" placeholder="Comunique-se com o Orquestrador Zeus ou despache subagentes..." rows="1" style="flex: 1; resize: none; min-height: 38px; max-height: 120px; padding: 8px 12px; border-radius: 6px; background: var(--bg-card, #181b20); border: 1px solid var(--border, #23282f); color: var(--foreground, #f4f4f5); font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;"></textarea>
-            <button class="action-btn primary btn-sm btn-send-zeus-chat" id="btn-send-zeus-chat" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+            <textarea class="zeus-chat-input" id="zeus-chat-input-${id}" placeholder="Comunique-se com o Orquestrador Zeus ou despache subagentes..." rows="1" style="flex: 1; resize: none; min-height: 38px; max-height: 120px; padding: 8px 12px; border-radius: 6px; background: var(--bg-card, #181b20); border: 1px solid var(--border, #23282f); color: var(--foreground, #f4f4f5); font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;"></textarea>
+            <button class="action-btn primary btn-sm btn-send-zeus-chat" id="btn-send-${id}" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
               <span>Enviar</span>
               <span>⚡</span>
             </button>
@@ -1151,21 +1160,24 @@ export class TerminalWorkspaceManager {
     return session;
   }
 
-  openZeusChat() {
-    // 1. Procura se já existe sessão de Zeus Chat ativa
-    for (const [id, s] of this.sessions) {
-      if (s.role === 'visual-chat' || id === 'zeus-chat' || s.name === 'Zeus Chat') {
-        this.selectSession(id);
-        if (s.focusInput) s.focusInput();
-        return s;
+  openZeusChat(options = {}) {
+    const forceNew = options.forceNew !== undefined ? options.forceNew : true;
+
+    // Se forceNew for explicitamente false e já houver sessão ativa, apenas foca
+    if (!forceNew) {
+      for (const [id, s] of this.sessions) {
+        if (s.role === 'visual-chat' || (s.name && s.name.includes('Zeus Chat'))) {
+          this.selectSession(id);
+          if (s.focusInput) s.focusInput();
+          return s;
+        }
       }
     }
 
-    // 2. Cria nova sessão nativa visual-chat no TerminalWorkspaceManager
+    // Cria nova sessão nativa visual-chat ilimitada no TerminalWorkspaceManager
     const session = this.createSession({
-      id: 'zeus-chat',
+      name: options.name,
       role: 'visual-chat',
-      name: 'Zeus Chat',
       agentType: 'zeus',
       cwd: this.getActiveProjectRoot ? this.getActiveProjectRoot() : '/'
     });
@@ -1181,7 +1193,7 @@ export class TerminalWorkspaceManager {
     const header = elPane.querySelector('.orca-pane-header');
     if (!header) return;
 
-    header.style.cursor = 'grab';
+    header.style.cursor = 'default';
 
     let isDragging = false;
     let startMouseX = 0;
@@ -1198,6 +1210,7 @@ export class TerminalWorkspaceManager {
 
       isDragging = true;
       header.style.cursor = 'grabbing';
+      document.body.style.cursor = 'grabbing';
       elPane.classList.add('is-dragging');
 
       // Traz o painel arrastado para a camada de foco superior
@@ -1256,7 +1269,8 @@ export class TerminalWorkspaceManager {
       const onMouseUp = () => {
         if (!isDragging) return;
         isDragging = false;
-        header.style.cursor = 'grab';
+        header.style.cursor = 'default';
+        document.body.style.cursor = '';
         elPane.classList.remove('is-dragging');
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
@@ -1461,6 +1475,14 @@ export class TerminalWorkspaceManager {
     try {
       session.term.dispose();
     } catch (e) {}
+
+    if (session.role === 'visual-chat' || (typeof window !== 'undefined' && window.zeusChatWorkspace)) {
+      try {
+        if (typeof window !== 'undefined' && window.zeusChatWorkspace && window.zeusChatWorkspace.closeSession) {
+          window.zeusChatWorkspace.closeSession(id);
+        }
+      } catch (e) {}
+    }
 
     this.sessions.delete(id);
 
