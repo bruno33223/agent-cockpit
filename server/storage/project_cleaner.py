@@ -58,7 +58,7 @@ def default_initial_state(project_name: Optional[str] = None, project_root: Opti
         "nodes": nodes, "pairs_3x3": pairs_3x3, "project_root": project_root,
         "steering_messages": [{"id": "msg-0", "sender": "ORCHESTRATOR", "text": "Agent Cockpit online. Conecte o Antigravity via MCP para iniciar o fluxo Spec-Driven.", "timestamp": time.strftime("%H:%M:%S"), "consumed": True}],
         "gauntlet_log": [],
-        "human_gates": {"gate_plan_approved": True, "gate_ship_approved": False, "last_approved_at": None, "approved_by": None},
+        "human_gates": {"gate_plan_approved": False, "gate_ship_approved": False, "last_approved_at": None, "approved_by": None},
         "last_handoff": None,
         "local_worker": {"enabled": False, "provider": "ollama", "endpoint": "http://127.0.0.1:11434", "model": "deepseek-coder-v2:16b-q3_k_m", "circuit_breaker_threshold": 2, "consecutive_failures": {}, "auto_start_ollama": False, "delegate_styles_to_cloud": True},
         "governance_settings": {"autostart_slices": False, "security_preset": "standard", "human_gate_policy": "manual", "artifact_review_policy": "strict"},
@@ -160,18 +160,44 @@ def purge_stale_or_temp_projects(
     }
 
 
-def verify_commit_proof(repo_root: str, slice_id: str, base_branch: str = "master") -> Dict[str, Any]:
+def detect_base_branch(repo_root: str) -> str:
+    """Detecta dinamicamente a branch base do repositório (origin/HEAD, main, master ou branch atual)."""
+    root = os.path.abspath(os.path.expanduser(repo_root))
+    if not os.path.isdir(root):
+        return "main"
+    res_sym = subprocess.run(["git", "-C", root, "symbolic-ref", "refs/remotes/origin/HEAD"], capture_output=True, text=True, check=False)
+    if res_sym.returncode == 0 and res_sym.stdout.strip():
+        branch = res_sym.stdout.strip().split("/")[-1].strip()
+        if branch:
+            return branch
+    for candidate in ("main", "master"):
+        if subprocess.run(["git", "-C", root, "rev-parse", "--verify", candidate], capture_output=True, text=True, check=False).returncode == 0:
+            return candidate
+    res_curr = subprocess.run(["git", "-C", root, "branch", "--show-current"], capture_output=True, text=True, check=False)
+    curr = res_curr.stdout.strip() if res_curr.returncode == 0 else ""
+    if curr:
+        return curr
+    return "HEAD" if subprocess.run(["git", "-C", root, "rev-parse", "--verify", "HEAD"], capture_output=True, text=True, check=False).returncode == 0 else "main"
+
+
+def verify_commit_proof(repo_root: str, slice_id: str, base_branch: Optional[str] = None) -> Dict[str, Any]:
     root, branch = os.path.abspath(os.path.expanduser(repo_root)), f"cockpit/{slice_id}"
+    target_base = base_branch
+    if target_base and subprocess.run(["git", "-C", root, "rev-parse", "--verify", target_base], capture_output=True, text=True, check=False).returncode != 0:
+        target_base = None
+    if not target_base:
+        target_base = detect_base_branch(root)
     res = subprocess.run(["git", "-C", root, "rev-parse", "--verify", branch], capture_output=True, text=True, check=False)
     if res.returncode != 0:
         return {"valid_proof": False, "reason": f"Branch '{branch}' não encontrada no repositório. O subagente não comitou nada.", "commits_count": 0}
     b_head = res.stdout.strip()
-    res_b = subprocess.run(["git", "-C", root, "rev-parse", "--verify", base_branch], capture_output=True, text=True, check=False)
+    res_b = subprocess.run(["git", "-C", root, "rev-parse", "--verify", target_base], capture_output=True, text=True, check=False)
     if b_head == (res_b.stdout.strip() if res_b.returncode == 0 else ""):
-        return {"valid_proof": False, "reason": f"A branch '{branch}' aponta exatamente para a '{base_branch}'. Nenhum commit de trabalho foi produzido.", "commits_count": 0}
-    log = subprocess.run(["git", "-C", root, "log", f"{base_branch}..{branch}", "--oneline"], capture_output=True, text=True, check=False)
+        return {"valid_proof": False, "reason": f"A branch '{branch}' aponta exatamente para a '{target_base}'. Nenhum commit de trabalho foi produzido.", "commits_count": 0}
+    log = subprocess.run(["git", "-C", root, "log", f"{target_base}..{branch}", "--oneline"], capture_output=True, text=True, check=False)
     lines = [l.strip() for l in log.stdout.splitlines() if l.strip()]
     return {"valid_proof": len(lines) > 0, "head_commit": b_head, "commits_count": len(lines), "commits": lines, "latest_commit_msg": lines[0] if lines else ""}
+
 
 
 def checkpoint_ops(states_dir: str, atomic_write_fn: Callable, action: str, project_id: str, state: Optional[Dict[str, Any]] = None) -> Any:

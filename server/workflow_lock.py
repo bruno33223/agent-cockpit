@@ -38,8 +38,10 @@ def create_blueprint_lock(
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "slices": lock_slices,
         "human_gates": {
-            "gate_plan_approved": True,
-            "gate_ship_approved": False
+            "gate_plan_approved": False,
+            "gate_ship_approved": False,
+            "last_approved_at": None,
+            "approved_by": None
         }
     }
 
@@ -166,3 +168,25 @@ def read_latest_handoff(base_dir: str = ".") -> Optional[Dict[str, Any]]:
         }
     except Exception as e:
         return {"error": str(e)}
+
+def approve_gate(
+    gate_name: str = "gate_plan_approved",
+    approved_by: str = "user",
+    blueprint_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """Aprova formalmente um human gate no blueprint.lock.json."""
+    target_dir = blueprint_dir or find_latest_blueprint_dir(".")
+    if not target_dir:
+        return {"status": "ERROR", "reason": "Diretório de blueprint não encontrado"}
+    lock_path = os.path.join(target_dir, "blueprint.lock.json")
+    if not os.path.exists(lock_path):
+        return {"status": "ERROR", "reason": f"Lock file não encontrado em {lock_path}"}
+    with open(lock_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    gates = data.setdefault("human_gates", {})
+    gates[gate_name] = True
+    gates["last_approved_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    gates["approved_by"] = approved_by
+    with open(lock_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    return {"status": "APPROVED", "gate": gate_name, "approved_by": approved_by, "blueprint_dir": target_dir}

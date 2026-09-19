@@ -6,13 +6,9 @@ except ImportError:
     fcntl = None
 from typing import List, Dict, Any, Optional
 from .project_cleaner import (
-    is_slice_identifier,
-    validate_and_normalize_project_path,
-    default_initial_state,
-    purge_stale_or_temp_projects,
-    verify_commit_proof,
-    checkpoint_ops,
-    scan_local_projects_impl
+    is_slice_identifier, validate_and_normalize_project_path, default_initial_state,
+    purge_stale_or_temp_projects, verify_commit_proof, detect_base_branch,
+    checkpoint_ops, scan_local_projects_impl
 )
 
 def normalize_canonical_path(path: str) -> str:
@@ -292,5 +288,9 @@ class ProjectRepository:
     def read_checkpoint(self, project_id: str) -> Optional[Dict[str, Any]]:
         return checkpoint_ops(self.states_dir, self._atomic_write_json, "read", project_id)
 
-    def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: str = "master") -> Dict[str, Any]:
+    def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: Optional[str] = None) -> Dict[str, Any]:
         return verify_commit_proof(repo_root, slice_id, base_branch)
+
+    def detect_base_branch(self, repo_root: str) -> str:
+        return detect_base_branch(repo_root)
+

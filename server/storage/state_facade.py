@@ -20,7 +20,7 @@ class StateFacade:
         env_dir = os.getenv("COCKPIT_STATES_DIR")
         self.states_dir = os.path.abspath(states_dir or env_dir or os.path.join(BASE_DIR, 'states'))
         self.index_file = os.path.join(self.states_dir, 'projects_index.json')
-        self.legacy_file = os.getenv("COCKPIT_LEGACY_FILE") or LEGACY_STATE_FILE
+        self.legacy_file = os.getenv("COCKPIT_LEGACY_FILE") or (LEGACY_STATE_FILE if states_dir is None else os.path.join(self.states_dir, 'workflow_state.json'))
         self.lock = threading.RLock()
         self.listeners: List[Callable] = []
 
@@ -218,8 +218,10 @@ class StateFacade:
         res = self.project_repo.purge_stale_or_temp_projects()
         self._notify("PROJECTS_UPDATED", self.list_projects())
         return res
-    def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: str = "master") -> Dict[str, Any]:
+    def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: Optional[str] = None) -> Dict[str, Any]:
         return self.project_repo.verify_worktree_commit_proof(repo_root, slice_id, base_branch)
+    def detect_base_branch(self, repo_root: str) -> str: return self.project_repo.detect_base_branch(repo_root)
+
 
     # Delegações para SliceRepository
     def sync_epic(self, epic_name: str, goal: str, vertical_slices: List[Dict[str, Any]], project_root: Optional[str] = None, project_id: Optional[str] = None) -> Dict[str, Any]:
