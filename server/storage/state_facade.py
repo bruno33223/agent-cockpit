@@ -95,7 +95,10 @@ class StateFacade:
     def _save_state(self, state: Dict[str, Any], project_id: str):
         target_pid = self.resolve_project_id(project_id)
         self._atomic_write_json(self._get_project_file(target_pid), state)
-        self.project_repo._update_index_entry(target_pid, state.get("epic", {}).get("name", "Épico"), state.get("project_root"), state)
+        existing_name = self.project_repo._read_index().get("projects", {}).get(target_pid, {}).get("name")
+        folder_name = os.path.basename(state.get("project_root")) if state.get("project_root") else None
+        proj_name = state.get("project_name") or existing_name or folder_name or state.get("epic", {}).get("name", "Épico")
+        self.project_repo._update_index_entry(target_pid, proj_name, state.get("project_root"), state)
         if target_pid == self.get_current_project_id():
             self._sync_legacy_file(state)
 

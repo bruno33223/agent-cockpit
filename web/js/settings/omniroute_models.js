@@ -92,6 +92,14 @@ export function renderOmniRouteModels(filterQuery = '') {
     activeOpt.selected = true;
     selectEl.insertBefore(activeOpt, selectEl.children[1] || null);
   }
+
+  if (list.length === 0 || (list.length === 1 && list[0] === 'auto')) {
+    const hintOpt = document.createElement('option');
+    hintOpt.value = '';
+    hintOpt.disabled = true;
+    hintOpt.textContent = '(Nenhum modelo conectado no OmniRoute - Inicie o daemon ou conecte contas)';
+    selectEl.appendChild(hintOpt);
+  }
 }
 
 export async function applyOmniRouteActiveModel() {

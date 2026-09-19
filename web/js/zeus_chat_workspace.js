@@ -52,10 +52,24 @@ export class ZeusChatSessionController {
     this.fileInput?.addEventListener('change', (e) => { Array.from(e.target.files || []).forEach(f => this.addAttachedImage(f)); e.target.value = ''; });
     this.btnMic?.addEventListener('click', () => this.toggleRecording());
     this.btnSkills?.addEventListener('click', () => { if (this.skillsPopover) this.skillsPopover.style.display = this.skillsPopover.style.display === 'none' ? 'flex' : 'none'; });
+    this.modelSelect?.addEventListener('change', (e) => { this.selectedModel = e.target.value; });
+    this.loadAvailableModels();
 
     const renderWelcome = () => { if (this.messages.length === 0) this.renderMessage({ role: 'assistant', author: 'Orquestrador Zeus', content: '⚡ **Zeus Master Chat Online.** Orquestração de alto nível e controle de subagentes.', timestamp: new Date().toLocaleTimeString() }); };
     if (savedId) { this.loadHistory(savedId).then(h => { if (!h || !h.length) renderWelcome(); }).catch(renderWelcome); }
     else { renderWelcome(); }
+  }
+
+  async loadAvailableModels() {
+    if (!this.modelSelect) return;
+    try {
+      const list = await this.core.loadAvailableModels();
+      if (Array.isArray(list) && list.length > 0) {
+        this.modelSelect.innerHTML = list.map(m => `<option value="${m.id || m}">${m.name || m}</option>`).join('');
+        if (this.selectedModel && list.some(m => (m.id || m) === this.selectedModel)) this.modelSelect.value = this.selectedModel;
+        else if (this.modelSelect.value) this.selectedModel = this.modelSelect.value;
+      }
+    } catch (_) {}
   }
 
   async loadHistory(sessionId = this.sessionId) {
@@ -67,8 +81,7 @@ export class ZeusChatSessionController {
         if (this.messagesContainer) this.messagesContainer.innerHTML = '';
         this.messages = [];
         history.forEach(item => {
-          const role = item.role || 'assistant';
-          const author = item.author || (role === 'user' ? 'Você' : 'Orquestrador Zeus');
+          const role = item.role || 'assistant', author = item.author || (role === 'user' ? 'Você' : 'Orquestrador Zeus');
           const time = item.timestamp ? (typeof item.timestamp === 'number' ? new Date(item.timestamp * 1000).toLocaleTimeString() : String(item.timestamp)) : new Date().toLocaleTimeString();
           this.renderMessage({ role, author, content: item.content || '', thinking: item.thinking || null, tools: item.tool_calls || item.tools || [], images: item.images || [], timestamp: time });
         });
@@ -86,8 +99,7 @@ export class ZeusChatSessionController {
 
   async clearMessages() {
     this.messages = []; if (this.messagesContainer) this.messagesContainer.innerHTML = '';
-    const oldId = this.sessionId;
-    this.sessionId = `zeus-chat-${Date.now()}`;
+    const oldId = this.sessionId; this.sessionId = `zeus-chat-${Date.now()}`;
     if (this.session) this.session.id = this.sessionId;
     setStoredSessionId(this.sessionId);
     if (oldId && this.core) await this.core.clearHistory(oldId).catch(() => {});
@@ -144,9 +156,7 @@ export class ZeusChatSessionController {
       liveMsg.card?.querySelectorAll('.typing-indicator, .thinking-indicator, [data-indicator="typing"]').forEach(el => el.remove());
       if (liveMsg.body) {
         liveMsg.body.querySelectorAll('.typing-indicator, .thinking-indicator').forEach(el => el.remove());
-        if (liveMsg.body.innerHTML && liveMsg.body.innerHTML.includes('Processando instrução')) {
-          liveMsg.body.innerHTML = liveMsg.body.innerHTML.replace(/<span[^>]*class="[^"]*(?:typing|thinking)-indicator[^"]*"[^>]*>.*?<\/span>/gi, '').replace(/⚡ Processando instrução\.\.\./g, '').trim();
-        }
+        if (liveMsg.body.innerHTML?.includes('Processando instrução')) liveMsg.body.innerHTML = liveMsg.body.innerHTML.replace(/<span[^>]*class="[^"]*(?:typing|thinking)-indicator[^"]*"[^>]*>.*?<\/span>/gi, '').replace(/⚡ Processando instrução\.\.\./g, '').trim();
       }
       if (!liveMsg.startedContent || !liveMsg.body?.textContent?.trim()) {
         if (liveMsg.body) liveMsg.body.innerHTML = '<span class="zeus-empty-completed" style="color: var(--text-muted, #94a3b8); font-style: italic;">⚡ Concluído.</span>';
@@ -160,8 +170,7 @@ export class ZeusChatSessionController {
   async sendMessage() {
     if (!this.chatInput) return;
     const text = this.chatInput.value.trim();
-    if (!text && this.core.attachedImages.length === 0) return;
-    if (this.isProcessing) return;
+    if ((!text && this.core.attachedImages.length === 0) || this.isProcessing) return;
     this.isProcessing = true;
     this.chatInput.value = ''; this.chatInput.disabled = true;
     if (this.btnSend) this.btnSend.disabled = true;
@@ -204,10 +213,7 @@ export class ZeusChatWorkspaceManager {
   }
   closeSession(sessionId) {
     const c = this.sessions.get(sessionId); if (c) { c.destroy(); this.sessions.delete(sessionId); }
-    if (this.activeSessionId === sessionId) {
-      const keys = Array.from(this.sessions.keys());
-      this.activeSessionId = keys.length ? keys[keys.length - 1] : null;
-    }
+    if (this.activeSessionId === sessionId) { const keys = Array.from(this.sessions.keys()); this.activeSessionId = keys.length ? keys[keys.length - 1] : null; }
   }
   getSession(id) { return this.sessions.get(id) || null; }
   getActiveSession() {

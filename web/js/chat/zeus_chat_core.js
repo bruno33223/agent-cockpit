@@ -20,13 +20,9 @@ export class ZeusChatCore {
     if (!modelName) return false;
     const name = String(modelName).toLowerCase();
     const textOnly = ['coder', 'gpt-3.5', 'gpt-35', 'deepseek-chat', 'deepseek-coder', 'llama-3-8b', 'llama-3-70b', 'llama3:8b', 'llama3:latest', 'mistral:7b', 'codellama', 'qwen2.5-coder'];
-    for (const kw of textOnly) {
-      if (name.includes(kw) && !name.includes('vision')) return false;
-    }
+    if (textOnly.some(kw => name.includes(kw) && !name.includes('vision'))) return false;
     const visionKw = ['gpt-4o', 'gpt-4-turbo', 'gemini', 'claude-3', 'claude-3-5', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku', 'llava', 'bakllava', 'vision', 'multimodal', 'pixtral', 'qwen-vl', 'minicpm-v', 'llama-3.2-11b-vision', 'llama-3.2-90b-vision'];
-    for (const kw of visionKw) {
-      if (name.includes(kw)) return true;
-    }
+    if (visionKw.some(kw => name.includes(kw))) return true;
     const found = this.availableModels.find(m => (m.id || m.name || '').toLowerCase() === name);
     return Boolean(found && (found.supports_vision || found.vision || (found.capabilities && found.capabilities.includes('vision'))));
   }
@@ -56,6 +52,8 @@ export class ZeusChatCore {
         if (!list.some(x => x.id === id)) list.push({ id, name: `${id} (Local)`, provider: 'Local Worker', supports_vision: this.isVisionSupported(id) });
       });
     } catch (_) {}
+    if (!list.some(x => (x.id || x) === 'auto')) list.unshift({ id: 'auto', name: 'auto (Roteamento Automático)', provider: 'OmniRoute', supports_vision: true });
+    if (!list.some(x => (x.id || x) === 'opencode/big-pickle')) list.push({ id: 'opencode/big-pickle', name: 'opencode/big-pickle (Padrão)', provider: 'OpenCode', supports_vision: true });
     this.availableModels = list;
     return list;
   }
