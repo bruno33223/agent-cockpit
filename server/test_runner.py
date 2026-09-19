@@ -3,8 +3,77 @@ import re
 import sys
 import time
 import signal
+import shlex
 import subprocess
 from typing import Dict, List, Any, Optional
+
+ALLOWED_TEST_EXECUTORS = {
+    "pytest", "python", "python3", "unittest",
+    "npm", "yarn", "pnpm", "npx",
+    "cargo", "dotnet", "go", "mvn", "gradle",
+    "vitest", "jest"
+}
+
+DANGEROUS_SHELL_OPERATORS = {";", "&&", "||", "|", "&"}
+
+
+def sanitize_and_validate_test_command(command: str) -> List[str]:
+    """Sanitiza e valida o comando de teste para execução segura com shell=False.
+    Bloqueia operadores de encadeamento, injeções e binários não autorizados.
+    """
+    if not command or not isinstance(command, str) or not command.strip():
+        raise ValueError("Comando de teste vazio ou inválido.")
+
+    raw = command.strip()
+    if "\n" in raw or "\r" in raw:
+        raise ValueError("Comando de teste contém quebras de linha não permitidas.")
+
+    try:
+        tokens = shlex.split(raw)
+    except Exception as e:
+        raise ValueError(f"Falha ao interpretar comando de teste: {e}")
+
+    if not tokens:
+        raise ValueError("Comando de teste vazio após interpretação.")
+
+    # 1. Validação do binário executor (primeiro token)
+    executor_token = tokens[0]
+    executor_name = os.path.basename(executor_token).lower()
+    if executor_name.endswith(".exe"):
+        executor_name = executor_name[:-4]
+
+    if executor_name not in ALLOWED_TEST_EXECUTORS:
+        allowed_str = ", ".join(sorted(ALLOWED_TEST_EXECUTORS))
+        raise ValueError(
+            f"Executor de teste não permitido: '{executor_token}'. "
+            f"Executores permitidos: {allowed_str}"
+        )
+
+    # 2. Validação contra injeções de shell em cada token
+    for i, tok in enumerate(tokens):
+        if "`" in tok or "$(" in tok:
+            raise ValueError(f"Substituição de shell não permitida no token: {tok}")
+
+        if ">" in tok or "<" in tok:
+            raise ValueError(f"Redirecionamento de shell não permitido no token: {tok}")
+
+        if tok in DANGEROUS_SHELL_OPERATORS:
+            raise ValueError(f"Operador de encadeamento de shell não permitido: {tok}")
+
+        if tok.endswith(";") or tok.endswith("&"):
+            raise ValueError(f"Token contém caractere de encadeamento de shell: {tok}")
+
+        if ";" in tok or "|" in tok or "&" in tok:
+            is_valid_python_arg = (
+                executor_name in ("python", "python3")
+                and i > 0
+                and tokens[i - 1] == "-c"
+            )
+            if not is_valid_python_arg:
+                raise ValueError(f"Caractere de controle de shell não permitido no token: {tok}")
+
+    return tokens
+
 
 def auto_detect_test_command(working_dir: str = ".") -> str:
     """Detecta automaticamente o comando de teste apropriado para a codebase."""
@@ -34,6 +103,7 @@ def auto_detect_test_command(working_dir: str = ".") -> str:
 
     return "pytest"
 
+
 def run_distilled_tests(
     test_command: Optional[str] = None,
     working_dir: str = ".",
@@ -56,9 +126,33 @@ def run_distilled_tests(
     start_time = time.time()
 
     try:
+        cmd_list = sanitize_and_validate_test_command(test_command)
+    except ValueError as val_err:
+        return {
+            "status": "ERROR",
+            "command": test_command,
+            "duration_seconds": 0.0,
+            "exit_code": 1,
+            "summary": f"Validação de segurança: {str(val_err)}",
+            "failures_count": 1,
+            "failures": [{
+                "test_name": "SecurityValidationError",
+                "file": None,
+                "line": None,
+                "message": f"Validação de segurança: {str(val_err)}"
+            }],
+            "tdd_validation": {
+                "mode": tdd_mode,
+                "compliant": False,
+                "message": f"Comando de teste rejeitado por segurança: {str(val_err)}"
+            },
+            "error": f"Validação de segurança: {str(val_err)}"
+        }
+
+    try:
         proc = subprocess.Popen(
-            test_command,
-            shell=True,
+            cmd_list,
+            shell=False,
             cwd=working_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

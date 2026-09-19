@@ -36,6 +36,7 @@ workflow_state.json
 states/*.json
 states/terminals/
 states/cache/
+states/session_token.txt
 !states/.gitkeep
 opencode.json
 *.key

@@ -7,7 +7,7 @@
       "name": "OmniRoute Gateway",
       "options": {
         "baseURL": "http://localhost:20128/v1",
-        "apiKey": "omniroute-local"
+        "apiKey": "your-api-key-here"
       },
       "models": {
         "auto": {
@@ -20,8 +20,8 @@
     "agent-cockpit": {
       "type": "local",
       "command": [
-        "/usr/bin/python3",
-        "/home/bruno/Projects/agent-cockpit/server/mcp_server.py"
+        "python3",
+        "server/mcp_server.py"
       ],
       "enabled": true
     }

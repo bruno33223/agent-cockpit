@@ -1,6 +1,7 @@
 """
 web_server.py: Ponto de entrada modular e enxuto do Agent Cockpit Server.
 Instancia FastAPI, middlewares, WebSocket /ws, montagem estática e agrega APIRouters.
+Governança Issue #32 (< 200 linhas) e Hardening Issue #38 (Autenticação Local).
 """
 
 import os
@@ -18,6 +19,7 @@ from state_store import db
 from connection_manager import manager, ConnectionManager
 from port_utils import has_listening_socket, is_port_in_use, create_bound_socket, handle_port_conflict
 from fs_utils import _resolve_project_fs_root
+from auth import auth_middleware, verify_ws_auth, auth_manager, AuthManager
 
 try:
     import opencode_manager
@@ -43,16 +45,13 @@ _watch_task: Optional[asyncio.Task] = None
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:20128", "http://127.0.0.1:20128",
-        "http://localhost:3000", "http://127.0.0.1:3000",
-        "http://localhost:5173", "http://127.0.0.1:5173",
-    ],
+    allow_origins=["http://localhost:20128", "http://127.0.0.1:20128", "http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(auth_middleware)
 
 
 @app.middleware("http")
@@ -64,6 +63,14 @@ async def add_no_cache_for_static_assets(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+
+@app.get("/api/auth/status")
+async def auth_status_endpoint(request: Request):
+    """Endpoint público de verificação de status de autenticação."""
+    req = auth_manager.is_auth_required()
+    tok = auth_manager.extract_token_from_request(request) if req else None
+    return {"auth_required": req, "authenticated": auth_manager.verify_token(tok) if req else True}
 
 
 async def file_watch_loop():
@@ -135,6 +142,8 @@ async def shutdown_event():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    if not await verify_ws_auth(websocket):
+        return
     await manager.connect(websocket)
     try:
         while True:
@@ -166,23 +175,15 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# MONTAGEM DOS APIRouters
-app.include_router(telemetry.router)
-app.include_router(settings.router)
-app.include_router(omniroute.router)
-app.include_router(models.router)
-app.include_router(pty.router)
-app.include_router(orchestrator.router)
-app.include_router(zeus_chat.router)
+for _r in (telemetry.router, settings.router, omniroute.router, models.router, pty.router, orchestrator.router, zeus_chat.router):
+    app.include_router(_r)
 
 # Compatibilidade FastAPI 0.141+ para inspeção direta de app.routes
 for inc in list(app.router.routes):
     if hasattr(inc, "original_router"):
         app.router.routes.remove(inc)
-        for sub_route in inc.original_router.routes:
-            app.router.routes.append(sub_route)
+        app.router.routes.extend(inc.original_router.routes)
 
-# MONTAGEM DOS ARQUIVOS ESTÁTICOS NO FINAL
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 if os.path.exists(WEB_DIR):
     app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
