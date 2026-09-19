@@ -4,6 +4,7 @@ Cuida da configuração do OmniRoute (endpoint, API key, modelos), detecção de
 detecção de conectores e provedores, detecção de binários e geração de opencode.json.
 """
 
+import subprocess
 import os
 import sys
 import json
@@ -11,6 +12,7 @@ import re
 import shutil
 import urllib.request
 import urllib.error
+import urllib.parse
 import time
 import uuid
 import threading
@@ -233,7 +235,27 @@ def detect_omniroute_connectors(base_url: Optional[str] = None) -> List[Dict[str
                     elif isinstance(m, str):
                         models_list.append(m)
     except Exception:
-        return []
+        pass
+
+    # Enriquecimento com modelos vivos de contas diretas (ex: Antigravity/AGY)
+    origin = resolve_omniroute_origin(base_url)
+    for prov in ("antigravity", "agy"):
+        try:
+            prov_req = urllib.request.Request(
+                f"{origin}/api/v1/providers/{prov}/models",
+                headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+            )
+            with urllib.request.urlopen(prov_req, timeout=1.5) as prov_resp:
+                p_data = json.loads(prov_resp.read().decode("utf-8"))
+                p_models = p_data.get("data", []) if isinstance(p_data, dict) else []
+                for pm in p_models:
+                    pm_id = pm.get("id") if isinstance(pm, dict) else str(pm)
+                    if pm_id:
+                        full_id = pm_id if ("/" in pm_id) else f"{prov}/{pm_id}"
+                        if full_id not in models_list:
+                            models_list.append(full_id)
+        except Exception:
+            pass
 
     # Agrupa por conector/provedor
     groups: Dict[str, List[str]] = {}
@@ -364,6 +386,595 @@ def detect_binaries() -> Dict[str, Any]:
             "path": npm_path
         }
     }
+
+
+def resolve_omniroute_origin(base_url: Optional[str] = None) -> str:
+    """Retorna a origem (ex: http://localhost:20128) do OmniRoute sem /v1 ou trailing slashes."""
+    if base_url:
+        raw = base_url.rstrip("/")
+        if raw.endswith("/v1"):
+            raw = raw[:-3]
+        return raw.rstrip("/")
+    cfg = load_config()
+    raw = (cfg.get("omniroute_url") or "http://localhost:20128").rstrip("/")
+    if raw.endswith("/v1"):
+        raw = raw[:-3]
+    return raw.rstrip("/")
+
+
+def get_omniroute_daemon_status() -> Dict[str, Any]:
+    """Retorna o status do daemon OmniRoute (instalado, executando, porta, URL)."""
+    bins = detect_binaries()
+    omni_info = bins.get("omniroute", {})
+    installed = omni_info.get("installed", False)
+    omni_path = omni_info.get("path")
+    
+    origin = resolve_omniroute_origin()
+    running = False
+    message = "OmniRoute não está em execução."
+    
+    try:
+        health_req = urllib.request.Request(
+            f"{origin}/health",
+            headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+        )
+        with urllib.request.urlopen(health_req, timeout=1.5) as resp:
+            if resp.status in (200, 307):
+                running = True
+                message = "OmniRoute está online e respondendo."
+    except Exception:
+        try:
+            m_req = urllib.request.Request(
+                f"{origin}/v1/models",
+                headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+            )
+            with urllib.request.urlopen(m_req, timeout=1.5) as resp:
+                if resp.status in (200, 307):
+                    running = True
+                    message = "OmniRoute está online e respondendo."
+        except Exception as e:
+            running = False
+            message = f"OmniRoute inacessível em {origin}: {str(e)}"
+            
+    return {
+        "installed": installed,
+        "running": running,
+        "binary": omni_path,
+        "url": origin,
+        "message": message
+    }
+
+
+def start_omniroute_daemon() -> Dict[str, Any]:
+    """Inicia o daemon do OmniRoute em segundo plano caso não esteja em execução."""
+    status = get_omniroute_daemon_status()
+    if status.get("running"):
+        return {"status": "ok", "message": "OmniRoute já está em execução."}
+        
+    binary = status.get("binary")
+    if not binary or not os.path.isfile(binary):
+        return {"status": "error", "message": "Binário do OmniRoute não encontrado no sistema."}
+        
+    try:
+        subprocess.Popen(
+            [binary, "serve", "--daemon", "--no-open"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        origin = resolve_omniroute_origin()
+        for _ in range(15):
+            time.sleep(0.3)
+            try:
+                m_req = urllib.request.Request(
+                    f"{origin}/health",
+                    headers={"Accept": "application/json"}
+                )
+                with urllib.request.urlopen(m_req, timeout=1.0) as resp:
+                    if resp.status in (200, 307):
+                        return {"status": "ok", "message": "OmniRoute iniciado com sucesso."}
+            except Exception:
+                pass
+        return {"status": "ok", "message": "Comando de inicialização enviado ao OmniRoute."}
+    except Exception as e:
+        return {"status": "error", "message": f"Falha ao iniciar OmniRoute: {str(e)}"}
+
+
+def list_omniroute_accounts(base_url: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Consulta as conexões e contas configuradas na API de gerenciamento do OmniRoute."""
+    origin = resolve_omniroute_origin(base_url)
+    req = urllib.request.Request(
+        f"{origin}/api/providers?limit=5000",
+        headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            conns = data.get("connections", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            sanitized = []
+            for c in conns:
+                sanitized.append({
+                    "id": c.get("id"),
+                    "provider": c.get("provider"),
+                    "name": c.get("name") or c.get("provider"),
+                    "authType": c.get("authType", "apikey"),
+                    "isActive": c.get("isActive", True),
+                    "testStatus": c.get("testStatus", "unknown"),
+                    "lastTested": c.get("lastTested"),
+                    "lastError": c.get("lastError"),
+                    "defaultModel": c.get("defaultModel"),
+                })
+            return sanitized
+    except Exception:
+        return []
+
+
+def add_omniroute_account(payload: Dict[str, Any], base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Cadastra uma nova conexão de conta de provedor via POST /api/providers no OmniRoute."""
+    provider = str(payload.get("provider") or "").strip()
+    name = str(payload.get("name") or provider).strip()
+    if not provider:
+        return {"status": "error", "message": "Identificador do provedor é obrigatório."}
+        
+    api_body: Dict[str, Any] = {
+        "provider": provider,
+        "name": name or provider,
+    }
+    api_key = payload.get("api_key") or payload.get("apiKey")
+    if api_key:
+        api_body["apiKey"] = str(api_key).strip()
+        
+    default_model = payload.get("default_model") or payload.get("defaultModel")
+    if default_model:
+        api_body["defaultModel"] = str(default_model).strip()
+
+    url = payload.get("url") or payload.get("base_url") or payload.get("baseURL")
+    if url:
+        api_body["url"] = str(url).strip()
+
+    psd = payload.get("provider_specific_data") or payload.get("providerSpecificData") or {}
+    if isinstance(psd, dict):
+        if url and "baseURL" not in psd:
+            psd["baseURL"] = str(url).strip()
+        if psd:
+            api_body["providerSpecificData"] = psd
+        
+    origin = resolve_omniroute_origin(base_url)
+    req = urllib.request.Request(
+        f"{origin}/api/providers",
+        data=json.dumps(api_body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Agent-Cockpit/1.0"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            account = data.get("connection") or data.get("provider") or data
+            return {"status": "ok", "account": account}
+    except urllib.error.HTTPError as he:
+        err_msg = f"HTTP {he.code}"
+        try:
+            err_data = json.loads(he.read().decode("utf-8"))
+            err_msg = err_data.get("error", {}).get("message") or err_data.get("message") or str(err_data)
+        except Exception:
+            pass
+        return {"status": "error", "message": f"Erro do OmniRoute: {err_msg}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Falha ao conectar com OmniRoute: {str(e)}"}
+
+
+def delete_omniroute_account(account_id: str, base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Remove uma conexão de conta de provedor via DELETE /api/providers/:id no OmniRoute."""
+    if not account_id:
+        return {"status": "error", "message": "ID da conta é obrigatório."}
+    origin = resolve_omniroute_origin(base_url)
+    req = urllib.request.Request(
+        f"{origin}/api/providers/{urllib.parse.quote(str(account_id))}",
+        headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"},
+        method="DELETE"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            return {"status": "ok", "message": "Conta removida com sucesso."}
+    except urllib.error.HTTPError as he:
+        return {"status": "error", "message": f"Falha ao remover conta: HTTP {he.code}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Falha na comunicação: {str(e)}"}
+
+
+def test_omniroute_account(account_id: str, base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Testa a conexão de uma conta via POST /api/providers/:id/test no OmniRoute."""
+    if not account_id:
+        return {"valid": False, "status": "error", "message": "ID da conta é obrigatório."}
+    origin = resolve_omniroute_origin(base_url)
+    req = urllib.request.Request(
+        f"{origin}/api/providers/{urllib.parse.quote(str(account_id))}/test",
+        data=b"{}",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Agent-Cockpit/1.0"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            is_valid = data.get("valid", False)
+            status_code = "success" if is_valid else "error"
+            msg = data.get("message") or ("Conexão verificada com sucesso!" if is_valid else "Falha no teste de conexão.")
+            return {
+                "valid": is_valid,
+                "status": status_code,
+                "message": msg,
+                "details": data
+            }
+    except urllib.error.HTTPError as he:
+        return {"valid": False, "status": "error", "message": f"Erro de teste: HTTP {he.code}"}
+    except Exception as e:
+        return {"valid": False, "status": "error", "message": f"Falha ao testar conta: {str(e)}"}
+
+
+def list_omniroute_live_models(base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Retorna os modelos vivos disponíveis nas contas conectadas no OmniRoute e modelo ativo."""
+    origin = resolve_omniroute_origin(base_url)
+    cfg = load_config()
+    active_model = cfg.get("model", "auto") or "auto"
+    
+    req = urllib.request.Request(
+        f"{origin}/v1/models",
+        headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+    )
+    models_list = []
+    try:
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw_models = data.get("data", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            for m in raw_models:
+                if isinstance(m, dict) and "id" in m:
+                    models_list.append(m["id"])
+                elif isinstance(m, str):
+                    models_list.append(m)
+    except Exception:
+        pass
+
+    # Enriquecimento com modelos vivos de contas diretas (ex: Antigravity/AGY)
+    for prov in ("antigravity", "agy"):
+        try:
+            prov_req = urllib.request.Request(
+                f"{origin}/api/v1/providers/{prov}/models",
+                headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+            )
+            with urllib.request.urlopen(prov_req, timeout=1.5) as prov_resp:
+                p_data = json.loads(prov_resp.read().decode("utf-8"))
+                p_models = p_data.get("data", []) if isinstance(p_data, dict) else []
+                for pm in p_models:
+                    pm_id = pm.get("id") if isinstance(pm, dict) else str(pm)
+                    if pm_id:
+                        full_id = f"{prov}/{pm_id}" if not pm_id.startswith(f"{prov}/") else pm_id
+                        if full_id not in models_list:
+                            models_list.append(full_id)
+        except Exception:
+            pass
+        
+    groups: Dict[str, List[str]] = {}
+    for model_id in models_list:
+        if "/" in model_id:
+            connector_id = model_id.split("/", 1)[0].lower()
+        else:
+            connector_id = "general"
+        if connector_id not in groups:
+            groups[connector_id] = []
+        groups[connector_id].append(model_id)
+
+    connectors = []
+    for cid, m_list in groups.items():
+        name = KNOWN_CONNECTOR_NAMES.get(cid, cid.capitalize())
+        connectors.append({
+            "id": cid,
+            "name": name,
+            "models": m_list,
+            "count": len(m_list)
+        })
+    connectors.sort(key=lambda c: (1 if c["id"] == "general" else 0, c["name"]))
+    
+    return {
+        "status": "ok",
+        "models": models_list,
+        "connectors": connectors,
+        "active_model": active_model
+    }
+
+
+OAUTH_DIRECT_PROVIDERS = [
+    {
+        "id": "antigravity",
+        "backend_key": "antigravity",
+        "name": "Google Antigravity / Gemini",
+        "flow": "browser",
+        "badge": "Sem Chave • OAuth",
+        "icon": "fa-brands fa-google",
+        "description": "Conecte sua conta Google diretamente. Acesse Gemini 2.5 Flash, Pro e modelos Claude integrados sem digitar chave de API.",
+        "has_free": True
+    },
+    {
+        "id": "claude-code",
+        "backend_key": "claude",
+        "name": "Anthropic Claude Code",
+        "flow": "browser",
+        "badge": "Sem Chave • OAuth",
+        "icon": "fa-solid fa-robot",
+        "description": "Conecte sua conta Anthropic Claude Code via fluxo oficial no navegador com autenticação direta.",
+        "has_free": False
+    },
+    {
+        "id": "copilot",
+        "backend_key": "github",
+        "name": "GitHub Copilot",
+        "flow": "device",
+        "badge": "Sem Chave • Device Code",
+        "icon": "fa-brands fa-github",
+        "description": "Conecte sua conta GitHub via Device Code oficial (código gerado para autorizar em github.com/login/device).",
+        "has_free": False
+    },
+    {
+        "id": "codex",
+        "backend_key": "codex",
+        "name": "OpenAI Codex",
+        "flow": "device",
+        "badge": "Sem Chave • Device Code",
+        "icon": "fa-solid fa-bolt",
+        "description": "Conecte sua conta ChatGPT / OpenAI via fluxo de dispositivo seguro sem expor API keys.",
+        "has_free": False
+    },
+    {
+        "id": "cursor",
+        "backend_key": "cursor",
+        "name": "Cursor IDE (Local)",
+        "flow": "import",
+        "badge": "1 Clique • Importação Local",
+        "icon": "fa-solid fa-laptop-code",
+        "description": "Detecta e importa a sessão de login já configurada no Cursor IDE desta máquina diretamente.",
+        "has_free": False
+    },
+    {
+        "id": "zed",
+        "backend_key": "zed",
+        "name": "Zed IDE (Local)",
+        "flow": "import",
+        "badge": "1 Clique • Importação Local",
+        "icon": "fa-solid fa-code",
+        "description": "Importa as credenciais locais salvas no chaveiro do sistema configuradas no Zed IDE.",
+        "has_free": False
+    }
+]
+
+
+def list_omniroute_oauth_providers() -> List[Dict[str, Any]]:
+    """Retorna os provedores suportados para autenticação direta de contas sem chave de API."""
+    return list(OAUTH_DIRECT_PROVIDERS)
+
+
+def start_omniroute_oauth(provider_id: str, base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Inicia o fluxo de autorização OAuth ou Device Code no OmniRoute."""
+    origin = resolve_omniroute_origin(base_url)
+    p_def = next((p for p in OAUTH_DIRECT_PROVIDERS if p["id"] == provider_id), None)
+    if not p_def:
+        return {"status": "error", "message": f"Provedor OAuth '{provider_id}' não suportado."}
+
+    backend_key = p_def.get("backend_key", provider_id)
+    flow = p_def.get("flow", "browser")
+
+    if flow == "import":
+        return import_omniroute_local_credentials(provider_id=provider_id, base_url=base_url)
+
+    if flow == "browser":
+        req = urllib.request.Request(
+            f"{origin}/api/oauth/{backend_key}/authorize",
+            headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return {
+                    "status": "ok",
+                    "provider": provider_id,
+                    "backend_key": backend_key,
+                    "flow": "browser",
+                    "auth_url": data.get("authUrl") or data.get("authorizeUrl") or data.get("url"),
+                    "state": data.get("state"),
+                    "code_verifier": data.get("codeVerifier"),
+                    "redirect_uri": data.get("redirectUri") or "http://localhost:8080/callback"
+                }
+        except Exception as e:
+            return {"status": "error", "message": f"Falha ao iniciar autorização OAuth: {str(e)}"}
+
+    if flow == "device":
+        url = f"{origin}/api/oauth/{backend_key}/device-code"
+        req = urllib.request.Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return {
+                    "status": "ok",
+                    "provider": provider_id,
+                    "backend_key": backend_key,
+                    "flow": "device",
+                    "device_code": data.get("device_code") or data.get("deviceCode"),
+                    "user_code": data.get("user_code") or data.get("userCode"),
+                    "verification_uri": data.get("verification_uri") or data.get("verificationUri") or "https://github.com/login/device",
+                    "expires_in": data.get("expires_in", 900),
+                    "interval": data.get("interval", 5)
+                }
+        except Exception as e:
+            return {"status": "error", "message": f"Falha ao iniciar Device Flow: {str(e)}"}
+
+    return {"status": "error", "message": f"Fluxo de autenticação '{flow}' desconhecido."}
+
+
+def finish_omniroute_oauth(payload: Dict[str, Any], base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Troca o código de autorização OAuth pela sessão conectada no OmniRoute."""
+    origin = resolve_omniroute_origin(base_url)
+    provider_id = str(payload.get("provider") or "").strip()
+    p_def = next((p for p in OAUTH_DIRECT_PROVIDERS if p["id"] == provider_id), None)
+    backend_key = p_def.get("backend_key", provider_id) if p_def else provider_id
+
+    code = payload.get("code")
+    code_verifier = payload.get("code_verifier") or payload.get("codeVerifier")
+    redirect_uri = payload.get("redirect_uri") or payload.get("redirectUri") or "http://localhost:8080/callback"
+    state = payload.get("state")
+
+    if not code:
+        return {"status": "error", "message": "Código de autorização é obrigatório."}
+
+    # Tratamento resiliente: se o usuário ou frontend repassar a URL de callback completa ou código com state
+    code_str = str(code).strip()
+    if "code=" in code_str or "://" in code_str or code_str.startswith("localhost:"):
+        try:
+            target_url = code_str if "://" in code_str else f"http://{code_str}"
+            parsed = urllib.parse.urlparse(target_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            if "code" in params and params["code"]:
+                code = params["code"][0]
+            if "state" in params and params["state"] and not state:
+                state = params["state"][0]
+        except Exception:
+            pass
+    elif "#" in code_str:
+        parts = code_str.split("#", 1)
+        code = parts[0]
+        if not state and len(parts) > 1:
+            state = parts[1]
+
+    body: Dict[str, Any] = {
+        "code": code,
+        "redirectUri": redirect_uri,
+        "codeVerifier": code_verifier,
+    }
+    if state:
+        body["state"] = state
+
+    req = urllib.request.Request(
+        f"{origin}/api/oauth/{backend_key}/exchange",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Agent-Cockpit/1.0"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            account = data.get("connection") or data.get("provider") or data
+            return {"status": "ok", "account": account}
+    except urllib.error.HTTPError as he:
+        err_msg = f"HTTP {he.code}"
+        try:
+            err_data = json.loads(he.read().decode("utf-8"))
+            err_msg = err_data.get("error") or err_data.get("message") or str(err_data)
+        except Exception:
+            pass
+        return {"status": "error", "message": f"Falha na troca de token OAuth: {err_msg}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Erro de comunicação com OmniRoute: {str(e)}"}
+
+
+def import_omniroute_local_credentials(provider_id: str = "cursor", base_url: Optional[str] = None) -> Dict[str, Any]:
+    """Importa credenciais e sessões ativas instaladas no sistema local para o OmniRoute."""
+    origin = resolve_omniroute_origin(base_url)
+    if provider_id == "cursor":
+        req = urllib.request.Request(
+            f"{origin}/api/oauth/cursor/auto-import",
+            headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("found"):
+                    return {"status": "ok", "count": 1, "message": "Conta do Cursor IDE importada com sucesso!", "data": data}
+                else:
+                    msg = data.get("error") or "Nenhuma sessão ativa do Cursor encontrada no sistema."
+                    return {"status": "error", "message": msg}
+        except Exception as e:
+            return {"status": "error", "message": f"Falha ao auto-importar Cursor: {str(e)}"}
+
+    elif provider_id in ["cliproxy", "antigravity", "agy"]:
+        req = urllib.request.Request(
+            f"{origin}/api/oauth/cliproxy-import",
+            headers={"Accept": "application/json", "User-Agent": "Agent-Cockpit/1.0"}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                accounts = data.get("accounts", [])
+                if accounts:
+                    return {"status": "ok", "count": len(accounts), "message": f"{len(accounts)} conta(s) CLI importada(s) com sucesso!"}
+                else:
+                    return {"status": "warning", "count": 0, "message": "Nenhuma credencial do CLI encontrada para importar."}
+        except Exception as e:
+            return {"status": "error", "message": f"Falha ao importar CLI Proxy: {str(e)}"}
+
+    return {"status": "error", "message": f"Importação local para '{provider_id}' não suportada."}
+
+
+def list_opencode_models(opencode_bin: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Lista os modelos reais suportados pelo OpenCode CLI executando 'opencode models'.
+    Retorna lista dinâmica baseada na CLI oficial sem modelos hardcoded ou simulados.
+    """
+    bin_path = opencode_bin
+    if not bin_path:
+        bins = detect_binaries()
+        bin_path = bins.get("opencode", {}).get("path")
+
+    if not bin_path or not os.path.isfile(bin_path):
+        return {
+            "status": "error",
+            "models": [],
+            "count": 0,
+            "message": "Binário do OpenCode não encontrado no ambiente do servidor."
+        }
+
+    try:
+        proc = subprocess.run(
+            [bin_path, "models"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=os.environ.copy()
+        )
+        if proc.returncode != 0:
+            err_msg = proc.stderr.strip() or f"Processo retornou código {proc.returncode}"
+            return {
+                "status": "error",
+                "models": [],
+                "count": 0,
+                "message": f"Falha ao executar '{bin_path} models': {err_msg}"
+            }
+
+        lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+        return {
+            "status": "ok",
+            "models": lines,
+            "count": len(lines),
+            "binary": bin_path
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "models": [],
+            "count": 0,
+            "message": f"Exceção ao listar modelos do OpenCode: {str(e)}"
+        }
 
 
 def sync_opencode_config(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

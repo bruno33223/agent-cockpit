@@ -302,6 +302,82 @@ class TestZeusChatEngineLifecycle(unittest.TestCase):
         self.assertEqual(tool_event["params"]["path"], "main.py")
 
     @patch("urllib.request.urlopen")
+    def test_stream_omniroute_strips_prefix_and_resolves_auto(self, mock_urlopen):
+        """Valida que omniroute/auto e auto são resolvidos para 'auto' e que prefixos omniroute/ são removidos."""
+        mock_response = [
+            b'data: {"choices": [{"delta": {"content": "Ol\xc3\xa1!"}}]}\n',
+            b'data: [DONE]\n'
+        ]
+        mock_cm = MagicMock()
+        mock_cm.__iter__.return_value = mock_response
+        mock_cm.__enter__.return_value = mock_cm
+        mock_cm.__exit__.return_value = None
+        mock_urlopen.return_value = mock_cm
+
+        # 1. omniroute/auto deve virar auto
+        events = list(self.engine._stream_omniroute(
+            session_id="test-omni-auto",
+            message="oi",
+            model_id="omniroute/auto"
+        ))
+        called_req = mock_urlopen.call_args[0][0]
+        sent_body = json.loads(called_req.data.decode("utf-8"))
+        self.assertEqual(sent_body["model"], "auto")
+        self.assertIn("Authorization", called_req.headers)
+
+        # 2. auto puro deve continuar auto (não gpt-4o!)
+        list(self.engine._stream_omniroute(
+            session_id="test-omni-auto",
+            message="oi",
+            model_id="auto"
+        ))
+        called_req = mock_urlopen.call_args[0][0]
+        sent_body = json.loads(called_req.data.decode("utf-8"))
+        self.assertEqual(sent_body["model"], "auto")
+
+        # 3. omniroute/antigravity/gemini-3.7-flash-medium deve virar antigravity/gemini-3.7-flash-medium
+        list(self.engine._stream_omniroute(
+            session_id="test-omni-auto",
+            message="oi",
+            model_id="omniroute/antigravity/gemini-3.7-flash-medium"
+        ))
+        called_req = mock_urlopen.call_args[0][0]
+        sent_body = json.loads(called_req.data.decode("utf-8"))
+        self.assertEqual(sent_body["model"], "antigravity/gemini-3.7-flash-medium")
+
+    @patch("urllib.request.urlopen")
+    def test_stream_omniroute_http_error_graceful(self, mock_urlopen):
+        """Valida que falhas HTTP do OmniRoute geram evento de erro amigável sem quebrar o stream com exceção não tratada."""
+        import io
+        import urllib.error
+
+        error_json = json.dumps({
+            "error": {
+                "message": "No active credentials for provider: openai.",
+                "type": "authentication_error"
+            }
+        }).encode("utf-8")
+
+        err = urllib.error.HTTPError(
+            url="http://localhost:20128/v1/chat/completions",
+            code=401,
+            msg="Unauthorized",
+            hdrs={"Content-Type": "application/json"},
+            fp=io.BytesIO(error_json)
+        )
+        mock_urlopen.side_effect = err
+
+        events = list(self.engine._stream_omniroute(
+            session_id="test-omni-err",
+            message="oi",
+            model_id="auto"
+        ))
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["type"], "error")
+        self.assertIn("No active credentials", events[0]["error"])
+
+    @patch("urllib.request.urlopen")
     def test_stream_ollama_mock(self, mock_urlopen):
         """Verifica integração com Ollama nativo emitindo thinking e content."""
         mock_response = [
@@ -519,6 +595,114 @@ class TestWebServerIssue24Endpoints(unittest.TestCase):
             self.assertEqual(resp.getcode(), 200)
             del_data = json.loads(resp.read().decode("utf-8"))
             self.assertTrue(del_data.get("deleted"))
+
+
+class TestOpenCodeIntegrationAndNoMockFallbacks(unittest.TestCase):
+    """Testes de conformidade para integração real com OpenCode sem fallbacks simulados."""
+
+    def setUp(self):
+        self.engine = ZeusChatEngine()
+        self.session_id = f"test-opencode-{uuid.uuid4().hex[:6]}"
+
+    def test_list_opencode_models_structure(self):
+        """Verifica se list_opencode_models retorna modelos reais ou erro estruturado."""
+        import opencode_manager
+        res = opencode_manager.list_opencode_models()
+        self.assertIn("status", res)
+        self.assertIn("models", res)
+        if res["status"] == "ok":
+            self.assertIsInstance(res["models"], list)
+            self.assertGreater(len(res["models"]), 0)
+            # Confirma que os modelos retornados pertencem ao ecossistema real
+            self.assertTrue(any("opencode/" in m or "omniroute/" in m for m in res["models"]))
+
+    @patch("os.path.isfile", return_value=True)
+    @patch("subprocess.Popen")
+    @patch("server.opencode_manager.detect_binaries")
+    def test_stream_opencode_emits_real_thinking_and_content(self, mock_detect, mock_popen, mock_isfile):
+        """Verifica se _stream_opencode faz o parse correto das linhas NDJSON do OpenCode."""
+        mock_detect.return_value = {"opencode": {"installed": True, "path": "/usr/local/bin/opencode"}}
+        
+        ndjson_output = [
+            json.dumps({"type": "step_start", "timestamp": 123456}) + "\n",
+            json.dumps({"type": "reasoning", "part": {"text": "Analisando código de infraestrutura..."}}) + "\n",
+            json.dumps({"type": "text", "part": {"text": "Resposta técnica real da IA."}}) + "\n",
+            json.dumps({"type": "step_finish", "part": {"reason": "stop", "tokens": {"total": 50, "reasoning": 20}}}) + "\n"
+        ]
+
+        mock_proc = MagicMock()
+        mock_proc.stdout = io.StringIO("".join(ndjson_output))
+        mock_proc.stderr = io.StringIO("")
+        mock_proc.returncode = 0
+        mock_popen.return_value = mock_proc
+
+        events = list(self.engine._stream_opencode(
+            session_id=self.session_id,
+            message="Prompt teste",
+            model_id="opencode/nemotron-3.5-lightning-free"
+        ))
+
+        types = [e["type"] for e in events]
+        self.assertIn("thinking", types)
+        self.assertIn("content", types)
+        self.assertIn("step_finish", types)
+
+        thinking_event = [e for e in events if e["type"] == "thinking"][0]
+        self.assertEqual(thinking_event["text"], "Analisando código de infraestrutura...")
+
+        content_event = [e for e in events if e["type"] == "content"][0]
+        self.assertEqual(content_event["text"], "Resposta técnica real da IA.")
+
+        finish_event = [e for e in events if e["type"] == "step_finish"][0]
+        self.assertEqual(finish_event["tokens"]["total"], 50)
+
+    @patch("os.path.isfile", return_value=True)
+    @patch("subprocess.Popen")
+    @patch("server.opencode_manager.detect_binaries")
+    def test_stream_opencode_transparent_error_reporting(self, mock_detect, mock_popen, mock_isfile):
+        """Verifica se erros da API/CLI são reportados de forma transparente sem texto inventado."""
+        mock_detect.return_value = {"opencode": {"installed": True, "path": "/usr/local/bin/opencode"}}
+        
+        ndjson_output = [
+            json.dumps({"type": "error", "error": {"message": "Cannot connect to API: 401 Unauthorized"}}) + "\n"
+        ]
+
+        mock_proc = MagicMock()
+        mock_proc.stdout = io.StringIO("".join(ndjson_output))
+        mock_proc.stderr = io.StringIO("")
+        mock_proc.returncode = 1
+        mock_popen.return_value = mock_proc
+
+        events = list(self.engine._stream_opencode(
+            session_id=self.session_id,
+            message="Prompt teste",
+            model_id="opencode/nemotron-3.5-lightning-free"
+        ))
+
+        types = [e["type"] for e in events]
+        self.assertIn("error", types)
+        self.assertNotIn("content", types, "Nunca deve inventar conteúdo de sucesso quando há erro")
+
+        err_event = [e for e in events if e["type"] == "error"][0]
+        self.assertIn("401 Unauthorized", err_event["error"])
+
+    @patch.object(ZeusChatEngine, "check_omniroute_online", return_value=False)
+    @patch.object(ZeusChatEngine, "check_ollama_online", return_value=False)
+    @patch("server.opencode_manager.detect_binaries", return_value={"opencode": {"installed": False}})
+    def test_no_active_backend_emits_explicit_error(self, mock_bins, mock_ollama, mock_omni):
+        """Verifica que quando nenhum backend está ativo, emite erro transparente em vez de resposta simulada."""
+        events = list(self.engine.stream_chat(
+            session_id=self.session_id,
+            message="Qual o status do projeto?",
+            backend="auto"
+        ))
+
+        types = [e["type"] for e in events]
+        self.assertIn("error", types, "Deve emitir evento de erro transparente")
+        self.assertNotIn("content", types, "NÃO deve emitir conteúdo mockado quando nenhum backend está ativo")
+        
+        err_ev = [e for e in events if e["type"] == "error"][0]
+        self.assertEqual(err_ev.get("code"), "NO_ACTIVE_BACKEND")
 
 
 if __name__ == "__main__":
