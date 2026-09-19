@@ -1498,6 +1498,120 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
+/* ==========================================================================
+   ZEUS AGENT - SIDEBAR VOICE CARD (Issue #46)
+   ========================================================================== */
+.zeus-sidebar-voice-card {
+  margin: 10px 10px 6px 10px;
+  padding: 10px;
+  background: rgba(18, 20, 24, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: var(--radius-md, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.zeus-sidebar-voice-card:hover {
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.12);
+}
+
+.zeus-sidebar-voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.zeus-sidebar-voice-identity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zeus-sidebar-pulse-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #00ff66;
+  box-shadow: 0 0 8px #00ff66;
+  flex-shrink: 0;
+}
+
+.zeus-sidebar-agent-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #00e5ff;
+}
+
+.btn-zeus-sidebar-mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(0, 150, 255, 0.08));
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: var(--radius-sm, 6px);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-zeus-sidebar-mic:hover {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.22), rgba(0, 150, 255, 0.15));
+  border-color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-zeus-sidebar-mic .mic-shortcut {
+  font-size: 9px;
+  font-family: var(--font-mono, monospace);
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--muted-foreground, #94a3b8);
+  margin-left: auto;
+}
+
+.btn-zeus-sidebar-mic.recording {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4) !important;
+  animation: avatarPulseListening 1s infinite alternate ease-in-out;
+}
+
+.app-sidebar.collapsed .zeus-sidebar-voice-card {
+  margin: 6px 4px;
+  padding: 6px 4px;
+  align-items: center;
+}
+
+.app-sidebar.collapsed .zeus-sidebar-voice-header,
+.app-sidebar.collapsed .btn-zeus-sidebar-mic .mic-text,
+.app-sidebar.collapsed .btn-zeus-sidebar-mic .mic-shortcut {
+  display: none;
+}
+
+.app-sidebar.collapsed .btn-zeus-sidebar-mic {
+  padding: 8px;
+  width: auto;
+  border-radius: 50%;
+}
+
+
 
 /* ==========================================================================
    MODULE: TOPBAR & BRANDING

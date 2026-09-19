@@ -1,8 +1,10 @@
 /**
  * VoiceController - VAD Hands-Free, Push-To-Talk (PTT), TTS e Sincronia com Avatar 3D.
- * Issue #46 (Frontend/Voice UX) - Clean Architecture & No-Build ES Modules.
+ * Issue #46 (Frontend/Voice UX & Chief Architect Voice Assistant).
  */
-import { encodeWav } from './chat/zeus_chat_core.js';
+import { encodeWav, downsampleTo16k } from './chat/zeus_chat_core.js';
+
+const ensureChatOpen = () => { if (typeof window?.switchTab === 'function') window.switchTab('view-terminal'); if (typeof window?.openOrCreateChatSession === 'function') window.openOrCreateChatSession(); };
 
 export class VoiceController {
   constructor(options = {}) {
@@ -29,10 +31,10 @@ export class VoiceController {
     if (this.isListening) return true;
     if (!navigator?.mediaDevices?.getUserMedia) return false;
     try {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
-        this.audioContext = new AudioCtx({ sampleRate: 16000 });
+        this.audioContext = new AudioCtx();
         const source = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 512;
@@ -92,21 +94,34 @@ export class VoiceController {
     if (has && dur >= this.minSpeechMs) {
       const total = this.pcmBuffer.reduce((acc, c) => acc + c.length, 0), merged = new Float32Array(total);
       let off = 0; for (const c of this.pcmBuffer) { merged.set(c, off); off += c.length; }
-      this.pcmBuffer = []; await this._sendAudio(encodeWav(merged, 16000));
+      this.pcmBuffer = [];
+      const rate = this.audioContext?.sampleRate || 16000;
+      await this._sendAudio(encodeWav(downsampleTo16k(merged, rate), 16000));
     } else { this.pcmBuffer = []; this._getAvatar()?.setState('IDLE'); }
   }
 
   async _sendAudio(audioBlob) {
     const av = this._getAvatar(); av?.setState('THINKING');
+    if (typeof document !== 'undefined') document.querySelectorAll('.btn-zeus-sidebar-mic .mic-text').forEach(t => t.textContent = 'Processando...');
     try {
       const fd = new FormData(); fd.append('audio', audioBlob, 'voice_input.wav');
       const res = await fetch('/api/audio/transcribe-and-optimize', { method: 'POST', body: fd }), data = await res.json();
       const text = data?.optimized_prompt || data?.prompt || data?.transcription || '';
       if (text) {
+        ensureChatOpen();
         if (this.onTranscription) this.onTranscription(text);
         if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:transcription', { detail: { text, data } }));
+        setTimeout(() => {
+          const s = window.zeusChatWorkspace?.getActiveSession?.();
+          if (s?.sendMessage) { if (s.chatInput) s.chatInput.value = text; s.sendMessage(); }
+          else {
+            const el = document.querySelector('.zeus-chat-pane:not(.context-hidden) .zeus-chat-input') || document.getElementById('opencode-chat-input') || document.querySelector('.zeus-chat-input');
+            if (el) { el.value = text; el.closest('.zeus-chat-input-area, .opencode-chat-input-area')?.querySelector('.btn-send-zeus-chat, .opencode-chat-send')?.click(); }
+          }
+        }, 120);
       }
     } catch (_) {}
+    if (typeof document !== 'undefined') document.querySelectorAll('.btn-zeus-sidebar-mic .mic-text').forEach(t => t.textContent = this.isListening ? 'Ouvindo...' : 'Falar com Zeus');
     if (av?.getState() === 'THINKING') av?.setState('IDLE');
   }
 
@@ -144,9 +159,13 @@ export class VoiceController {
   _bindPttShortcuts() {
     if (typeof window === 'undefined') return;
     window.addEventListener('keydown', (e) => {
-      if (this.mode !== 'ptt') return;
-      const t = e.target;
-      if (t?.tagName === 'INPUT' || t?.tagName === 'TEXTAREA' || t?.isContentEditable) return;
+      const t = e.target, isInput = t?.tagName === 'INPUT' || t?.tagName === 'TEXTAREA' || t?.isContentEditable;
+      if (e.altKey && e.key.toLowerCase() === 'v') {
+        e.preventDefault(); ensureChatOpen();
+        if (this.isListening) { this.stopListening(); } else { this.startListening(); }
+        return;
+      }
+      if (this.mode !== 'ptt' || isInput) return;
       if (e.code === 'Space' && !e.repeat && !this.isPttPressed) { e.preventDefault(); this.startPtt(); }
     });
     window.addEventListener('keyup', (e) => {
@@ -156,6 +175,17 @@ export class VoiceController {
   }
 
   _notifyState(evt, meta = {}) {
+    if (typeof document !== 'undefined') {
+      const rec = evt === 'listening_started' || evt === 'ptt_start' || evt === 'speech_start';
+      const stop = evt === 'listening_stopped' || evt === 'ptt_end';
+      if (rec) {
+        document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.add('recording'));
+        document.querySelectorAll('.btn-zeus-sidebar-mic .mic-text').forEach(t => t.textContent = 'Ouvindo...');
+      } else if (stop) {
+        document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.remove('recording'));
+        document.querySelectorAll('.btn-zeus-sidebar-mic .mic-text').forEach(t => t.textContent = 'Falar com Zeus');
+      }
+    }
     if (this.onStateChange) this.onStateChange(evt, meta);
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:state', { detail: { event: evt, ...meta } }));
   }
@@ -187,27 +217,24 @@ export function initAvatarAndVoice() {
       return;
     }
     const btnMic = e.target.closest('.zeus-btn-mic');
-    if (btnMic && voiceController.getMode() === 'vad') {
-      if (voiceController.isListening) {
-        voiceController.stopListening();
-        document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.remove('recording'));
-      } else {
-        const ok = await voiceController.startListening();
-        if (ok) document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.add('recording'));
+    if (btnMic) {
+      if (btnMic.classList.contains('btn-zeus-sidebar-mic')) ensureChatOpen();
+      if (voiceController.getMode() === 'vad') {
+        if (voiceController.isListening) voiceController.stopListening();
+        else await voiceController.startListening();
       }
     }
   });
   document.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.zeus-btn-mic') && voiceController.getMode() === 'ptt') {
+    const btn = e.target.closest('.zeus-btn-mic');
+    if (btn && voiceController.getMode() === 'ptt') {
+      if (btn.classList.contains('btn-zeus-sidebar-mic')) ensureChatOpen();
       e.preventDefault(); voiceController.startPtt();
-      document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.add('recording'));
     }
   });
   document.addEventListener('pointerup', (e) => {
-    if (e.target.closest('.zeus-btn-mic') && voiceController.getMode() === 'ptt') {
-      voiceController.stopPtt();
-      document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.remove('recording'));
-    }
+    const btn = e.target.closest('.zeus-btn-mic');
+    if (btn && voiceController.getMode() === 'ptt') voiceController.stopPtt();
   });
 }
 

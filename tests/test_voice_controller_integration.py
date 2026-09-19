@@ -112,6 +112,35 @@ class TestVoiceControllerIntegration(unittest.TestCase):
         for st in expected_states:
             self.assertIn(st, ["IDLE", "LISTENING", "THINKING", "DISPATCHING_WORKER", "TESTING", "SPEAKING", "READY"])
 
+    def test_07_sidebar_voice_card_and_downsample(self):
+        """Valida o card de voz na barra lateral esquerda e downsampling de sample-rate."""
+        with open(self.index_path, "r", encoding="utf-8") as f:
+            html = f.read()
+
+        self.assertIn('id="zeus-sidebar-voice-card"', html)
+        self.assertIn('id="btn-zeus-sidebar-mic"', html)
+        self.assertIn('class="btn-zeus-sidebar-mic zeus-btn-mic"', html)
+
+        with open(self.voice_ctrl_path, "r", encoding="utf-8") as f:
+            js = f.read()
+
+        self.assertIn("downsampleTo16k", js)
+        self.assertIn("ensureChatOpen", js)
+        self.assertIn("btn-zeus-sidebar-mic", js)
+
+        # Simulação matemática da função pura downsampleTo16k (48kHz -> 16kHz = 1/3)
+        def downsample(samples, in_rate, out_rate=16000):
+            if in_rate == out_rate:
+                return samples
+            ratio = in_rate / out_rate
+            out_len = round(len(samples) / ratio)
+            return [samples[round(i * ratio)] if round(i * ratio) < len(samples) else 0 for i in range(out_len)]
+
+        samples_48k = [math.sin(i * 0.05) for i in range(4800)]
+        samples_16k = downsample(samples_48k, 48000, 16000)
+        self.assertEqual(len(samples_16k), 1600)
+
 
 if __name__ == "__main__":
     unittest.main()
+

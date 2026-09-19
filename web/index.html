@@ -110,6 +110,23 @@
 
       <!-- CORPO ROLÁVEL DA SIDEBAR -->
       <div class="sidebar-scrollable-body">
+        <!-- CARD DE VOZ E ASSISTENTE GLOBAL ZEUS AGENT (Issue #46) -->
+        <div class="zeus-sidebar-voice-card" id="zeus-sidebar-voice-card">
+          <div class="zeus-sidebar-voice-header">
+            <div class="zeus-sidebar-voice-identity">
+              <span class="zeus-sidebar-pulse-led pulse-led online"></span>
+              <img src="/zeus_terminal_god.svg" class="zeus-sidebar-agent-icon" alt="" style="width: 16px; height: 16px; vertical-align: middle;" />
+              <span class="zeus-sidebar-agent-title">ZEUS AGENT</span>
+            </div>
+            <button type="button" class="zeus-btn-voice-mode badge badge-info" id="btn-zeus-sidebar-mode" title="Alternar Modo de Voz (VAD / PTT)">VAD</button>
+          </div>
+          <button type="button" class="btn-zeus-sidebar-mic zeus-btn-mic" id="btn-zeus-sidebar-mic" title="Falar com o Zeus (Alt+V)">
+            <span class="mic-icon">🎙️</span>
+            <span class="mic-text">Falar com Zeus</span>
+            <span class="mic-shortcut">Alt+V</span>
+          </button>
+        </div>
+
         <!-- 1. MENU DE NAVEGAÇÃO DE VIEWS NO TOPO -->
         <nav class="sidebar-nav" id="sidebar-views-nav">
           <button class="nav-tab active" data-view="view-terminal" id="nav-tab-terminal" data-tooltip="Terminal & OpenCode">

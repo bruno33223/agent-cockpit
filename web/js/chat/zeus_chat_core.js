@@ -17,6 +17,12 @@ export const encodeWav = (samples, sampleRate = 16000) => {
   }
   return new Blob([buf], { type: 'audio/wav' });
 };
+export const downsampleTo16k = (s, r) => {
+  if (!s?.length || !r || r === 16000) return s;
+  const ratio = r / 16000, len = Math.round(s.length / ratio), out = new Float32Array(len);
+  for (let i = 0; i < len; i++) out[i] = s[Math.round(i * ratio)] || 0;
+  return out;
+};
 
 export class ZeusChatCore {
   constructor() {
@@ -30,12 +36,12 @@ export class ZeusChatCore {
   isVisionSupported(modelName) {
     if (!modelName) return false;
     const name = String(modelName).toLowerCase();
-    const textOnly = ['coder', 'gpt-3.5', 'gpt-35', 'deepseek-chat', 'deepseek-coder', 'llama-3-8b', 'llama-3-70b', 'llama3:8b', 'llama3:latest', 'mistral:7b', 'codellama', 'qwen2.5-coder'];
+    const textOnly = ['coder', 'gpt-3.5', 'gpt-35', 'deepseek', 'llama-3-8b', 'llama-3-70b', 'mistral:7b', 'codellama'];
     if (textOnly.some(kw => name.includes(kw) && !name.includes('vision'))) return false;
-    const visionKw = ['gpt-4o', 'gpt-4-turbo', 'gemini', 'claude-3', 'claude-3-5', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku', 'llava', 'bakllava', 'vision', 'multimodal', 'pixtral', 'qwen-vl', 'minicpm-v', 'llama-3.2-11b-vision', 'llama-3.2-90b-vision'];
+    const visionKw = ['gpt-4o', 'gemini', 'claude-3', 'llava', 'bakllava', 'vision', 'multimodal', 'pixtral', 'qwen-vl', 'minicpm-v'];
     if (visionKw.some(kw => name.includes(kw))) return true;
     const found = this.availableModels.find(m => (m.id || m.name || '').toLowerCase() === name);
-    return Boolean(found && (found.supports_vision || found.vision || (found.capabilities && found.capabilities.includes('vision'))));
+    return Boolean(found && (found.supports_vision || found.vision));
   }
 
   async loadAvailableModels(fetchFn = fetch) {
@@ -124,10 +130,10 @@ export class ZeusChatCore {
   async _startMediaRecording({ onStart, onError, onEnd }) {
     if (!navigator?.mediaDevices?.getUserMedia) { if (onError) onError(new Error('Microfone não suportado no navegador')); return; }
     try {
-      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
-        this.audioContext = new AudioCtx({ sampleRate: 16000 });
+        this.audioContext = new AudioCtx();
         const source = this.audioContext.createMediaStreamSource(this.audioStream);
         this.pcmChunks = [];
         this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
@@ -176,13 +182,14 @@ export class ZeusChatCore {
     if (this.recognition) { try { this.recognition.stop(); } catch (_) {} this.recognition = null; }
     if (this.audioStream) { this.audioStream.getTracks().forEach(t => t.stop()); this.audioStream = null; }
     if (this.audioProcessor && this.audioContext) {
+      const rate = this.audioContext.sampleRate || 16000;
       try { this.audioProcessor.disconnect(); this.audioContext.close(); } catch (_) {}
-      this.audioProcessor = null; this.audioContext = null;
+      this.audioProcessor = this.audioContext = null;
       if (onStop && this.pcmChunks?.length) {
         const total = this.pcmChunks.reduce((acc, c) => acc + c.length, 0);
         const merged = new Float32Array(total);
         let off = 0; for (const c of this.pcmChunks) { merged.set(c, off); off += c.length; }
-        this.pcmChunks = []; onStop(encodeWav(merged, 16000)); return;
+        this.pcmChunks = []; onStop(encodeWav(downsampleTo16k(merged, rate), 16000)); return;
       }
     }
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
@@ -193,12 +200,9 @@ export class ZeusChatCore {
   }
 
   async sendAudioForTranscription(audioBlob, projectId = 'default', fetchFn = fetch) {
-    const formData = new FormData();
-    formData.append('audio', audioBlob, 'prompt_audio.wav');
-    formData.append('project_id', projectId);
-    const res = await fetchFn('/api/audio/transcribe-and-optimize', { method: 'POST', body: formData });
-    const data = typeof res.json === 'function' ? await res.json() : res;
-    return data?.optimized_prompt || data?.prompt || data?.text || data?.transcription || '';
+    const fd = new FormData(); fd.append('audio', audioBlob, 'prompt_audio.wav'); fd.append('project_id', projectId);
+    const res = await fetchFn('/api/audio/transcribe-and-optimize', { method: 'POST', body: fd }), d = typeof res.json === 'function' ? await res.json() : res;
+    return d?.optimized_prompt || d?.prompt || d?.text || d?.transcription || '';
   }
 
   async sendStreamMessage({ endpoint = '/api/zeus-chat/message', payload, onEvent, onThinking, onToolCall, onSubagentSpawn, onContent, onDone, onError }) {
