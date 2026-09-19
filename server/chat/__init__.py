@@ -4,6 +4,7 @@ server/chat: Pacote modular do motor de chat do Zeus (Agent Cockpit).
 
 from server.chat.constants import (
     DEFAULT_ZEUS_SYSTEM_PROMPT,
+    ZEUS_VOICE_SYSTEM_PROMPT,
     AVAILABLE_TOOLS,
     ZEUS_TOOLS,
 )
@@ -42,6 +43,7 @@ from server.chat.zeus_engine import (
 
 __all__ = [
     "DEFAULT_ZEUS_SYSTEM_PROMPT",
+    "ZEUS_VOICE_SYSTEM_PROMPT",
     "AVAILABLE_TOOLS",
     "ZEUS_TOOLS",
     "VISION_MODEL_PATTERNS",

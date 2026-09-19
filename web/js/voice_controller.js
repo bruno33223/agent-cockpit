@@ -4,8 +4,6 @@
  */
 import { encodeWav, downsampleTo16k } from './chat/zeus_chat_core.js';
 
-const ensureChatOpen = () => { window?.switchTab?.('view-terminal'); window?.openOrCreateChatSession?.(); };
-
 export class VoiceController {
   constructor(options = {}) {
     this.mode = options.mode || 'vad';
@@ -33,7 +31,7 @@ export class VoiceController {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
-        this.audioContext = new AudioCtx();
+        try { this.audioContext = new AudioCtx({ sampleRate: 16000 }); } catch (_) { this.audioContext = new AudioCtx(); }
         if (this.audioContext.state === 'suspended') await this.audioContext.resume().catch(() => {});
         const source = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.analyser = this.audioContext.createAnalyser(); this.analyser.fftSize = 512;
@@ -99,18 +97,15 @@ export class VoiceController {
       if (activeVoice) {
         av?.updateAudioLevel(Math.min(1.0, rms * 4.5));
         if (av?.getState() !== 'LISTENING') av?.setState('LISTENING');
-        this.pcmBuffer.push(new Float32Array(samples));
-        if (!this.isSpeaking) {
-          this.isSpeaking = true; this.speechStartTime = Date.now();
-          if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
-          this._notifyState('speech_start');
-        } else if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
+        if (!this.isSpeaking) { this.isSpeaking = true; this.speechStartTime = Date.now(); this._notifyState('speech_start'); }
+        if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
       } else {
         av?.updateAudioLevel(Math.max(0, (av.getAudioLevel?.() || 0) * 0.8));
         if (this.isSpeaking && this.mode === 'vad' && !this.silenceTimer) {
           this.silenceTimer = setTimeout(() => this._handleSpeechEnd(), this.silenceTimeoutMs);
         }
       }
+      if (this.isSpeaking) { this.pcmBuffer.push(new Float32Array(samples)); }
     }
     return rms;
   }
@@ -138,17 +133,24 @@ export class VoiceController {
     const promptText = text.trim(); this.lastCapturedText = '';
     if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
     const av = this._getAvatar(); av?.setState('THINKING');
-    ensureChatOpen();
+    const ensureChatOpen = () => { window?.switchTab?.('view-terminal'); window?.openOrCreateChatSession?.(); };
+    if (/\b(abrir?|mostr[ae]|modifiq|alter[ae]|cri[ae]|execut[ae]|consert[ae]|corrij[ae]|implement[ae]|adicione|remova)\b/i.test(promptText)) {
+      ensureChatOpen();
+    }
     setTimeout(() => {
-      const s = window.zeusChatWorkspace?.getActiveSession?.();
-      const input = s?.chatInput || document.querySelector('.zeus-chat-pane:not(.context-hidden) .zeus-chat-input') || document.getElementById('opencode-chat-input') || document.querySelector('.zeus-chat-input');
-      if (input) { input.value = promptText; input.focus(); input.dispatchEvent(new Event('input', { bubbles: true })); }
-      else if (this.onTranscription) { this.onTranscription(promptText); }
+      let s = window.zeusChatWorkspace?.getActiveSession?.();
+      if (!s && typeof window.openOrCreateChatSession === 'function') {
+        const sess = window.openOrCreateChatSession();
+        s = sess?.chatController || window.zeusChatWorkspace?.getActiveSession?.();
+      }
+      if (s) {
+        s._isFromVoice = true;
+        if (s.chatInput) { s.chatInput.value = promptText; s.chatInput.dispatchEvent(new Event('input', { bubbles: true })); }
+        if (typeof s.sendMessage === 'function' && !s.isProcessing) s.sendMessage();
+      }
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:transcription', { detail: { text: promptText } }));
-      if (s) s._isFromVoice = true;
-      if (s && typeof s.sendMessage === 'function' && !s.isProcessing) s.sendMessage();
       av?.setState(this.isListening ? 'LISTENING' : 'OFF'); this._isHandlingSpeech = false;
-    }, 180);
+    }, 120);
   }
 
   async _sendAudio(audioBlob) {
@@ -227,12 +229,6 @@ export function initAvatarAndVoice() {
     window.avatar3D.init(dock);
     dock.addEventListener('click', async (e) => { e.stopPropagation(); if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening(); });
   }
-  voiceController.init({
-    onTranscription: (t) => {
-      const el = document.querySelector('.zeus-chat-pane:not(.context-hidden) .zeus-chat-input') || document.getElementById('opencode-chat-input') || document.querySelector('.zeus-chat-input');
-      if (el) el.value = t;
-    }
-  });
   document.addEventListener('click', async (e) => {
     const btnMic = e.target.closest('.zeus-btn-mic');
     if (btnMic) { if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening(); }

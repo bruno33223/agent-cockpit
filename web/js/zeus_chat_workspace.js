@@ -180,12 +180,10 @@ export class ZeusChatSessionController {
     const liveMsg = this.renderer.createLiveAssistantCard(this.messagesContainer);
     let fullContent = '', fullThinking = '';
     try {
-      await this.core.sendStreamMessage({
-        endpoint: '/api/zeus-chat/message',
-        payload: { message: text, session_id: this.sessionId, model_id: this.selectedModel, project_id: currentProjectId || 'default' },
-        signal: this.abortController?.signal,
-        onEvent: (evt) => this._handleLiveStreamEvent(evt, liveMsg, { onThinking: c => { fullThinking += c; }, onContent: c => { fullContent += c; } })
-      });
+      const vSys = 'Você é o Zeus em diálogo por voz com o Diretor. Responda em Português do Brasil com fala natural, direta e concisa (máximo 2 a 3 frases curtas). NUNCA use markdown, asteriscos, títulos (#) ou listas.';
+      const payload = { message: text, session_id: this.sessionId, model_id: this.selectedModel, project_id: currentProjectId || 'default' };
+      if (this._isFromVoice) payload.system_prompt = vSys;
+      await this.core.sendStreamMessage({ endpoint: '/api/zeus-chat/message', payload, signal: this.abortController?.signal, onEvent: (evt) => this._handleLiveStreamEvent(evt, liveMsg, { onThinking: c => { fullThinking += c; }, onContent: c => { fullContent += c; } }) });
       this.messages.push({ role: 'assistant', author: 'Orquestrador Zeus', content: fullContent, thinking: fullThinking, timestamp: new Date().toLocaleTimeString() });
       if (window.voiceController?.playTts && fullContent && (this._isFromVoice || window.voiceController?.isListening)) { window.voiceController.playTts(fullContent); } this._isFromVoice = false;
     } catch (err) {

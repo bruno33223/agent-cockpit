@@ -228,7 +228,7 @@ class AudioTranscriber:
             ext = audio_bytes[start:len(audio_bytes) if end == -1 else end].decode("utf-8", errors="ignore").strip()
             if ext:
                 return self.normalize_transcription(ext)
-        return "Comando de voz recebido com sucesso."
+        return "Não consegui compreender o áudio. Poderia repetir?"
 
     def create_stream_buffer(self, silence_chunks_limit: int = 3, silence_rms_threshold: float = 15.0) -> AudioStreamBuffer:
         """Cria uma nova instância de buffer de streaming de áudio contínuo."""
