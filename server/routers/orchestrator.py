@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from state_store import db
+from connection_manager import manager
 from fs_utils import _resolve_project_fs_root, DEFAULT_FS_IGNORE_DIRS, DEFAULT_FS_IGNORE_FILES
 
 router = APIRouter(tags=["orchestrator"])
@@ -210,3 +211,47 @@ def read_fs_file(path: str, project_id: Optional[str] = None, max_bytes: int = 5
         return {"path": rel_path, "name": file_name, "size": file_size, "is_binary": False, "content": text_content, "truncated": file_size > max_bytes, "mime": mime_type}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo: {str(e)}")
+
+
+def notify_worker_task_completion(task_data: Dict[str, Any], project_id: Optional[str] = None) -> Dict[str, Any]:
+    """Emite mensagem do orquestrador em linguagem natural quando um worker conclui tarefa."""
+    slice_id = task_data.get("slice_id") or "geral"
+    ticket_id = task_data.get("ticket_id") or "desconhecido"
+    status = task_data.get("status")
+    duration = task_data.get("duration", 0.0)
+    tokens = task_data.get("tokens", 0)
+    error = task_data.get("error")
+
+    if status == "completed":
+        text = (
+            f"Fatia '{slice_id}' concluída com sucesso pelo Local Worker em {duration:.1f}s "
+            f"({tokens} tokens gerados, Ticket: {ticket_id})."
+        )
+    else:
+        text = (
+            f"A execução da fatia '{slice_id}' falhou no Local Worker após {duration:.1f}s: "
+            f"{error or 'Erro indeterminado'} (Ticket: {ticket_id})."
+        )
+
+    msg_dict = {
+        "text": text,
+        "project_id": project_id,
+        "slice_id": slice_id,
+        "sender": "ORCHESTRATOR"
+    }
+    if db and hasattr(db, "post_orchestrator_message"):
+        res = db.post_orchestrator_message(
+            text=text,
+            project_id=project_id,
+            slice_id=slice_id,
+            sender="ORCHESTRATOR"
+        )
+        if isinstance(res, dict):
+            msg_dict = res
+
+    if manager:
+        try:
+            manager.broadcast_sync("ORCHESTRATOR_MESSAGE", msg_dict, project_id)
+        except Exception:
+            pass
+    return msg_dict

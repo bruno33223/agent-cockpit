@@ -25,6 +25,7 @@ MODULES = [
     "worker.css",
     "modals.css",
     "zeus_chat.css",
+    "avatar_3d.css",
 ]
 
 HEADER = """/* ==========================================================================

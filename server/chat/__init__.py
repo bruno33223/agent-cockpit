@@ -22,6 +22,9 @@ from server.chat.audio_transcriber import (
     InMemorySTTEngine,
     extract_audio_from_multipart,
 )
+from server.chat.audio_synthesizer import (
+    AudioSynthesizer,
+)
 from server.chat.prompt_optimizer import (
     PromptOptimizer,
 )
@@ -49,6 +52,7 @@ __all__ = [
     "ChatMessage",
     "AudioTranscriber",
     "InMemorySTTEngine",
+    "AudioSynthesizer",
     "extract_audio_from_multipart",
     "PromptOptimizer",
     "stream_opencode",

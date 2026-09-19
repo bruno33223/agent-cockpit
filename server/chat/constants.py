@@ -4,64 +4,137 @@ server/chat/constants.py: Definições de ferramentas disponíveis e prompts de 
 
 from typing import Dict, List, Any
 
-DEFAULT_ZEUS_SYSTEM_PROMPT = """Você é o Orquestrador Zeus (Staff Orchestrator) do Agent Cockpit.
-Sua missão é atuar como orquestrador staff e líder técnico de projetos:
-1. AVALIAÇÃO DE ESCOPO E DECOMPOSIÇÃO AUTÔNOMA:
+DEFAULT_ZEUS_SYSTEM_PROMPT = """Você é o Orquestrador Zeus (Chief Architect & Staff Orchestrator) do Agent Cockpit.
+Sua missão é atuar como Arquiteto e Orquestrador Chefe com visão sistêmica, diálogo de alto nível e planejamento estratégico:
+1. DIÁLOGO DE ALTO NÍVEL, VISÃO SISTÊMICA E PLANEJAMENTO:
+   - Atue no nível arquitetural, liderando o design sistêmico e a orquestração do ciclo de engenharia.
    - Avalie rigorosamente o escopo antes de qualquer execução técnica.
-   - Se a demanda envolver múltiplos arquivos, refatoração de módulos, criação de novos subsistemas ou tarefas complexas/épicos, NUNCA tente resolver de forma sequencial ou monolítica diretamente no chat principal com comandos bash em série sem delegar.
-   - Decomponha obrigatoriamente a demanda em fatias verticais concisas (ex: 'slice-1', 'slice-auth', 'slice-database') e despache subagentes especializados utilizando a ferramenta `subagent_spawn`.
-   - Para cada fatia, invoque `subagent_spawn` fornecendo os parâmetros estruturados:
-     * slice_id: Identificador único da fatia vertical (ex: 'slice-1').
-     * role: Papel do subagente ('builder' para implementação ou 'critic' / 'code_reviewer' para validação e testes).
-     * task: Descrição clara e técnica da meta a ser executada no ambiente isolado.
-     * target_files: Lista de arquivos afetados que o subagente irá criar, modificar ou testar.
-     * worktree_path: Caminho opcional do workspace/worktree isolado (ex: '.worktrees/slice-1').
-2. COORDENAÇÃO DE SUBAGENTES (BUILDERS E CRITICS):
-   - Atue como maestro técnico: oriente, monitore e integre o trabalho dos subagentes em Git Worktrees isolados.
-   - Mantenha o chat principal como centro de comando sem travar a sessão durante o despacho.
-3. PADRÃO DE ENGENHARIA LIMPA:
+   - Não codificar diretamente no chat principal: NUNCA tente resolver de forma sequencial ou monolítica diretamente no chat. Para tarefas complexas ou que afetam múltiplos arquivos, não codifique diretamente sem delegar.
+   - Analise dependências, impactos arquiteturais e decomponha demandas em fatias verticais concisas.
+2. FUNCTION CALLING TÁTICO E DESPACHO DE TOOLS:
+   - Para implementar recursos, novos subsistemas ou modificar múltiplos arquivos, despache subagentes utilizando `dispatch_subagent`:
+     * task_description: Descrição técnica clara do objetivo a ser executado no ambiente isolado.
+     * target_slice: Identificador único da fatia vertical (ex: 'slice-auth', 'slice-database').
+     * isolation_level: Nível de isolamento ('worktree' para Git Worktree dedicado ou 'shared').
+   - Para verificar estabilidade e qualidade técnica, utilize `run_test_suite`:
+     * test_target: Caminho ou escopo dos testes (ex: 'all' ou 'tests/test_mod.py').
+     * run_mode: Modo de execução ('fast' ou 'standard').
+   - Para diagnosticar o andamento global antes de tomar decisões, invoque `read_project_status`.
+   - Mantenha suporte ao legado `subagent_spawn` fornecendo slice_id, role (builder ou critic), task e target_files quando aplicável.
+3. PADRÃO DE ENGENHARIA LIMPA E COMUNICAÇÃO:
    - Manter alto padrão de engenharia ("Sem gambiarras, sempre encontrando a melhor solução para o problema").
-4. COMUNICAÇÃO EM PT-BR:
-   - Responder sempre em Português do Brasil (PT-BR) de forma técnica, limpa, objetiva e sem rodeios.
-5. EFICIÊNCIA DE FERRAMENTAS E SÍNTESE OBRIGATÓRIA:
-   - Limite de leitura pontual: evite inspecionar arquivos inteiros com 'cat' em sequência quando buscas pontuais (grep/head/find) forem suficientes.
-   - Use no máximo 3 a 5 chamadas de ferramentas exploratórias por turno para evitar esgotamento de loop.
-   - NUNCA encerre seu turno sem emitir uma síntese explicativa completa e estruturada em Markdown para o usuário. A resposta textual final ao usuário é OBRIGATÓRIA."""
+   - Responder sempre em Português do Brasil (PT-BR) de forma técnica, limpa, executiva e assertiva.
+   - Limite de leitura pontual: evite inspecionar arquivos inteiros com 'cat' quando buscas pontuais (grep/head) forem suficientes (limite de 3 a 5 por turno).
+   - NUNCA encerre seu turno sem emitir uma síntese explicativa completa em Markdown para o usuário: a síntese final textual é obrigatória."""
 
 AVAILABLE_TOOLS: List[Dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "dispatch_subagent",
+            "description": (
+                "Despacha um subagente/worker para executar uma tarefa em fatia vertical isolada, "
+                "criando automaticamente uma Git Worktree dedicada e enfileirando na WorkerQueue."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_description": {
+                        "type": "string",
+                        "description": "Descrição clara e completa da tarefa a ser executada no ambiente isolado."
+                    },
+                    "target_slice": {
+                        "type": "string",
+                        "description": "Identificador único da fatia vertical (ex: 'slice-auth', 'slice-database')."
+                    },
+                    "isolation_level": {
+                        "type": "string",
+                        "enum": ["worktree", "shared"],
+                        "default": "worktree",
+                        "description": "Nível de isolamento para a execução: 'worktree' (padrão isolado) ou 'shared'."
+                    }
+                },
+                "required": ["task_description"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_test_suite",
+            "description": (
+                "Dispara a suíte de testes de forma determinística via test_runner do Cockpit, "
+                "retornando resumo destilado com exit_code e eventuais falhas."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "test_target": {
+                        "type": "string",
+                        "default": "all",
+                        "description": "Alvo dos testes ('all' para todos os testes ou caminho específico como 'tests/')."
+                    },
+                    "run_mode": {
+                        "type": "string",
+                        "enum": ["fast", "standard", "full"],
+                        "default": "fast",
+                        "description": "Modo de execução: 'fast' (rápido/otimizado) ou 'standard'."
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_project_status",
+            "description": (
+                "Retorna um sumário estruturado e consolidado do estado do projeto ativo: "
+                "épico, fatias, gates de aprovação, pares 3x3 e status da fila de workers."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID opcional do projeto. Se omitido, retorna o estado do projeto ativo."
+                    }
+                }
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
             "name": "subagent_spawn",
             "description": (
                 "Despacha um subagente autônomo e especializado (Builder ou Critic) em uma fatia vertical "
-                "com workspace/git-worktree isolado para executar tarefas complexas, novos subsistemas ou "
-                "modificações multi-arquivo sem poluir o chat principal."
+                "com workspace/git-worktree isolado para executar tarefas complexas sem poluir o chat principal."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "slice_id": {
                         "type": "string",
-                        "description": "Identificador único da fatia vertical (ex: 'slice-1', 'slice-auth', 'slice-database')."
+                        "description": "Identificador único da fatia vertical (ex: 'slice-1', 'slice-auth')."
                     },
                     "task": {
                         "type": "string",
-                        "description": "Descrição técnica clara e completa do objetivo que o subagente deve realizar na fatia."
+                        "description": "Descrição técnica clara e completa do objetivo do subagente."
                     },
                     "role": {
                         "type": "string",
                         "enum": ["builder", "critic", "code_reviewer", "specialist"],
-                        "description": "Papel do subagente: 'builder' para construção/código, 'critic' ou 'code_reviewer' para revisão e testes."
+                        "description": "Papel do subagente: 'builder' ou 'critic'."
                     },
                     "target_files": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Lista de arquivos ou caminhos que o subagente deve criar, modificar ou testar."
+                        "description": "Lista de arquivos ou caminhos que o subagente deve modificar."
                     },
                     "worktree_path": {
                         "type": "string",
-                        "description": "Caminho relativo para o Git Worktree isolado da fatia (ex: '.worktrees/slice-1')."
+                        "description": "Caminho relativo para o Git Worktree isolado da fatia."
                     }
                 },
                 "required": ["slice_id", "task", "role"]
