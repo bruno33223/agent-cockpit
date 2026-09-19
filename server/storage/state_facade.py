@@ -82,6 +82,8 @@ class StateFacade:
                         state = json.load(f)
                 except Exception:
                     state = default_initial_state("Projeto Padrão")
+            if not state.get("pairs_3x3"):
+                state["pairs_3x3"] = default_initial_state().get("pairs_3x3", [])
             state["project_id"] = target_pid
             state["active_project_id"] = target_pid
             if not state.get("project_root"):
