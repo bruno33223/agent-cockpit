@@ -27,7 +27,7 @@ class TestLocalBuilder(unittest.TestCase):
         self.worktree_dir = os.path.join(self.test_dir, ".worktrees", self.slice_id)
         os.makedirs(self.worktree_dir, exist_ok=True)
         db.switch_current_project("default")
-        db.set_local_worker_config({"enabled": True, "delegate_styles_to_cloud": False})
+        db.set_local_worker_config({"enabled": True, "delegate_styles_to_cloud": False, "omniroute_fallback": False})
         if hasattr(db, "reset_local_worker_attempts"):
             db.reset_local_worker_attempts(self.slice_id)
 
