@@ -4,7 +4,7 @@ telemetry.py: Endpoints de telemetria, ciclo de vida do workspace, grafo e estad
 
 import os
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from state_store import db
@@ -15,6 +15,12 @@ router = APIRouter(tags=["telemetry"])
 
 class SwitchProjectPayload(BaseModel):
     project_id: str
+
+
+class ImportProjectPayload(BaseModel):
+    path: str
+    name: Optional[str] = None
+    switch: Optional[bool] = True
 
 
 class SteeringPayload(BaseModel):
@@ -64,6 +70,35 @@ def post_switch_project(payload: SwitchProjectPayload):
 def delete_project_endpoint(project_id: str):
     success = db.delete_project(project_id)
     return {"status": "ok" if success else "error", "projects": db.list_projects()}
+
+
+@router.post("/api/projects/import")
+def import_project_endpoint(payload: ImportProjectPayload):
+    """Importa explicitamente um projeto existente a partir do diretório raiz local."""
+    try:
+        res = db.import_project(payload.path, name=payload.name, switch=(payload.switch is not False))
+        return {
+            "status": "ok",
+            "project": res.get("project"),
+            "current_project_id": res.get("current_project_id"),
+            "projects": db.list_projects()
+        }
+    except (ValueError, FileNotFoundError, NotADirectoryError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao importar projeto: {e}")
+
+
+@router.post("/api/projects/purge")
+def purge_projects_endpoint():
+    """Purga projetos fantasmas e arquivos órfãos de teste de states/."""
+    report = db.purge_stale_or_temp_projects()
+    return {
+        "status": "ok",
+        "report": report,
+        "current_project_id": db.get_current_project_id(),
+        "projects": db.list_projects()
+    }
 
 
 @router.get("/api/projects/scan")

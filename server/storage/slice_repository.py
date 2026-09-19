@@ -228,7 +228,7 @@ class SliceRepository:
         return {"status": "PRUNED", "project_id": target_pid, "epic_name": state.get("epic", {}).get("name"), "pruned_messages_count": p_msgs, "pruned_verdicts_count": p_v, "active_nodes_count": len(state.get("nodes", []))}
 
     def register_fleet_anomaly(self, slice_id: Optional[str], anomaly_type: str, details: str, project_id: Optional[str] = None) -> Dict[str, Any]:
-        target_pid = project_id or self.facade.get_current_project_id()
+        target_pid = self.facade.resolve_project_id(project_id)
         with self.lock:
             state = self.facade.get_state(target_pid)
             target_slice = None
@@ -255,7 +255,7 @@ class SliceRepository:
     def check_fleet_liveness(self, subagents_status: Optional[List[Dict[str, Any]]] = None,
                              repo_root: Optional[str] = None, slice_id: Optional[str] = None,
                              project_id: Optional[str] = None) -> Dict[str, Any]:
-        target_pid = project_id or self.facade.get_current_project_id()
+        target_pid = self.facade.resolve_project_id(project_id)
         state = self.facade.get_state(target_pid)
         root = repo_root or state.get("project_root")
         if subagents_status:

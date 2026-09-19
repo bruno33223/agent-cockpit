@@ -5,19 +5,11 @@
 
 import { escapeHtml } from './ui_utils.js';
 import {
-  apiFetch,
-  state,
-  currentProjectId,
-  knownProjects,
-  getPinnedProjectIds,
-  savePinnedProjectIds,
-  getRecentProjectIds,
-  switchProject,
-  setActiveSliceId,
-  getProjectDotClass,
-  getProjectDotTitle,
-  subscribe
+  apiFetch, state, currentProjectId, knownProjects, getPinnedProjectIds,
+  savePinnedProjectIds, getRecentProjectIds, switchProject, setActiveSliceId,
+  getProjectDotClass, getProjectDotTitle, subscribe
 } from './state.js';
+import { initProjectImport, openImportProjectModal } from './project_import.js';
 
 let isProjectsExpanded = false;
 
@@ -346,6 +338,9 @@ export function initOrcaNavigationAndModals() {
   if (btnShowMoreProjects) {
     btnShowMoreProjects.addEventListener('click', toggleShowMoreProjects);
   }
+
+  // 2.6. Fluxo de Importação Explícita de Projetos (Issue #37)
+  initProjectImport();
 
   // 3. Quick-Nav Buttons
   const navQuickSearch = document.getElementById('nav-quick-search');

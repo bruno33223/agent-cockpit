@@ -16,10 +16,11 @@ LEGACY_STATE_FILE = os.getenv("COCKPIT_LEGACY_FILE") or os.path.join(BASE_DIR, '
 
 class StateFacade:
     """Fachada integradora de persistência compatível com a API do StateStore."""
-    def __init__(self, states_dir: str = STATES_DIR):
-        self.states_dir = os.path.abspath(states_dir)
+    def __init__(self, states_dir: Optional[str] = None):
+        env_dir = os.getenv("COCKPIT_STATES_DIR")
+        self.states_dir = os.path.abspath(states_dir or env_dir or os.path.join(BASE_DIR, 'states'))
         self.index_file = os.path.join(self.states_dir, 'projects_index.json')
-        self.legacy_file = LEGACY_STATE_FILE
+        self.legacy_file = os.getenv("COCKPIT_LEGACY_FILE") or LEGACY_STATE_FILE
         self.lock = threading.RLock()
         self.listeners: List[Callable] = []
 
@@ -90,9 +91,10 @@ class StateFacade:
             return state
 
     def _save_state(self, state: Dict[str, Any], project_id: str):
-        self._atomic_write_json(self._get_project_file(project_id), state)
-        self.project_repo._update_index_entry(project_id, state.get("epic", {}).get("name", "Épico"), state.get("project_root"), state)
-        if project_id == self.get_current_project_id():
+        target_pid = self.resolve_project_id(project_id)
+        self._atomic_write_json(self._get_project_file(target_pid), state)
+        self.project_repo._update_index_entry(target_pid, state.get("epic", {}).get("name", "Épico"), state.get("project_root"), state)
+        if target_pid == self.get_current_project_id():
             self._sync_legacy_file(state)
 
     def _save_workflow(self, state: Dict[str, Any], filepath: Optional[str] = None):
@@ -204,6 +206,16 @@ class StateFacade:
         res = self.project_repo.scan_local_projects(base_dir)
         self._notify("PROJECTS_UPDATED", self.list_projects())
         return res
+    def import_project(self, project_path: str, name: Optional[str] = None, switch: bool = True) -> Dict[str, Any]:
+        res = self.project_repo.import_project(project_path, name=name, switch=switch)
+        self._notify("PROJECTS_UPDATED", self.list_projects())
+        if switch and res.get("current_project_id"):
+            self._notify("PROJECT_SWITCHED", {"project_id": res.get("current_project_id")})
+        return res
+    def purge_stale_or_temp_projects(self) -> Dict[str, Any]:
+        res = self.project_repo.purge_stale_or_temp_projects()
+        self._notify("PROJECTS_UPDATED", self.list_projects())
+        return res
     def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: str = "master") -> Dict[str, Any]:
         return self.project_repo.verify_worktree_commit_proof(repo_root, slice_id, base_branch)
 
@@ -277,3 +289,5 @@ class StateFacade:
         return self.settings_repo.increment_circuit_breaker(slice_id, project_id=project_id)
     def reset_circuit_breaker(self, slice_id: str, project_id: Optional[str] = None) -> None:
         self.settings_repo.reset_circuit_breaker(slice_id, project_id=project_id)
+
+StateStoreFacade = StateFacade

@@ -1,10 +1,19 @@
-import json, os, re, hashlib, time, tempfile, threading, subprocess
+import json, os, re, hashlib, time, tempfile, threading
 from contextlib import contextmanager
 try:
     import fcntl
 except ImportError:
     fcntl = None
 from typing import List, Dict, Any, Optional
+from .project_cleaner import (
+    is_slice_identifier,
+    validate_and_normalize_project_path,
+    default_initial_state,
+    purge_stale_or_temp_projects,
+    verify_commit_proof,
+    checkpoint_ops,
+    scan_local_projects_impl
+)
 
 def normalize_canonical_path(path: str) -> str:
     abs_p = os.path.abspath(os.path.expanduser(path))
@@ -15,56 +24,35 @@ def canonical_project_id(project_path_or_name: Optional[str]) -> str:
     if not project_path_or_name:
         return "default"
     val = project_path_or_name.strip()
-    if re.match(r'^slice-\d+$', val):
+    if is_slice_identifier(val):
+        if ".worktrees" in val:
+            abs_p = normalize_canonical_path(val)
+            slug = re.sub(r'[^a-zA-Z0-9_\-]', '-', os.path.basename(abs_p) or "workspace").strip('-').lower() or "workspace"
+            return f"{slug}-{hashlib.sha256(abs_p.encode('utf-8')).hexdigest()[:8]}"
         return "default"
-    if ".worktrees" in val:
-        abs_p = normalize_canonical_path(val)
-        slug = re.sub(r'[^a-zA-Z0-9_\-]', '-', os.path.basename(abs_p) or "workspace").strip('-').lower() or "workspace"
-        return f"{slug}-{hashlib.sha256(abs_p.encode('utf-8')).hexdigest()[:8]}"
     if val == "default" or bool(re.search(r'-[0-9a-f]{8}$', val)):
         return val
     abs_p = normalize_canonical_path(val)
     slug = re.sub(r'[^a-zA-Z0-9_\-]', '-', os.path.basename(abs_p) or "workspace").strip('-').lower() or "workspace"
     return f"{slug}-{hashlib.sha256(abs_p.encode('utf-8')).hexdigest()[:8]}"
 
-def default_initial_state(project_name: Optional[str] = None, project_root: Optional[str] = None) -> Dict[str, Any]:
-    titles = [
-        ("slice-1", "Fatia Vertical 1: Contratos & Dados", "- Contratos de interface validados\n- Zero acoplamento destrutivo\n- Testes de ponta a ponta"),
-        ("slice-2", "Fatia Vertical 2: Regras & Domínio", "- Lógica de negócio coesa\n- Sem regressões funcionais"),
-        ("slice-3", "Fatia Vertical 3: Interface & Integração", "- Renderização e usabilidade validadas\n- Auditoria de integração final aprovada"),
-    ]
-    nodes = [{
-        "id": sid, "title": title, "pair_id": i + 1, "kanban_status": "BACKLOG", "attempt": 1, "max_attempts": 5,
-        "acceptance_criteria": crit, "spec_md": f"### {title}\nAguardando envio do Master Blueprint pelo Orquestrador.",
-        "latest_feedback": "Nenhuma revisão executada ainda.", "tdd_stage": "PENDING",
-        "review_metrics": {"critical": 0, "important": 0, "minor": 0}, "updated_at": time.strftime("%H:%M:%S")
-    } for i, (sid, title, crit) in enumerate(titles)]
-    pair_names = ["Par 1: Infra & Contratos", "Par 2: Backend & Regras", "Par 3: Frontend & UX"]
-    pairs_3x3 = [{
-        "id": i + 1, "name": name, "builder_status": "IDLE", "critic_status": "IDLE",
-        "current_slice_id": f"slice-{i+1}", "last_heartbeat": time.strftime("%H:%M:%S")
-    } for i, name in enumerate(pair_names)]
-    return {
-        "epic": {"name": project_name or "Aguardando Inicialização do Épico", "goal": "Conecte o Antigravity via MCP para sincronizar o Master Blueprint.", "status": "PLANNING", "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")},
-        "nodes": nodes, "pairs_3x3": pairs_3x3, "project_root": project_root,
-        "steering_messages": [{"id": "msg-0", "sender": "ORCHESTRATOR", "text": "Agent Cockpit online. Conecte o Antigravity via MCP para iniciar o fluxo Spec-Driven.", "timestamp": time.strftime("%H:%M:%S"), "consumed": True}],
-        "gauntlet_log": [],
-        "human_gates": {"gate_plan_approved": True, "gate_ship_approved": False, "last_approved_at": None, "approved_by": None},
-        "last_handoff": None,
-        "local_worker": {"enabled": False, "provider": "ollama", "endpoint": "http://127.0.0.1:11434", "model": "deepseek-coder-v2:16b-q3_k_m", "circuit_breaker_threshold": 2, "consecutive_failures": {}, "auto_start_ollama": False, "delegate_styles_to_cloud": True},
-        "governance_settings": {"autostart_slices": False, "security_preset": "standard", "human_gate_policy": "manual", "artifact_review_policy": "strict"},
-        "project_settings_overrides": {}
-    }
-
 class ProjectRepository:
     def __init__(self, states_dir: str, index_file: str, legacy_file: str, lock: Optional[threading.RLock] = None):
         self.states_dir, self.index_file, self.legacy_file = os.path.abspath(states_dir), os.path.abspath(index_file), os.path.abspath(legacy_file)
         self.lock = lock or threading.RLock()
 
+    _local_locks = threading.local()
+
     @contextmanager
     def _file_lock(self, filepath: str):
-        lock_path = filepath if filepath.endswith('.lock') else f"{filepath}.lock"
-        try: os.makedirs(os.path.dirname(os.path.abspath(lock_path)), exist_ok=True)
+        lock_path = os.path.realpath(filepath if filepath.endswith('.lock') else f"{filepath}.lock")
+        if not hasattr(self._local_locks, "active"):
+            self._local_locks.active = set()
+        if lock_path in self._local_locks.active:
+            yield
+            return
+
+        try: os.makedirs(os.path.dirname(lock_path), exist_ok=True)
         except Exception: pass
         fd = None
         try:
@@ -72,8 +60,10 @@ class ProjectRepository:
             if fcntl:
                 try: fcntl.flock(fd, fcntl.LOCK_EX)
                 except (OSError, IOError): pass
+            self._local_locks.active.add(lock_path)
             yield
         finally:
+            self._local_locks.active.discard(lock_path)
             if fd is not None:
                 if fcntl:
                     try: fcntl.flock(fd, fcntl.LOCK_UN)
@@ -111,6 +101,8 @@ class ProjectRepository:
             projects, current_id = data.get("projects", {}), data.get("current_project_id", "default")
             seen_roots, cleaned, id_mapping = {}, {}, {}
             for pid, pmeta in list(projects.items()):
+                if is_slice_identifier(pid):
+                    continue
                 p_root = pmeta.get("project_root")
                 norm = os.path.realpath(os.path.abspath(p_root)) if p_root and os.path.exists(p_root) else p_root
                 if norm:
@@ -138,8 +130,25 @@ class ProjectRepository:
     def _save_index(self, index_data: Dict[str, Any]):
         self._atomic_write_json(self.index_file, index_data)
 
+    def _is_production_dir(self) -> bool:
+        prod = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..', 'states'))
+        return os.path.realpath(self.states_dir) == prod
+
     def _update_index_entry(self, project_id: str, project_name: str,
                             project_root: Optional[str], state_data: Dict[str, Any]):
+        if is_slice_identifier(project_id):
+            return
+        if self._is_production_dir():
+            tmp_dir = os.path.realpath(tempfile.gettempdir())
+            if project_root:
+                r_str = str(project_root)
+                if r_str.startswith("/tmp") or os.path.realpath(r_str).startswith(tmp_dir):
+                    return
+                if not os.path.exists(project_root) and project_id != "default":
+                    return
+            elif project_id != "default" and project_id not in self._read_index().get("projects", {}):
+                return
+
         nodes = state_data.get("nodes", [])
         approved = len([n for n in nodes if n.get("kanban_status") == "APPROVED"])
         active_pairs = len([p for p in state_data.get("pairs_3x3", []) if p.get("builder_status") in ("WORKING", "EXECUTING") or p.get("critic_status") in ("WORKING", "CRITIQUING")])
@@ -160,7 +169,7 @@ class ProjectRepository:
                     break
 
         folder_name = os.path.basename(norm) if norm else "Projeto Sem Nome"
-        display_name = folder_name if folder_name else (project_name or "Projeto Sem Nome")
+        display_name = project_name.strip() if project_name and project_name.strip() else (folder_name or "Projeto Sem Nome")
         projects[project_id] = {
             "id": project_id, "name": display_name, "project_root": norm or project_root,
             "epic_name": state_data.get("epic", {}).get("name", "Épico"),
@@ -187,6 +196,8 @@ class ProjectRepository:
             index_data = self._read_index()
             curr, result = index_data.get("current_project_id", "default"), []
             for pid, pmeta in index_data.get("projects", {}).items():
+                if is_slice_identifier(pid):
+                    continue
                 m = dict(pmeta)
                 m["is_current"] = (pid == curr)
                 m.setdefault("active_agents", 0)
@@ -198,17 +209,63 @@ class ProjectRepository:
     def resolve_project_id(self, project_id: Optional[str] = None, project_root: Optional[str] = None) -> str:
         if project_id:
             val = project_id.strip()
-            if re.match(r'^slice-\d+$', val):
+            if is_slice_identifier(val):
+                if ".worktrees" in val:
+                    return canonical_project_id(val)
+                if project_root and not is_slice_identifier(project_root):
+                    return canonical_project_id(project_root)
                 return self.get_current_project_id()
-            if ".worktrees" in val:
-                return canonical_project_id(val)
+            if val == "default":
+                return "default"
             idx = self._read_index()
-            if val in idx.get("projects", {}) or os.path.exists(self._get_project_file(val)):
+            if val in idx.get("projects", {}) or (os.path.exists(self._get_project_file(val)) and not is_slice_identifier(val)):
                 return val
             if "/" not in val and "\\" not in val:
                 return val
             return canonical_project_id(val)
-        return canonical_project_id(project_root) if project_root else self.get_current_project_id()
+        if project_root:
+            if is_slice_identifier(project_root):
+                if ".worktrees" in project_root:
+                    return canonical_project_id(project_root)
+                return self.get_current_project_id()
+            return canonical_project_id(project_root)
+        return self.get_current_project_id()
+
+    def import_project(self, project_path: str, name: Optional[str] = None, switch: bool = True) -> Dict[str, Any]:
+        with self.lock:
+            canonical_path = validate_and_normalize_project_path(project_path)
+            folder_name = os.path.basename(canonical_path) or "workspace"
+            display_name = name.strip() if name and name.strip() else folder_name
+            pid = canonical_project_id(canonical_path)
+            pfile = self._get_project_file(pid)
+            if not os.path.exists(pfile):
+                state_data = default_initial_state(project_name=display_name, project_root=canonical_path)
+                self._atomic_write_json(pfile, state_data)
+            else:
+                try:
+                    with open(pfile, "r", encoding="utf-8") as f:
+                        state_data = json.load(f)
+                    state_data["project_root"] = canonical_path
+                    if name and name.strip():
+                        state_data.setdefault("epic", {})["name"] = display_name
+                    self._atomic_write_json(pfile, state_data)
+                except Exception:
+                    state_data = default_initial_state(project_name=display_name, project_root=canonical_path)
+                    self._atomic_write_json(pfile, state_data)
+            self._update_index_entry(pid, display_name, canonical_path, state_data)
+            if switch:
+                self.switch_current_project(pid)
+            proj_meta = self._read_index().get("projects", {}).get(pid, {
+                "id": pid, "name": display_name, "project_root": canonical_path
+            })
+            return {"status": "ok", "project": proj_meta, "current_project_id": self.get_current_project_id()}
+
+    def purge_stale_or_temp_projects(self) -> Dict[str, Any]:
+        with self.lock:
+            return purge_stale_or_temp_projects(
+                self.states_dir, self.index_file, "default",
+                self._atomic_write_json, self._file_lock
+            )
 
     def delete_project(self, project_id: str) -> bool:
         with self.lock:
@@ -226,61 +283,14 @@ class ProjectRepository:
             return True
 
     def scan_local_projects(self, base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
-        target_dir = os.path.abspath(os.path.expanduser(base_dir or "~/Projects"))
-        if not os.path.exists(target_dir):
-            return self.list_projects()
-        with self.lock:
-            idx = self._read_index()
-            projects = idx.setdefault("projects", {})
-            existing = {p.get("project_root") for p in projects.values() if p.get("project_root")}
-            for entry in os.scandir(target_dir):
-                if not entry.is_dir() or entry.name.startswith(".") or entry.path in existing:
-                    continue
-                pid = canonical_project_id(entry.path)
-                pfile = self._get_project_file(pid)
-                if not os.path.exists(pfile):
-                    init_st = default_initial_state(project_name=entry.name, project_root=entry.path)
-                    self._atomic_write_json(pfile, init_st)
-                    self._update_index_entry(pid, entry.name, entry.path, init_st)
-                elif pid not in projects:
-                    try:
-                        with open(pfile, 'r', encoding='utf-8') as f:
-                            s_data = json.load(f)
-                    except Exception:
-                        s_data = default_initial_state(project_name=entry.name, project_root=entry.path)
-                    self._update_index_entry(pid, entry.name, entry.path, s_data)
-        return self.list_projects()
+        return scan_local_projects_impl(self, base_dir)
 
     def freeze_checkpoint(self, state: Dict[str, Any], project_id: str) -> str:
         with self.lock:
-            cp_file = os.path.join(self.states_dir, f"{re.sub(r'[^a-zA-Z0-9_-]', '-', project_id) or 'default'}.checkpoint.json")
-            self._atomic_write_json(cp_file, {
-                "checkpoint_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "project_id": project_id, "project_root": state.get("project_root"),
-                "epic": state.get("epic"), "nodes": state.get("nodes"),
-                "pairs_3x3": state.get("pairs_3x3"), "human_gates": state.get("human_gates")
-            })
-            return cp_file
+            return checkpoint_ops(self.states_dir, self._atomic_write_json, "freeze", project_id, state)
 
     def read_checkpoint(self, project_id: str) -> Optional[Dict[str, Any]]:
-        cp_file = os.path.join(self.states_dir, f"{re.sub(r'[^a-zA-Z0-9_-]', '-', project_id) or 'default'}.checkpoint.json")
-        if not os.path.exists(cp_file):
-            return None
-        try:
-            with open(cp_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            return None
+        return checkpoint_ops(self.states_dir, self._atomic_write_json, "read", project_id)
 
     def verify_worktree_commit_proof(self, repo_root: str, slice_id: str, base_branch: str = "master") -> Dict[str, Any]:
-        root, branch = os.path.abspath(os.path.expanduser(repo_root)), f"cockpit/{slice_id}"
-        res = subprocess.run(["git", "-C", root, "rev-parse", "--verify", branch], capture_output=True, text=True, check=False)
-        if res.returncode != 0:
-            return {"valid_proof": False, "reason": f"Branch '{branch}' não encontrada no repositório. O subagente não comitou nada.", "commits_count": 0}
-        b_head = res.stdout.strip()
-        res_b = subprocess.run(["git", "-C", root, "rev-parse", "--verify", base_branch], capture_output=True, text=True, check=False)
-        if b_head == (res_b.stdout.strip() if res_b.returncode == 0 else ""):
-            return {"valid_proof": False, "reason": f"A branch '{branch}' aponta exatamente para a '{base_branch}'. Nenhum commit de trabalho foi produzido.", "commits_count": 0}
-        log = subprocess.run(["git", "-C", root, "log", f"{base_branch}..{branch}", "--oneline"], capture_output=True, text=True, check=False)
-        lines = [l.strip() for l in log.stdout.splitlines() if l.strip()]
-        return {"valid_proof": len(lines) > 0, "head_commit": b_head, "commits_count": len(lines), "commits": lines, "latest_commit_msg": lines[0] if lines else ""}
+        return verify_commit_proof(repo_root, slice_id, base_branch)

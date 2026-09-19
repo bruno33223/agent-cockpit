@@ -5,6 +5,7 @@ Delega internamente para a arquitetura desacoplada em server/storage/.
 
 import os
 import sys
+from typing import Optional
 
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SERVER_DIR not in sys.path:
@@ -33,9 +34,11 @@ LEGACY_STATE_FILE = os.getenv("COCKPIT_LEGACY_FILE") or os.path.join(BASE_DIR, '
 
 class StateStore(StateFacade):
     """Fachada pública de persistência compatível com a API original do StateStore."""
-    def __init__(self, states_dir: str = STATES_DIR):
+    def __init__(self, states_dir: Optional[str] = None):
         super().__init__(states_dir=states_dir)
 
+
+StateStoreFacade = StateStore
 
 db = StateStore()
 

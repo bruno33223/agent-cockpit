@@ -176,12 +176,21 @@
             <div class="sidebar-workspaces-title-group">
               <span class="sidebar-workspaces-title">WORKSPACES</span>
             </div>
-            <button class="btn-sidebar-new-worktree" id="btn-sidebar-new-worktree" title="Criar Nova Worktree / Sessão" aria-label="Nova Worktree">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
+            <div class="sidebar-workspaces-header-actions" style="display: flex; gap: 4px;">
+              <button class="btn-sidebar-new-worktree" id="btn-sidebar-import-project" title="Importar Pasta de Projeto" aria-label="Importar Projeto">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  <line x1="12" y1="11" x2="12" y2="17"></line>
+                  <line x1="9" y1="14" x2="15" y2="14"></line>
+                </svg>
+              </button>
+              <button class="btn-sidebar-new-worktree" id="btn-sidebar-new-worktree" title="Criar Nova Worktree / Sessão" aria-label="Nova Worktree">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <!-- SEÇÃO "PINNED" COLAPSÁVEL (.worktree-section-pinned) -->
@@ -1397,6 +1406,39 @@
       </div>
       <div class="about-zeus-footer" style="display: none;">
         <button class="action-btn primary btn-sm" id="btn-about-zeus-ok">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE IMPORTAÇÃO EXPLÍCITA DE PROJETO (ISSUE #37) -->
+  <div class="modal-backdrop" id="modal-import-project" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-card" style="background: var(--bg-card, #12161a); border: 1px solid var(--border-color, #2d3748); border-radius: 12px; width: 460px; max-width: 90vw; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary, #f3f4f6); display: flex; align-items: center; gap: 8px;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            <line x1="12" y1="11" x2="12" y2="17"></line>
+            <line x1="9" y1="14" x2="15" y2="14"></line>
+          </svg>
+          Importar Pasta de Projeto
+        </h3>
+        <button class="modal-close-btn" id="btn-close-import-modal" style="background: transparent; border: none; color: var(--text-secondary, #9ca3af); cursor: pointer; font-size: 20px;" aria-label="Fechar">&times;</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-secondary, #9ca3af); margin-bottom: 16px; line-height: 1.4;">
+        Informe o caminho da pasta local no seu sistema de arquivos. O Agent Cockpit vinculará todas as fatias, kanban e logs dentro deste projeto unificado.
+      </p>
+      <div style="margin-bottom: 12px;">
+        <label for="import-project-path" style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary, #9ca3af); margin-bottom: 6px;">Caminho da Pasta (Obrigatório):</label>
+        <input type="text" id="import-project-path" placeholder="ex: /home/bruno/Projects/meu-app ou ~/meu-repo" style="width: 100%; padding: 8px 12px; background: var(--bg-input, #1a202c); border: 1px solid var(--border-color, #2d3748); border-radius: 6px; color: var(--text-primary, #f3f4f6); font-size: 13px; box-sizing: border-box;" />
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label for="import-project-name" style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary, #9ca3af); margin-bottom: 6px;">Nome do Projeto (Opcional):</label>
+        <input type="text" id="import-project-name" placeholder="Deixe em branco para usar o nome da pasta" style="width: 100%; padding: 8px 12px; background: var(--bg-input, #1a202c); border: 1px solid var(--border-color, #2d3748); border-radius: 6px; color: var(--text-primary, #f3f4f6); font-size: 13px; box-sizing: border-box;" />
+      </div>
+      <div id="import-project-feedback" style="display: none; margin-bottom: 14px;"></div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button id="btn-import-project-cancel" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border-color, #2d3748); color: var(--text-secondary, #9ca3af); border-radius: 6px; cursor: pointer; font-size: 13px;">Cancelar</button>
+        <button id="btn-import-project-confirm" style="padding: 8px 16px; background: var(--color-primary, #2563eb); border: none; color: #fff; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px;">Importar Projeto</button>
       </div>
     </div>
   </div>

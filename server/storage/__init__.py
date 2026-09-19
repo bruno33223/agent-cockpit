@@ -11,10 +11,11 @@ from .project_repository import (
 )
 from .slice_repository import SliceRepository
 from .settings_repository import SettingsRepository
-from .state_facade import StateFacade
+from .state_facade import StateFacade, StateStoreFacade
 
 __all__ = [
     "StateFacade",
+    "StateStoreFacade",
     "ProjectRepository",
     "SliceRepository",
     "SettingsRepository",
