@@ -172,6 +172,7 @@ class TestIssue28LocalBuilderOmniRouteFallback(unittest.TestCase):
         reroute_msgs = [
             m for m in steering_msgs
             if "Re-roteando tarefa para nuvem via OmniRoute" in m.get("text", "")
+            and target_file in m.get("text", "")
         ]
         self.assertGreater(
             len(reroute_msgs), 0,

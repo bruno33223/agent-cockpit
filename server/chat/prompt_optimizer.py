@@ -29,6 +29,18 @@ class PromptOptimizer:
         (re.compile(r"\b(otimiz[ae]|aceler[ae]|deix[ae] mais r[aá]pido)\b", re.IGNORECASE), "Otimizar desempenho"),
     ]
 
+    QUESTION_PATTERN = re.compile(
+        r'(^(como|qual|quais|quando|onde|por\s*que|porque|quem|o\s+que|quanto|quantos|quantas|será|status|olá|oi|bom\s+dia|boa\s+tarde|boa\s+noite|você|voce|me\s+diga|me\s+fale|me\s+explica|explique)\b|\b(de\s+que|sobre\s+o\s+que|se\s+trata|o\s+que\s+[ée]|o\s+que\s+faz|para\s+que\s+serve|como\s+funciona)\b|\?$)',
+        re.IGNORECASE
+    )
+
+    def is_conversational_or_query(self, text: str) -> bool:
+        """Determina se a mensagem é uma pergunta conversacional, consulta ou saudação."""
+        t = text.strip()
+        if not t:
+            return False
+        return t.endswith("?") or bool(self.QUESTION_PATTERN.search(t))
+
     def optimize(self, transcription: str) -> str:
         """Converte a transcrição em instrução técnica concisa e bem estruturada."""
         if not transcription or not transcription.strip():
@@ -42,8 +54,18 @@ class PromptOptimizer:
             cleaned = re.sub(filler, "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-        # Identifica a intenção primária
-        intent_prefix = "Executar tarefa técnica"
+        if not cleaned:
+            cleaned = text
+
+        # Preserva perguntas conversacionais e saudações sem forçar prefixos imperativos
+        if self.is_conversational_or_query(cleaned):
+            cleaned = cleaned[0].upper() + cleaned[1:] if len(cleaned) > 1 else cleaned.upper()
+            if not cleaned.endswith((".", "!", "?")):
+                cleaned += "?"
+            return cleaned
+
+        # Identifica a intenção primária para diretivas técnicas
+        intent_prefix = None
         for pattern, label in self.INTENT_MAP:
             if pattern.search(cleaned):
                 intent_prefix = label
@@ -55,5 +77,5 @@ class PromptOptimizer:
         if not cleaned.endswith((".", "!", "?")):
             cleaned += "."
 
-        # Formatação estruturada em prompt técnico conciso
-        return f"[{intent_prefix}]: {cleaned}"
+        return f"[{intent_prefix}]: {cleaned}" if intent_prefix else cleaned
+

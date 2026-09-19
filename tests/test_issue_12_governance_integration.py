@@ -10,6 +10,9 @@ from state_store import db
 from mcp_server import handle_tool_call
 
 class TestIssue12GovernanceIntegration(unittest.TestCase):
+    def setUp(self):
+        db.switch_current_project("default")
+
     def test_governance_settings_defaults(self):
         gov = db.get_governance_settings()
         self.assertIn("autostart_slices", gov)

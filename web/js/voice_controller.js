@@ -4,10 +4,7 @@
  */
 import { encodeWav, downsampleTo16k } from './chat/zeus_chat_core.js';
 
-const ensureChatOpen = () => {
-  if (typeof window?.switchTab === 'function') window.switchTab('view-terminal');
-  if (typeof window?.openOrCreateChatSession === 'function') window.openOrCreateChatSession();
-};
+const ensureChatOpen = () => { window?.switchTab?.('view-terminal'); window?.openOrCreateChatSession?.(); };
 
 export class VoiceController {
   constructor(options = {}) {
@@ -37,6 +34,7 @@ export class VoiceController {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         this.audioContext = new AudioCtx();
+        if (this.audioContext.state === 'suspended') await this.audioContext.resume().catch(() => {});
         const source = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.analyser = this.audioContext.createAnalyser(); this.analyser.fftSize = 512;
         this.processor = this.audioContext.createScriptProcessor(2048, 1, 1);
@@ -46,8 +44,7 @@ export class VoiceController {
         this.processor.connect(muteGain); muteGain.connect(this.audioContext.destination);
       }
       this._startWebSpeechRecognition();
-      this.isListening = true;
-      this._getAvatar()?.setState('LISTENING');
+      this.isListening = true; this._getAvatar()?.setState('LISTENING');
       this._notifyState('listening_started');
       return true;
     } catch (_) { this.isListening = false; return false; }
@@ -58,9 +55,7 @@ export class VoiceController {
     if (!SpeechRec) return;
     try {
       this.recognition = new SpeechRec();
-      this.recognition.lang = 'pt-BR';
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
+      this.recognition.lang = 'pt-BR'; this.recognition.continuous = true; this.recognition.interimResults = true;
       this.recognition.onresult = (evt) => {
         let interim = '', final = '';
         for (let i = evt.resultIndex; i < evt.results.length; i++) {
@@ -69,14 +64,13 @@ export class VoiceController {
         }
         const captured = (final || interim).trim();
         if (captured) {
-          this.lastCapturedText = captured;
-          this._getAvatar()?.updateAudioLevel(0.85);
+          this.lastCapturedText = captured; this._getAvatar()?.updateAudioLevel(0.85);
           if (this.silenceTimer) clearTimeout(this.silenceTimer);
           this.silenceTimer = setTimeout(() => this._handleSpeechText(this.lastCapturedText), 1100);
         }
       };
-      this.recognition.onerror = () => {};
-      this.recognition.onend = () => { if (this.isListening) { try { this.recognition?.start(); } catch (_) {} } };
+      this.recognition.onerror = (e) => { if (e?.error === 'network' || e?.error === 'not-allowed') { try { this.recognition.stop(); } catch (_) {} this.recognition = null; } };
+      this.recognition.onend = () => { if (this.isListening && this.recognition) { try { this.recognition.start(); } catch (_) {} } };
       this.recognition.start();
     } catch (_) {}
   }
@@ -91,8 +85,7 @@ export class VoiceController {
     }
     if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
     this.lastCapturedText = '';
-    this._getAvatar()?.updateAudioLevel(0);
-    this._getAvatar()?.setState('OFF');
+    this._getAvatar()?.updateAudioLevel(0); this._getAvatar()?.setState('OFF');
     this._notifyState('listening_stopped');
   }
 
@@ -130,7 +123,7 @@ export class VoiceController {
     if (this.lastCapturedText) { const t = this.lastCapturedText; this.lastCapturedText = ''; return this._handleSpeechText(t); }
     const dur = Date.now() - this.speechStartTime, has = this.pcmBuffer.length > 0;
     this.isSpeaking = false;
-    if (has && dur >= this.minSpeechMs && !this.recognition) {
+    if (has && dur >= this.minSpeechMs) {
       const total = this.pcmBuffer.reduce((acc, c) => acc + c.length, 0), merged = new Float32Array(total);
       let off = 0; for (const c of this.pcmBuffer) { merged.set(c, off); off += c.length; }
       this.pcmBuffer = [];
@@ -150,8 +143,9 @@ export class VoiceController {
       const s = window.zeusChatWorkspace?.getActiveSession?.();
       const input = s?.chatInput || document.querySelector('.zeus-chat-pane:not(.context-hidden) .zeus-chat-input') || document.getElementById('opencode-chat-input') || document.querySelector('.zeus-chat-input');
       if (input) { input.value = promptText; input.focus(); input.dispatchEvent(new Event('input', { bubbles: true })); }
-      if (this.onTranscription) this.onTranscription(promptText);
+      else if (this.onTranscription) { this.onTranscription(promptText); }
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:transcription', { detail: { text: promptText } }));
+      if (s) s._isFromVoice = true;
       if (s && typeof s.sendMessage === 'function' && !s.isProcessing) s.sendMessage();
       av?.setState(this.isListening ? 'LISTENING' : 'OFF'); this._isHandlingSpeech = false;
     }, 180);
@@ -166,44 +160,50 @@ export class VoiceController {
     } catch (_) {}
   }
 
+  cleanTextForTts(text) {
+    if (!text) return '';
+    let t = text.replace(/```[\s\S]*?```/g, '').replace(/`([^`]+)`/g, '$1').replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1').replace(/[*#_~>]/g, '').replace(/\s+/g, ' ').trim();
+    if (t.length > 350) { const dot = t.indexOf('.', 220); t = dot !== -1 && dot < 380 ? t.substring(0, dot + 1) : t.substring(0, 350) + '...'; }
+    return t;
+  }
+
+  _speakWithWebSpeech(cleanText) {
+    const av = this._getAvatar();
+    if (typeof window === 'undefined' || !window.speechSynthesis) { this.isPlayingTts = false; av?.updateAudioLevel(0); av?.setState(this.isListening ? 'LISTENING' : 'OFF'); return false; }
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+    const utter = new SpeechSynthesisUtterance(cleanText); utter.lang = 'pt-BR'; utter.rate = 1.05;
+    this.isPlayingTts = true; av?.setState('SPEAKING');
+    const interval = setInterval(() => { if (!this.isPlayingTts) { clearInterval(interval); return; } av?.updateAudioLevel(0.3 + Math.random() * 0.5); }, 120);
+    return new Promise(resolve => {
+      utter.onend = utter.onerror = () => { clearInterval(interval); this.isPlayingTts = false; av?.updateAudioLevel(0); av?.setState(this.isListening ? 'LISTENING' : 'OFF'); resolve(true); };
+      window.speechSynthesis.speak(utter);
+    });
+  }
+
   async playTts(text, opt = {}) {
     if (!text || !text.trim()) return false;
+    const clean = this.cleanTextForTts(text); if (!clean) return false;
     const av = this._getAvatar(); this.isPlayingTts = true; av?.setState('SPEAKING');
     try {
-      const res = await fetch('/api/audio/synthesize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.trim(), voice: opt.voice || 'pt-BR-FranciscaNeural' }) });
+      const res = await fetch('/api/audio/synthesize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, voice: opt.voice || 'pt-BR-FranciscaNeural' }) });
       if (!res.ok) throw new Error('Falha síntese');
-      const arrayBuffer = await res.arrayBuffer(), AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) { this.isPlayingTts = false; av?.setState(this.isListening ? 'LISTENING' : 'OFF'); return true; }
-      const ctx = new AudioCtx(), audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      const source = ctx.createBufferSource(), analyser = ctx.createAnalyser();
-      analyser.fftSize = 256; source.buffer = audioBuffer;
-      source.connect(analyser); analyser.connect(ctx.destination);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const check = () => {
-        if (!this.isPlayingTts) return;
-        analyser.getByteFrequencyData(data);
-        av?.updateAudioLevel(Math.min(1.0, (data.reduce((a, v) => a + v, 0) / (data.length * 255)) * 1.5));
-        this._rafAudioLoop = requestAnimationFrame(check);
-      };
-      this._rafAudioLoop = requestAnimationFrame(check);
-      return new Promise(r => {
-        source.onended = () => {
-          this.isPlayingTts = false; if (this._rafAudioLoop) cancelAnimationFrame(this._rafAudioLoop);
-          av?.updateAudioLevel(0); av?.setState(this.isListening ? 'LISTENING' : 'OFF'); ctx.close(); r(true);
-        };
-        source.start(0);
+      const blob = await res.blob(); if (!blob || blob.size < 50) throw new Error('Áudio vazio');
+      const audioUrl = URL.createObjectURL(blob), audio = new Audio(audioUrl);
+      const interval = setInterval(() => { if (!this.isPlayingTts) { clearInterval(interval); return; } av?.updateAudioLevel(0.3 + Math.random() * 0.5); }, 120);
+      return new Promise(resolve => {
+        const cleanup = () => { clearInterval(interval); URL.revokeObjectURL(audioUrl); this.isPlayingTts = false; av?.updateAudioLevel(0); av?.setState(this.isListening ? 'LISTENING' : 'OFF'); };
+        audio.onended = () => { cleanup(); resolve(true); };
+        audio.onerror = () => { cleanup(); this._speakWithWebSpeech(clean).then(resolve); };
+        audio.play().catch(() => { cleanup(); this._speakWithWebSpeech(clean).then(resolve); });
       });
-    } catch (_) { this.isPlayingTts = false; av?.updateAudioLevel(0); av?.setState(this.isListening ? 'LISTENING' : 'OFF'); return false; }
+    } catch (_) { return this._speakWithWebSpeech(clean); }
   }
 
   _bindPttShortcuts() {
     if (typeof window === 'undefined') return;
     window.addEventListener('keydown', (e) => {
       const isInput = e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA' || e.target?.isContentEditable;
-      if (e.altKey && e.key.toLowerCase() === 'v') {
-        e.preventDefault(); if (this.isListening) this.stopListening(); else this.startListening();
-        return;
-      }
+      if (e.altKey && e.key.toLowerCase() === 'v') { e.preventDefault(); if (this.isListening) this.stopListening(); else this.startListening(); return; }
       if (this.mode === 'ptt' && !isInput && e.code === 'Space' && !e.repeat && !this.isPttPressed) { e.preventDefault(); this.startPtt(); }
     });
     window.addEventListener('keyup', (e) => { if (this.mode === 'ptt' && this.isPttPressed && e.code === 'Space') { e.preventDefault(); this.stopPtt(); } });
@@ -225,15 +225,12 @@ export function initAvatarAndVoice() {
   const dock = document.getElementById('zeus-avatar-dock');
   if (dock && typeof window !== 'undefined' && window.avatar3D) {
     window.avatar3D.init(dock);
-    dock.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening();
-    });
+    dock.addEventListener('click', async (e) => { e.stopPropagation(); if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening(); });
   }
   voiceController.init({
     onTranscription: (t) => {
       const el = document.querySelector('.zeus-chat-pane:not(.context-hidden) .zeus-chat-input') || document.getElementById('opencode-chat-input') || document.querySelector('.zeus-chat-input');
-      if (el) el.value = (el.value ? el.value + ' ' : '') + t;
+      if (el) el.value = t;
     }
   });
   document.addEventListener('click', async (e) => {

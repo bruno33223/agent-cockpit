@@ -190,7 +190,7 @@ class AudioTranscriber:
             try:
                 rec = self._external_stt[1].Recognizer()
                 with self._external_stt[1].AudioFile(io.BytesIO(pcm_to_wav(audio_bytes))) as src:
-                    txt = rec.recognize_sphinx(rec.record(src))
+                    txt = rec.recognize_google(rec.record(src), language="pt-BR")
                     if txt:
                         return self.normalize_transcription(txt)
             except Exception:
@@ -228,7 +228,7 @@ class AudioTranscriber:
             ext = audio_bytes[start:len(audio_bytes) if end == -1 else end].decode("utf-8", errors="ignore").strip()
             if ext:
                 return self.normalize_transcription(ext)
-        return "Executar verificação de integridade e testes do sistema." if len(audio_bytes) > 1000 else "Instrução de comando vocal recebida com sucesso."
+        return "Comando de voz recebido com sucesso."
 
     def create_stream_buffer(self, silence_chunks_limit: int = 3, silence_rms_threshold: float = 15.0) -> AudioStreamBuffer:
         """Cria uma nova instância de buffer de streaming de áudio contínuo."""

@@ -187,7 +187,7 @@ export class ZeusChatSessionController {
         onEvent: (evt) => this._handleLiveStreamEvent(evt, liveMsg, { onThinking: c => { fullThinking += c; }, onContent: c => { fullContent += c; } })
       });
       this.messages.push({ role: 'assistant', author: 'Orquestrador Zeus', content: fullContent, thinking: fullThinking, timestamp: new Date().toLocaleTimeString() });
-      if (window.voiceController?.playTts && fullContent && window.voiceController?.isListening) { window.voiceController.playTts(fullContent); }
+      if (window.voiceController?.playTts && fullContent && (this._isFromVoice || window.voiceController?.isListening)) { window.voiceController.playTts(fullContent); } this._isFromVoice = false;
     } catch (err) {
       const msg = err.name === 'AbortError' ? 'Execução interrompida pelo usuário.' : err.message;
       if (liveMsg?.body) liveMsg.body.innerHTML += `<div style="color: var(--destructive, #ff6568); font-size: 11px; margin-top: 4px;">⚠️ ${escapeHtml(msg)}</div>`;
