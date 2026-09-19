@@ -94,6 +94,13 @@ class PTYSession:
             except Exception:
                 pass
             shell = self.env.get("SHELL", "/bin/bash")
+            try:
+                import ctypes
+                libc = ctypes.CDLL("libc.so.6")
+                PR_SET_PDEATHSIG = 1
+                libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
+            except Exception:
+                pass
             os.execvpe(shell, [shell], self.env)
         else:
             # Processo Pai
@@ -103,6 +110,11 @@ class PTYSession:
             self.is_alive = True
             self.is_spawned = True
             self.reader_task = None
+            try:
+                from server.process_lifecycle import get_process_lifecycle_manager
+                get_process_lifecycle_manager().register_process(self.pid, name=f"pty:{self.session_id}")
+            except Exception:
+                pass
 
     def _set_winsize(self, cols: int, rows: int):
         self.cols = cols
@@ -193,6 +205,12 @@ class PTYSession:
         if self.pid is not None:
             pid = self.pid
             try:
+                try:
+                    pgid = os.getpgid(pid)
+                    if pgid == pid:
+                        os.killpg(pgid, signal.SIGTERM)
+                except Exception:
+                    pass
                 os.kill(pid, signal.SIGTERM)
             except ProcessLookupError:
                 self.pid = None
@@ -218,6 +236,12 @@ class PTYSession:
             # Fallback escalonando para SIGKILL caso o processo ainda esteja ativo
             if not reaped:
                 try:
+                    try:
+                        pgid = os.getpgid(pid)
+                        if pgid == pid:
+                            os.killpg(pgid, signal.SIGKILL)
+                    except Exception:
+                        pass
                     os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError:
                     reaped = True
@@ -236,6 +260,12 @@ class PTYSession:
                     except Exception:
                         pass
                     time.sleep(0.02)
+
+            try:
+                from server.process_lifecycle import get_process_lifecycle_manager
+                get_process_lifecycle_manager().unregister_process(pid)
+            except Exception:
+                pass
 
             self.pid = None
 
@@ -355,6 +385,8 @@ class PTYSessionManager:
             
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
+        env["AGENT_COCKPIT_PTY"] = "1"
+        env["COCKPIT_PTY_SESSION"] = "1"
         return env
 
     def get_or_create(self, session_id: str, cwd: Optional[str] = None, cols: int = 80, rows: int = 24,

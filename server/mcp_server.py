@@ -1,6 +1,9 @@
 import sys
 import json
 import os
+import time
+import signal
+import threading
 import warnings
 import asyncio
 import concurrent.futures
@@ -921,6 +924,42 @@ async def async_stdio_server():
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
+def _start_parent_watchdog():
+    """Monitora a vida do processo pai. Se o processo pai morrer (PPID vira 1 ou muda), encerra para não virar zumbi."""
+    def _watchdog():
+        initial_ppid = os.getppid()
+        if initial_ppid <= 1:
+            return
+        while True:
+            time.sleep(2.0)
+            current_ppid = os.getppid()
+            if current_ppid != initial_ppid or current_ppid == 1:
+                os._exit(0)
+    t = threading.Thread(target=_watchdog, daemon=True)
+    t.start()
+
+def _configure_process_lifecycle():
+    """Configura proteção contra zumbis (PR_SET_PDEATHSIG e signal handlers) na execução do servidor."""
+    if sys.platform != "win32":
+        try:
+            import ctypes
+            libc = ctypes.CDLL("libc.so.6")
+            PR_SET_PDEATHSIG = 1
+            libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
+        except Exception:
+            pass
+
+    def _handle_exit_signal(sig, frame):
+        sys.exit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, _handle_exit_signal)
+        signal.signal(signal.SIGINT, _handle_exit_signal)
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, _handle_exit_signal)
+    except Exception:
+        pass
+
 def run_stdio_server():
     """Loop JSON-RPC 2.0 padrão MCP sobre stdin/stdout assíncrono."""
     try:
@@ -929,6 +968,8 @@ def run_stdio_server():
     except Exception:
         pass
 
+    _configure_process_lifecycle()
+    _start_parent_watchdog()
     asyncio.run(async_stdio_server())
 
 if __name__ == "__main__":
