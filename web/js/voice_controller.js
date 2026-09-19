@@ -130,7 +130,7 @@ export class VoiceController {
     if (this.lastCapturedText) { const t = this.lastCapturedText; this.lastCapturedText = ''; return this._handleSpeechText(t); }
     const dur = Date.now() - this.speechStartTime, has = this.pcmBuffer.length > 0;
     this.isSpeaking = false;
-    if (has && dur >= this.minSpeechMs) {
+    if (has && dur >= this.minSpeechMs && !this.recognition) {
       const total = this.pcmBuffer.reduce((acc, c) => acc + c.length, 0), merged = new Float32Array(total);
       let off = 0; for (const c of this.pcmBuffer) { merged.set(c, off); off += c.length; }
       this.pcmBuffer = [];
@@ -140,21 +140,21 @@ export class VoiceController {
   }
 
   async _handleSpeechText(text) {
-    if (!text || !text.trim()) return;
-    this.lastCapturedText = '';
+    if (!text || !text.trim() || this._isHandlingSpeech) return;
+    this._isHandlingSpeech = true;
+    const promptText = text.trim(); this.lastCapturedText = '';
+    if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
     const av = this._getAvatar(); av?.setState('THINKING');
     ensureChatOpen();
     setTimeout(() => {
       const s = window.zeusChatWorkspace?.getActiveSession?.();
       const input = s?.chatInput || document.querySelector('.zeus-chat-pane:not(.context-hidden) .zeus-chat-input') || document.getElementById('opencode-chat-input') || document.querySelector('.zeus-chat-input');
-      if (input) {
-        input.value = (input.value ? input.value + ' ' : '') + text.trim();
-        input.focus(); input.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-      if (this.onTranscription) this.onTranscription(text);
-      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:transcription', { detail: { text } }));
-      av?.setState(this.isListening ? 'LISTENING' : 'OFF');
-    }, 150);
+      if (input) { input.value = promptText; input.focus(); input.dispatchEvent(new Event('input', { bubbles: true })); }
+      if (this.onTranscription) this.onTranscription(promptText);
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:transcription', { detail: { text: promptText } }));
+      if (s && typeof s.sendMessage === 'function' && !s.isProcessing) s.sendMessage();
+      av?.setState(this.isListening ? 'LISTENING' : 'OFF'); this._isHandlingSpeech = false;
+    }, 180);
   }
 
   async _sendAudio(audioBlob) {

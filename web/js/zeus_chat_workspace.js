@@ -16,8 +16,7 @@ const setStoredSessionId = (id) => { try { id ? localStorage?.setItem?.(STORAGE_
 
 export class ZeusChatSessionController {
   constructor(session = null, elPane = null) {
-    const savedId = getStoredSessionId();
-    this.sessionId = session?.id || savedId || 'zeus-chat';
+    const savedId = getStoredSessionId(); this.sessionId = session?.id || savedId || 'zeus-chat';
     if (this.sessionId) setStoredSessionId(this.sessionId);
     this.paneClassName = 'zeus-chat-pane'; this.role = 'visual-chat';
     this.messages = []; this.isProcessing = false; this.subagents = new Map();
@@ -30,11 +29,8 @@ export class ZeusChatSessionController {
 
   attachPane(session, elPane) {
     this.session = session; this.paneEl = elPane;
-    const savedId = getStoredSessionId();
-    this.sessionId = savedId || session?.id || this.sessionId;
-    if (session) session.id = this.sessionId;
-    setStoredSessionId(this.sessionId);
-
+    const savedId = getStoredSessionId(); this.sessionId = savedId || session?.id || this.sessionId;
+    if (session) session.id = this.sessionId; setStoredSessionId(this.sessionId);
     const q = (s) => elPane.querySelector(s);
     this.messagesContainer = q('.zeus-chat-messages'); this.chatInput = q('.zeus-chat-input');
     this.btnSend = q('.btn-send-zeus-chat'); this.btnClear = q('.zeus-btn-clear-history') || q('#btn-clear-zeus-chat');
@@ -50,8 +46,7 @@ export class ZeusChatSessionController {
     this.fileInput?.addEventListener('change', (e) => { Array.from(e.target.files || []).forEach(f => this.addAttachedImage(f)); e.target.value = ''; });
     this.btnMic?.addEventListener('click', () => this.toggleRecording());
     this.btnSkills?.addEventListener('click', () => { if (this.skillsPopover) this.skillsPopover.style.display = this.skillsPopover.style.display === 'none' ? 'flex' : 'none'; });
-    this.modelSelect?.addEventListener('change', (e) => { this.selectedModel = e.target.value; });
-    this.loadAvailableModels();
+    this.modelSelect?.addEventListener('change', (e) => { this.selectedModel = e.target.value; }); this.loadAvailableModels();
 
     const renderWelcome = () => { if (this.messages.length === 0) this.renderMessage({ role: 'assistant', author: 'Orquestrador Zeus', content: '⚡ **Zeus Master Chat Online.** Orquestração de alto nível e controle de subagentes.', timestamp: new Date().toLocaleTimeString() }); };
     if (savedId) { this.loadHistory(savedId).then(h => { if (!h || !h.length) renderWelcome(); }).catch(renderWelcome); }
@@ -231,6 +226,12 @@ export class ZeusChatWorkspaceManager {
   openOrCreateChatSession(mgr = terminalWorkspace, opt = {}) {
     const m = mgr || (typeof window !== 'undefined' ? window.terminalWorkspace : null);
     if (!m) return null;
+    const existing = (m.sessions ? Array.from(m.sessions.values()).find(s => s.role === 'visual-chat') : null) || this.getActiveSession();
+    if (existing) {
+      const id = existing.id || existing.sessionId;
+      if (id && m.selectSession) m.selectSession(id);
+      existing.focusInput?.(); return existing.session || existing;
+    }
     const session = m.createSession({ id: opt.id || getStoredSessionId(), name: opt.name || 'Zeus Chat', role: 'visual-chat', agentType: 'zeus', cwd: m.getActiveProjectRoot?.() || '/' });
     if (session) { m.selectSession(session.id); session.focusInput?.(); }
     return session;
