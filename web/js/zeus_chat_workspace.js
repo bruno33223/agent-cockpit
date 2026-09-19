@@ -186,8 +186,8 @@ export class ZeusChatSessionController {
         payload: { message: text, session_id: this.sessionId, model_id: this.selectedModel, project_id: currentProjectId || 'default' },
         onEvent: (evt) => this._handleLiveStreamEvent(evt, liveMsg, { onThinking: c => { fullThinking += c; }, onContent: c => { fullContent += c; } })
       });
-      this.renderer.cleanPlaceholders(liveMsg);
       this.messages.push({ role: 'assistant', author: 'Orquestrador Zeus', content: fullContent, thinking: fullThinking, timestamp: new Date().toLocaleTimeString() });
+      if (window.voiceController?.playTts && fullContent && window.voiceController?.isListening) { window.voiceController.playTts(fullContent); }
     } catch (err) {
       if (liveMsg?.body) liveMsg.body.innerHTML = `<span style="color: var(--destructive, #ff6568);">❌ ${escapeHtml(err.message)}</span>`;
     } finally {

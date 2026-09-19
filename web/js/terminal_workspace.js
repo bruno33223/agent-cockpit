@@ -904,8 +904,8 @@ export class TerminalWorkspaceManager {
           <div class="zeus-attachments-preview" style="display: none; padding: 6px 14px; background: rgba(0,0,0,0.2); gap: 8px; flex-wrap: wrap;"></div>
           <div class="zeus-chat-input-bar" style="border-top: 1px solid var(--border-subtle, #23282f); padding: 10px 14px; display: flex; gap: 8px; background: var(--bg-surface, #111417); align-items: flex-end;">
             <button type="button" class="zeus-btn-attach" title="Anexar imagem (ou cole com Ctrl+V)" style="height: 38px; width: 38px; min-width: 38px;">📷</button>
-            <input type="file" class="zeus-file-input" accept="image/*" multiple style="display: none;" />
-            <button type="button" class="zeus-btn-mic" title="Gravar áudio (STT em RAM)" style="height: 38px; width: 38px; min-width: 38px;">🎙️</button>
+            <button type="button" class="zeus-btn-voice-mode badge badge-info" title="Alternar Modo de Voz (Hands-free VAD / Push-to-Talk)" style="height: 38px; padding: 0 8px; font-size: 11px; font-weight: 700; cursor: pointer; border-radius: 6px;">VAD</button>
+            <button type="button" class="zeus-btn-mic" title="Gravar áudio / Falar com o Zeus (VAD ou PTT)" style="height: 38px; width: 38px; min-width: 38px;">🎙️</button>
             <textarea class="zeus-chat-input" id="zeus-chat-input-${id}" placeholder="Comunique-se com o Orquestrador Zeus ou despache subagentes..." rows="1" style="flex: 1; resize: none; min-height: 38px; max-height: 120px; padding: 8px 12px; border-radius: 6px; background: var(--bg-card, #181b20); border: 1px solid var(--border, #23282f); color: var(--foreground, #f4f4f5); font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;"></textarea>
             <button class="action-btn primary btn-sm btn-send-zeus-chat" id="btn-send-${id}" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
               <span>Enviar</span>
