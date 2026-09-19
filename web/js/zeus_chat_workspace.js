@@ -10,7 +10,6 @@ import { openSubagentTab, focusSubagentTab } from './subagent_tabs.js';
 import { ZeusChatCore } from './chat/zeus_chat_core.js';
 import { MessageRenderer } from './chat/message_renderer.js';
 import { SubagentCardRenderer } from './chat/subagent_card_renderer.js';
-
 const STORAGE_KEY_SESSION = 'zeus_chat_active_session_id';
 const getStoredSessionId = () => { try { return localStorage?.getItem?.(STORAGE_KEY_SESSION) || null; } catch (_) { return null; } };
 const setStoredSessionId = (id) => { try { id ? localStorage?.setItem?.(STORAGE_KEY_SESSION, id) : localStorage?.removeItem?.(STORAGE_KEY_SESSION); } catch (_) {} };
@@ -25,8 +24,7 @@ export class ZeusChatSessionController {
     this.session = session; this.paneEl = elPane;
     this.core = new ZeusChatCore(); this.renderer = new MessageRenderer(); this.subRenderer = new SubagentCardRenderer();
     this.messagesContainer = this.chatInput = this.btnSend = null;
-    this.selectedModel = 'auto'; this.selectedSkills = this.core.selectedSkills;
-    this.selectedMcps = this.core.selectedMcps; this.attachedImages = this.core.attachedImages;
+    this.selectedModel = 'auto'; this.selectedSkills = this.core.selectedSkills; this.selectedMcps = this.core.selectedMcps; this.attachedImages = this.core.attachedImages;
     if (session && elPane) this.attachPane(session, elPane);
   }
 
@@ -92,8 +90,7 @@ export class ZeusChatSessionController {
   }
 
   fetchHistory(sessionId) { return this.loadHistory(sessionId); }
-  addAttachedImage(f) { this.core.addAttachedImage(f, () => this.renderAttachmentsPreview()); }
-  renderAttachmentsPreview() { this.core.renderAttachmentsPreview(this.attachmentsPreview); }
+  addAttachedImage(f) { this.core.addAttachedImage(f, () => this.renderAttachmentsPreview()); } renderAttachmentsPreview() { this.core.renderAttachmentsPreview(this.attachmentsPreview); }
   focusInput() { if (this.chatInput) setTimeout(() => this.chatInput.focus(), 60); }
   renderMessage(msg) { this.messages.push(msg); return this.renderer.renderMessage(msg, this.messagesContainer); }
 
@@ -113,6 +110,11 @@ export class ZeusChatSessionController {
       await this.core.startRecording({
         onStart: () => this.btnMic?.classList.add('recording'),
         onResult: t => { if (this.chatInput) this.chatInput.value += ` ${t}`; },
+        onError: (err) => {
+          this.btnMic?.classList.remove('recording');
+          const msg = typeof err === 'string' ? err : (err?.message || err?.error || 'Acesso ao microfone negado ou indisponível.');
+          if (this.messagesContainer) this.renderMessage({ role: 'assistant', author: 'Sistema', content: `⚠️ Microfone: ${escapeHtml(msg)}` });
+        },
         onEnd: () => this.btnMic?.classList.remove('recording')
       });
     }
@@ -221,8 +223,7 @@ export class ZeusChatWorkspaceManager {
     return this.sessions.get(this.activeSessionId) || Array.from(this.sessions.values()).pop() || null;
   }
   focusInput() { this.getActiveSession()?.focusInput(); }
-  get messages() { return this.getActiveSession()?.messages || []; }
-  get isProcessing() { return this.getActiveSession()?.isProcessing || false; }
+  get messages() { return this.getActiveSession()?.messages || []; } get isProcessing() { return this.getActiveSession()?.isProcessing || false; }
   handleSubagentSpawn(data = {}) { this.sessions.forEach(c => c.handleSubagentSpawn(data)); }
   openOrCreateChatSession(mgr = terminalWorkspace, opt = {}) {
     const m = mgr || (typeof window !== 'undefined' ? window.terminalWorkspace : null);
@@ -243,7 +244,6 @@ export function initZeusChatWorkspace() {
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     ZeusChatSessionController, ZeusChatWorkspaceManager, zeusChatWorkspace,
-    openOrCreateChatSession, openZeusChat: () => zeusChatWorkspace.openOrCreateChatSession(),
-    initZeusChatWorkspace
+    openOrCreateChatSession, openZeusChat: () => zeusChatWorkspace.openOrCreateChatSession(), initZeusChatWorkspace
   });
 }

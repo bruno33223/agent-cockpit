@@ -150,7 +150,9 @@ class TestSettingsAndCloudStyles(unittest.TestCase):
         Verifica se execute_local_builder retorna status DELEGATED_TO_CLOUD quando
         a opção 'DEIXAR ESTILOS COM A NUVEM' está ativa e o arquivo alvo é CSS.
         """
-        db.update_settings({"delegate_styles_to_cloud": True})
+        db.switch_current_project("default")
+        db.update_settings({"enable_local_ai": True, "delegate_styles_to_cloud": True})
+        db.update_local_worker_config({"enabled": True, "delegate_styles_to_cloud": True})
 
         res = execute_local_builder(
             slice_id="slice-test",

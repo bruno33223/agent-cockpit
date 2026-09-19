@@ -1,19 +1,30 @@
 /**
- * ZeusChatCore - Estado da sessão, chamadas à API, modelos, áudio e parser SSE.
- * Issue #34 (Deduplicação e Arquitetura Modular do Zeus Chat)
+ * ZeusChatCore - Estado da sessão, modelos, áudio WAV 16kHz PCM e parser SSE.
+ * Issue #34 & #42 (Gravação Resiliente WAV 16kHz e Fallback de Microfone)
  */
+
+export const encodeWav = (samples, sampleRate = 16000) => {
+  const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); w(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data');
+  v.setUint32(40, samples.length * 2, true);
+  for (let i = 0, o = 44; i < samples.length; i++, o += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+};
 
 export class ZeusChatCore {
   constructor() {
-    this.availableModels = [];
-    this.selectedModel = 'opencode/big-pickle';
-    this.selectedSkills = new Set();
-    this.selectedMcps = new Set();
-    this.attachedImages = [];
-    this.isRecording = false;
-    this.mediaRecorder = null;
-    this.recognition = null;
-    this.audioChunks = [];
+    this.availableModels = []; this.selectedModel = 'opencode/big-pickle';
+    this.selectedSkills = new Set(); this.selectedMcps = new Set();
+    this.attachedImages = []; this.isRecording = false;
+    this.mediaRecorder = this.recognition = this.audioStream = this.audioContext = this.audioProcessor = null;
+    this.audioChunks = []; this.pcmChunks = [];
   }
 
   isVisionSupported(modelName) {
@@ -35,18 +46,14 @@ export class ZeusChatCore {
       (data?.models || []).forEach(m => list.push({ id: m, name: m, provider: 'OpenCode', supports_vision: this.isVisionSupported(m) }));
     } catch (_) {}
     try {
-      const res = await fetchFn('/api/omniroute/connectors');
-      const data = typeof res.json === 'function' ? await res.json() : res;
-      (data?.connectors || (Array.isArray(data) ? data : [])).forEach(c => {
-        (c.models || []).forEach(m => {
-          const id = typeof m === 'string' ? m : (m.id || m.name);
-          if (!list.some(x => x.id === id)) list.push({ id, name: `${id} (${c.provider || 'Cloud'})`, provider: c.provider || 'OmniRoute', supports_vision: this.isVisionSupported(id) });
-        });
-      });
+      const res = await fetchFn('/api/omniroute/connectors'), data = typeof res.json === 'function' ? await res.json() : res;
+      (data?.connectors || (Array.isArray(data) ? data : [])).forEach(c => (c.models || []).forEach(m => {
+        const id = typeof m === 'string' ? m : (m.id || m.name);
+        if (!list.some(x => x.id === id)) list.push({ id, name: `${id} (${c.provider || 'Cloud'})`, provider: c.provider || 'OmniRoute', supports_vision: this.isVisionSupported(id) });
+      }));
     } catch (_) {}
     try {
-      const res = await fetchFn('/api/local-worker/models');
-      const data = typeof res.json === 'function' ? await res.json() : res;
+      const res = await fetchFn('/api/local-worker/models'), data = typeof res.json === 'function' ? await res.json() : res;
       (data?.models || (Array.isArray(data) ? data : [])).forEach(m => {
         const id = typeof m === 'string' ? m : (m.name || m.id);
         if (!list.some(x => x.id === id)) list.push({ id, name: `${id} (Local)`, provider: 'Local Worker', supports_vision: this.isVisionSupported(id) });
@@ -61,30 +68,24 @@ export class ZeusChatCore {
   validateMultimodalInput(model = this.selectedModel, images = this.attachedImages, warningEl = null) {
     if (images.length > 0 && !this.isVisionSupported(model)) {
       if (warningEl) {
-        warningEl.style.display = 'flex';
-        warningEl.className = 'zeus-model-warning zeus-vision-error badge-danger';
+        warningEl.style.display = 'flex'; warningEl.className = 'zeus-model-warning zeus-vision-error badge-danger';
         warningEl.innerHTML = `<span>⚠️ O modelo <strong>${model || 'atual'}</strong> não suporta visão. Escolha um modelo multimodal ou remova a imagem.</span>`;
       }
       return { valid: false, reason: 'vision_not_supported', model };
     }
-    if (warningEl) {
-      warningEl.style.display = 'none';
-      warningEl.innerHTML = '';
-    }
+    if (warningEl) { warningEl.style.display = 'none'; warningEl.innerHTML = ''; }
     return { valid: true };
   }
 
   addAttachedImage(file, callback = null) {
-    if (!file || !file.type || !file.type.startsWith('image/')) return;
+    if (!file || !file.type?.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      const imgObj = { id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), name: file.name, size: file.size, dataUrl: e.target.result, file };
-      this.attachedImages.push(imgObj);
+      this.attachedImages.push({ id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), name: file.name, size: file.size, dataUrl: e.target.result, file });
       if (callback) callback(this.attachedImages);
     };
     reader.readAsDataURL(file);
   }
-
   removeAttachedImage(idOrIndex, callback = null) {
     if (typeof idOrIndex === 'number') this.attachedImages.splice(idOrIndex, 1);
     else this.attachedImages = this.attachedImages.filter(img => (typeof img === 'string' ? img : img.id) !== idOrIndex);
@@ -94,16 +95,12 @@ export class ZeusChatCore {
   renderAttachmentsPreview(container, onRemove = null) {
     if (!container) return;
     container.innerHTML = '';
-    if (this.attachedImages.length === 0) {
-      container.style.display = 'none';
-      return;
-    }
+    if (this.attachedImages.length === 0) { container.style.display = 'none'; return; }
     container.style.display = 'flex';
     this.attachedImages.forEach((img, idx) => {
       const thumb = document.createElement('div');
       thumb.className = 'zeus-attachment-thumb';
-      const src = typeof img === 'string' ? img : img.dataUrl;
-      const name = typeof img === 'string' ? 'anexo' : (img.name || 'anexo');
+      const src = typeof img === 'string' ? img : img.dataUrl, name = typeof img === 'string' ? 'anexo' : (img.name || 'anexo');
       thumb.innerHTML = `<img src="${src}" alt="${name}" class="thumb-img" /><button type="button" class="btn-remove-thumb zeus-thumb-remove" title="Remover imagem">✕</button>`;
       thumb.querySelector('.zeus-thumb-remove').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -120,61 +117,84 @@ export class ZeusChatCore {
         fetchFn(`/api/customizations/mcp?project_id=${encodeURIComponent(projectId)}`).then(r => r.json()).catch(() => null),
         fetchFn(`/api/customizations/skills?project_id=${encodeURIComponent(projectId)}`).then(r => r.json()).catch(() => null)
       ]);
-      return {
-        mcps: (resMcp?.mcp_servers || resMcp?.mcp || (Array.isArray(resMcp) ? resMcp : [])) || [],
-        skills: (resSkills?.skills || (Array.isArray(resSkills) ? resSkills : [])) || []
-      };
-    } catch (_) {
-      return { mcps: [], skills: [] };
-    }
+      return { mcps: (resMcp?.mcp_servers || resMcp?.mcp || (Array.isArray(resMcp) ? resMcp : [])) || [], skills: (resSkills?.skills || (Array.isArray(resSkills) ? resSkills : [])) || [] };
+    } catch (_) { return { mcps: [], skills: [] }; }
+  }
+
+  async _startMediaRecording({ onStart, onError, onEnd }) {
+    if (!navigator?.mediaDevices?.getUserMedia) { if (onError) onError(new Error('Microfone não suportado no navegador')); return; }
+    try {
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.audioContext = new AudioCtx({ sampleRate: 16000 });
+        const source = this.audioContext.createMediaStreamSource(this.audioStream);
+        this.pcmChunks = [];
+        this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+        this.audioProcessor.onaudioprocess = (e) => { if (this.isRecording) this.pcmChunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+        source.connect(this.audioProcessor);
+        this.audioProcessor.connect(this.audioContext.destination);
+      } else {
+        this.mediaRecorder = new MediaRecorder(this.audioStream);
+        this.audioChunks = [];
+        this.mediaRecorder.ondataavailable = e => { if (e.data?.size > 0) this.audioChunks.push(e.data); };
+        this.mediaRecorder.start();
+      }
+      this.isRecording = true; if (onStart) onStart();
+    } catch (err) { this.isRecording = false; if (onError) onError(err); }
   }
 
   async startRecording({ onStart, onResult, onError, onEnd }) {
-    const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-    if (SpeechRecognition) {
+    const SpeechRec = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+    let hasResult = false;
+    if (SpeechRec) {
       try {
-        this.recognition = new SpeechRecognition();
-        this.recognition.lang = 'pt-BR';
-        this.recognition.continuous = true;
-        this.recognition.interimResults = true;
+        this.recognition = new SpeechRec();
+        this.recognition.lang = 'pt-BR'; this.recognition.continuous = true; this.recognition.interimResults = true;
         this.recognition.onstart = () => { this.isRecording = true; if (onStart) onStart(); };
         this.recognition.onresult = (evt) => {
-          let text = '';
+          hasResult = true; let text = '';
           for (let i = evt.resultIndex; i < evt.results.length; ++i) text += evt.results[i][0].transcript;
           if (onResult) onResult(text);
         };
-        this.recognition.onerror = (err) => { if (onError) onError(err); };
-        this.recognition.onend = () => { this.isRecording = false; if (onEnd) onEnd(); };
-        this.recognition.start();
-        return;
+        this.recognition.onerror = async (err) => {
+          if (!hasResult) {
+            try { this.recognition?.abort?.(); } catch (_) {}
+            this.recognition = null;
+            await this._startMediaRecording({ onStart, onError, onEnd });
+          } else if (onError) onError(err);
+        };
+        this.recognition.onend = () => { if (!this.audioStream) { this.isRecording = false; if (onEnd) onEnd(); } };
+        this.recognition.start(); return;
       } catch (_) {}
     }
-    if (!navigator?.mediaDevices?.getUserMedia) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    this.audioChunks = [];
-    this.mediaRecorder = new MediaRecorder(stream);
-    this.mediaRecorder.addEventListener('dataavailable', e => { if (e.data.size > 0) this.audioChunks.push(e.data); });
-    this.mediaRecorder.addEventListener('stop', () => stream.getTracks().forEach(t => t.stop()));
-    this.mediaRecorder.start();
-    this.isRecording = true;
-    if (onStart) onStart();
+    await this._startMediaRecording({ onStart, onError, onEnd });
   }
 
   stopRecording(onStop = null) {
     this.isRecording = false;
     if (this.recognition) { try { this.recognition.stop(); } catch (_) {} this.recognition = null; }
+    if (this.audioStream) { this.audioStream.getTracks().forEach(t => t.stop()); this.audioStream = null; }
+    if (this.audioProcessor && this.audioContext) {
+      try { this.audioProcessor.disconnect(); this.audioContext.close(); } catch (_) {}
+      this.audioProcessor = null; this.audioContext = null;
+      if (onStop && this.pcmChunks?.length) {
+        const total = this.pcmChunks.reduce((acc, c) => acc + c.length, 0);
+        const merged = new Float32Array(total);
+        let off = 0; for (const c of this.pcmChunks) { merged.set(c, off); off += c.length; }
+        this.pcmChunks = []; onStop(encodeWav(merged, 16000)); return;
+      }
+    }
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
-      if (onStop) {
-        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
-        onStop(audioBlob);
-      }
+      if (onStop) onStop(new Blob(this.audioChunks, { type: 'audio/wav' }));
+      this.mediaRecorder = null;
     }
   }
 
   async sendAudioForTranscription(audioBlob, projectId = 'default', fetchFn = fetch) {
     const formData = new FormData();
-    formData.append('audio', audioBlob, 'prompt_audio.webm');
+    formData.append('audio', audioBlob, 'prompt_audio.wav');
     formData.append('project_id', projectId);
     const res = await fetchFn('/api/audio/transcribe-and-optimize', { method: 'POST', body: formData });
     const data = typeof res.json === 'function' ? await res.json() : res;
@@ -182,17 +202,9 @@ export class ZeusChatCore {
   }
 
   async sendStreamMessage({ endpoint = '/api/zeus-chat/message', payload, onEvent, onThinking, onToolCall, onSubagentSpawn, onContent, onDone, onError }) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.message || `Erro HTTP ${response.status}: ${response.statusText}`);
-    }
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
+    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }, body: JSON.stringify(payload) });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.message || `Erro HTTP ${response.status}: ${response.statusText}`); }
+    const reader = response.body.getReader(), decoder = new TextDecoder('utf-8');
     let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
@@ -221,27 +233,13 @@ export class ZeusChatCore {
 
   async loadHistory(sessionId, fetchFn = fetch) {
     if (!sessionId) return [];
-    try {
-      const res = await fetchFn(`/api/zeus-chat/session/${encodeURIComponent(sessionId)}/history`);
-      const data = typeof res.json === 'function' ? await res.json() : res;
-      return Array.isArray(data?.history) ? data.history : [];
-    } catch (_) { return []; }
+    try { const res = await fetchFn(`/api/zeus-chat/session/${encodeURIComponent(sessionId)}/history`); const data = typeof res.json === 'function' ? await res.json() : res; return Array.isArray(data?.history) ? data.history : []; } catch (_) { return []; }
   }
-
   async fetchHistory(sessionId, fetchFn = fetch) { return this.loadHistory(sessionId, fetchFn); }
-
   async clearHistory(sessionId, fetchFn = fetch) {
     if (!sessionId) return false;
-    try {
-      const res = await fetchFn(`/api/zeus-chat/session/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
-      return Boolean(res?.ok || (res?.status >= 200 && res?.status < 300));
-    } catch (_) { return false; }
+    try { const res = await fetchFn(`/api/zeus-chat/session/${encodeURIComponent(sessionId)}`, { method: 'DELETE' }); return Boolean(res?.ok || (res?.status >= 200 && res?.status < 300)); } catch (_) { return false; }
   }
 }
-
 export const zeusChatCore = new ZeusChatCore();
-
-if (typeof window !== 'undefined') {
-  window.ZeusChatCore = ZeusChatCore;
-  window.zeusChatCore = zeusChatCore;
-}
+if (typeof window !== 'undefined') { window.ZeusChatCore = ZeusChatCore; window.zeusChatCore = zeusChatCore; }
