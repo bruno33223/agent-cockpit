@@ -171,11 +171,15 @@ export class ZeusChatSessionController {
 
   async sendMessage() {
     if (!this.chatInput) return;
+    if (this.isProcessing) {
+      if (this.abortController) { this.abortController.abort(); this.abortController = null; }
+      return;
+    }
     const text = this.chatInput.value.trim();
-    if ((!text && this.core.attachedImages.length === 0) || this.isProcessing) return;
-    this.isProcessing = true;
+    if (!text && this.core.attachedImages.length === 0) return;
+    this.isProcessing = true; this.abortController = new AbortController();
     this.chatInput.value = ''; this.chatInput.disabled = true;
-    if (this.btnSend) this.btnSend.disabled = true;
+    if (this.btnSend) { this.btnSend.textContent = '⏹ Parar'; this.btnSend.disabled = false; this.btnSend.title = 'Parar execução'; }
     this.renderMessage({ role: 'user', author: 'Você', content: text, images: [...this.core.attachedImages] });
     this.core.attachedImages = []; this.renderAttachmentsPreview();
     const liveMsg = this.renderer.createLiveAssistantCard(this.messagesContainer);
@@ -184,16 +188,18 @@ export class ZeusChatSessionController {
       await this.core.sendStreamMessage({
         endpoint: '/api/zeus-chat/message',
         payload: { message: text, session_id: this.sessionId, model_id: this.selectedModel, project_id: currentProjectId || 'default' },
+        signal: this.abortController?.signal,
         onEvent: (evt) => this._handleLiveStreamEvent(evt, liveMsg, { onThinking: c => { fullThinking += c; }, onContent: c => { fullContent += c; } })
       });
       this.messages.push({ role: 'assistant', author: 'Orquestrador Zeus', content: fullContent, thinking: fullThinking, timestamp: new Date().toLocaleTimeString() });
       if (window.voiceController?.playTts && fullContent && window.voiceController?.isListening) { window.voiceController.playTts(fullContent); }
     } catch (err) {
-      if (liveMsg?.body) liveMsg.body.innerHTML = `<span style="color: var(--destructive, #ff6568);">❌ ${escapeHtml(err.message)}</span>`;
+      const msg = err.name === 'AbortError' ? 'Execução interrompida pelo usuário.' : err.message;
+      if (liveMsg?.body) liveMsg.body.innerHTML += `<div style="color: var(--destructive, #ff6568); font-size: 11px; margin-top: 4px;">⚠️ ${escapeHtml(msg)}</div>`;
     } finally {
-      this.isProcessing = false;
+      this.isProcessing = false; this.abortController = null;
       if (this.chatInput) { this.chatInput.disabled = false; this.focusInput(); }
-      if (this.btnSend) this.btnSend.disabled = false;
+      if (this.btnSend) { this.btnSend.textContent = 'Enviar'; this.btnSend.title = 'Enviar mensagem'; }
     }
   }
 
@@ -218,10 +224,7 @@ export class ZeusChatWorkspaceManager {
     if (this.activeSessionId === sessionId) { const keys = Array.from(this.sessions.keys()); this.activeSessionId = keys.length ? keys[keys.length - 1] : null; }
   }
   getSession(id) { return this.sessions.get(id) || null; }
-  getActiveSession() {
-    if (terminalWorkspace?.activeSessionId && this.sessions.has(terminalWorkspace.activeSessionId)) return this.sessions.get(terminalWorkspace.activeSessionId);
-    return this.sessions.get(this.activeSessionId) || Array.from(this.sessions.values()).pop() || null;
-  }
+  getActiveSession() { return (terminalWorkspace?.activeSessionId && this.sessions.get(terminalWorkspace.activeSessionId)) || this.sessions.get(this.activeSessionId) || Array.from(this.sessions.values()).pop() || null; }
   focusInput() { this.getActiveSession()?.focusInput(); }
   get messages() { return this.getActiveSession()?.messages || []; } get isProcessing() { return this.getActiveSession()?.isProcessing || false; }
   handleSubagentSpawn(data = {}) { this.sessions.forEach(c => c.handleSubagentSpawn(data)); }
@@ -237,13 +240,10 @@ export class ZeusChatWorkspaceManager {
 export const zeusChatWorkspace = new ZeusChatWorkspaceManager();
 export function openOrCreateChatSession(mgr = terminalWorkspace) { return zeusChatWorkspace.openOrCreateChatSession(mgr); }
 export function initZeusChatWorkspace() {
-  const handler = e => { if (e?.detail) zeusChatWorkspace.handleSubagentSpawn(e.detail); };
-  if (typeof window !== 'undefined') window.addEventListener('subagent_spawn', handler);
-  if (typeof document !== 'undefined') document.addEventListener('subagent_spawn', handler);
+  const h = e => { if (e?.detail) zeusChatWorkspace.handleSubagentSpawn(e.detail); };
+  if (typeof window !== 'undefined') window.addEventListener('subagent_spawn', h);
+  if (typeof document !== 'undefined') document.addEventListener('subagent_spawn', h);
 }
 if (typeof window !== 'undefined') {
-  Object.assign(window, {
-    ZeusChatSessionController, ZeusChatWorkspaceManager, zeusChatWorkspace,
-    openOrCreateChatSession, openZeusChat: () => zeusChatWorkspace.openOrCreateChatSession(), initZeusChatWorkspace
-  });
+  Object.assign(window, { ZeusChatSessionController, ZeusChatWorkspaceManager, zeusChatWorkspace, openOrCreateChatSession, openZeusChat: () => zeusChatWorkspace.openOrCreateChatSession(), initZeusChatWorkspace });
 }

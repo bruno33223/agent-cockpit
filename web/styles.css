@@ -1498,119 +1498,6 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
-/* ==========================================================================
-   ZEUS AGENT - SIDEBAR VOICE CARD (Issue #46)
-   ========================================================================== */
-.zeus-sidebar-voice-card {
-  margin: 10px 10px 6px 10px;
-  padding: 10px;
-  background: rgba(18, 20, 24, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 229, 255, 0.2);
-  border-radius: var(--radius-md, 8px);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.zeus-sidebar-voice-card:hover {
-  border-color: rgba(0, 229, 255, 0.4);
-  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.12);
-}
-
-.zeus-sidebar-voice-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.zeus-sidebar-voice-identity {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.zeus-sidebar-pulse-led {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: #00ff66;
-  box-shadow: 0 0 8px #00ff66;
-  flex-shrink: 0;
-}
-
-.zeus-sidebar-agent-title {
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #00e5ff;
-}
-
-.btn-zeus-sidebar-mic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
-  background: linear-gradient(135deg, rgba(0, 229, 255, 0.12), rgba(0, 150, 255, 0.08));
-  border: 1px solid rgba(0, 229, 255, 0.35);
-  border-radius: var(--radius-sm, 6px);
-  color: #e2e8f0;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-zeus-sidebar-mic:hover {
-  background: linear-gradient(135deg, rgba(0, 229, 255, 0.22), rgba(0, 150, 255, 0.15));
-  border-color: #00e5ff;
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
-  transform: translateY(-1px);
-}
-
-.btn-zeus-sidebar-mic .mic-shortcut {
-  font-size: 9px;
-  font-family: var(--font-mono, monospace);
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: var(--muted-foreground, #94a3b8);
-  margin-left: auto;
-}
-
-.btn-zeus-sidebar-mic.recording {
-  background: rgba(239, 68, 68, 0.25) !important;
-  border-color: #ef4444 !important;
-  color: #ef4444 !important;
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4) !important;
-  animation: avatarPulseListening 1s infinite alternate ease-in-out;
-}
-
-.app-sidebar.collapsed .zeus-sidebar-voice-card {
-  margin: 6px 4px;
-  padding: 6px 4px;
-  align-items: center;
-}
-
-.app-sidebar.collapsed .zeus-sidebar-voice-header,
-.app-sidebar.collapsed .btn-zeus-sidebar-mic .mic-text,
-.app-sidebar.collapsed .btn-zeus-sidebar-mic .mic-shortcut {
-  display: none;
-}
-
-.app-sidebar.collapsed .btn-zeus-sidebar-mic {
-  padding: 8px;
-  width: auto;
-  border-radius: 50%;
-}
-
 
 
 /* ==========================================================================
@@ -10457,11 +10344,9 @@ body.sidebar-pinned-hidden .main-content {
    ========================================================================== */
 
 :root {
-  --avatar-glow-idle: #00ff66;
-  --avatar-glow-listening: #00e5ff;
-  --avatar-glow-thinking: #a855f7;
-  --avatar-glow-dispatching: #f59e0b;
-  --avatar-glow-testing: #06b6d4;
+  --avatar-glow-off: #ef4444; --avatar-glow-idle: #00ff66;
+  --avatar-glow-listening: #00ff66; --avatar-glow-thinking: #a855f7;
+  --avatar-glow-dispatching: #f59e0b; --avatar-glow-testing: #06b6d4;
   --avatar-glow-speaking: #10b981;
 }
 
@@ -10483,6 +10368,7 @@ body.sidebar-pinned-hidden .main-content {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
 .avatar-3d-canvas {
@@ -10513,83 +10399,86 @@ body.sidebar-pinned-hidden .main-content {
   transition: border-color 0.3s ease, color 0.3s ease;
 }
 
+/* Indicador e Controle de Voz Integrado no Avatar */
+.avatar-voice-control {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--avatar-current-glow, #ef4444);
+  pointer-events: none;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+  z-index: 6;
+}
+
+.avatar-3d-dock[data-state="LISTENING"] .avatar-voice-control {
+  background: rgba(0, 255, 102, 0.15); border-color: rgba(0, 255, 102, 0.4); color: #00ff66;
+}
+.avatar-3d-dock[data-state="OFF"] .avatar-voice-control {
+  background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #ef4444;
+}
+
 /* Suporte a Docks: Flutuante e Topo Workspace */
 .avatar-3d-dock,
 .tactical-avatar-dock {
-  position: relative;
-  z-index: 40;
-  transition: all 0.3s ease;
+  position: relative; z-index: 40; transition: all 0.3s ease; cursor: pointer;
 }
-
 .avatar-3d-dock.avatar-dock-top {
-  width: 100%;
-  height: 180px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  width: 100%; height: 180px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
-
 .avatar-3d-dock.avatar-dock-floating,
 .tactical-avatar-dock.dock-floating {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 220px;
-  height: 220px;
-  z-index: 999;
+  position: fixed; bottom: 24px; right: 24px; width: 220px; height: 220px; z-index: 999;
   filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.6));
 }
-
-/* Estado Retrátil / Colapsável */
 .avatar-3d-dock.avatar-dock-collapsed,
 .tactical-avatar-dock.dock-collapsed {
-  height: 42px !important;
-  width: 160px !important;
-  min-height: 42px !important;
-  overflow: hidden;
+  height: 42px !important; width: 160px !important; min-height: 42px !important; overflow: hidden;
 }
-
-.avatar-3d-dock.avatar-dock-collapsed .avatar-3d-canvas {
-  opacity: 0.2;
-}
+.avatar-3d-dock.avatar-dock-collapsed .avatar-3d-canvas { opacity: 0.2; }
 
 /* Reatividade Visual da Máquina de Estados */
+.avatar-3d-container[data-state="OFF"] {
+  --avatar-current-glow: var(--avatar-glow-off);
+  border-color: rgba(239, 68, 68, 0.45); box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+}
 .avatar-3d-container[data-state="IDLE"],
 .avatar-3d-container[data-state="READY"] {
-  --avatar-current-glow: var(--avatar-glow-idle);
-  box-shadow: 0 0 16px rgba(0, 255, 102, 0.15);
+  --avatar-current-glow: var(--avatar-glow-idle); box-shadow: 0 0 16px rgba(0, 255, 102, 0.15);
 }
-
 .avatar-3d-container[data-state="LISTENING"] {
   --avatar-current-glow: var(--avatar-glow-listening);
-  border-color: rgba(0, 229, 255, 0.35);
-  box-shadow: 0 0 24px rgba(0, 229, 255, 0.3);
+  border-color: rgba(0, 255, 102, 0.45); box-shadow: 0 0 24px rgba(0, 255, 102, 0.35);
   animation: avatarPulseListening 1.8s infinite ease-in-out;
 }
-
 .avatar-3d-container[data-state="THINKING"] {
   --avatar-current-glow: var(--avatar-glow-thinking);
-  border-color: rgba(168, 85, 247, 0.4);
-  box-shadow: 0 0 26px rgba(168, 85, 247, 0.35);
+  border-color: rgba(168, 85, 247, 0.4); box-shadow: 0 0 26px rgba(168, 85, 247, 0.35);
   animation: avatarGlitchThinking 1.2s infinite alternate ease-in-out;
 }
-
 .avatar-3d-container[data-state="DISPATCHING_WORKER"] {
   --avatar-current-glow: var(--avatar-glow-dispatching);
-  border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 0 28px rgba(245, 158, 11, 0.35);
+  border-color: rgba(245, 158, 11, 0.4); box-shadow: 0 0 28px rgba(245, 158, 11, 0.35);
   animation: avatarBurstDispatching 0.9s infinite ease-out;
 }
-
 .avatar-3d-container[data-state="TESTING"] {
   --avatar-current-glow: var(--avatar-glow-testing);
-  border-color: rgba(6, 182, 212, 0.45);
-  box-shadow: 0 0 22px rgba(6, 182, 212, 0.3);
+  border-color: rgba(6, 182, 212, 0.45); box-shadow: 0 0 22px rgba(6, 182, 212, 0.3);
   animation: avatarRhythmTesting 1s infinite alternate ease-in-out;
 }
-
 .avatar-3d-container[data-state="SPEAKING"] {
   --avatar-current-glow: var(--avatar-glow-speaking);
-  border-color: rgba(16, 185, 129, 0.4);
-  box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
+  border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
   animation: avatarWaveSpeaking 1.4s infinite ease-in-out;
 }
 
@@ -10598,24 +10487,19 @@ body.sidebar-pinned-hidden .main-content {
   0%, 100% { box-shadow: 0 0 16px rgba(0, 229, 255, 0.2); }
   50% { box-shadow: 0 0 30px rgba(0, 229, 255, 0.45); }
 }
-
 @keyframes avatarGlitchThinking {
-  0% { transform: scale(1); filter: brightness(1); }
+  0%, 100% { transform: scale(1); filter: brightness(1); }
   50% { transform: scale(0.985); filter: brightness(1.2) hue-rotate(10deg); }
-  100% { transform: scale(1); filter: brightness(1); }
 }
-
 @keyframes avatarBurstDispatching {
   0% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.2); }
   50% { box-shadow: 0 0 32px rgba(245, 158, 11, 0.5); }
   100% { box-shadow: 0 0 14px rgba(245, 158, 11, 0.2); }
 }
-
 @keyframes avatarRhythmTesting {
   0% { box-shadow: 0 0 18px rgba(6, 182, 212, 0.25); border-color: rgba(6, 182, 212, 0.3); }
   100% { box-shadow: 0 0 28px rgba(245, 158, 11, 0.4); border-color: rgba(245, 158, 11, 0.45); }
 }
-
 @keyframes avatarWaveSpeaking {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.015); }
@@ -10623,25 +10507,14 @@ body.sidebar-pinned-hidden .main-content {
 
 /* Controles de Voz & PTT (Issue #46) */
 .zeus-btn-voice-mode {
-  background: rgba(0, 229, 255, 0.12);
-  border: 1px solid rgba(0, 229, 255, 0.4);
-  color: #00e5ff;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 6px;
-  cursor: pointer;
-  letter-spacing: 0.05em;
-  transition: all 0.2s ease;
+  background: rgba(0, 229, 255, 0.12); border: 1px solid rgba(0, 229, 255, 0.4);
+  color: #00e5ff; border-radius: 4px; font-size: 10px; font-weight: 700;
+  padding: 3px 6px; cursor: pointer; letter-spacing: 0.05em; transition: all 0.2s ease;
 }
 .zeus-btn-voice-mode.badge-warning {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.5);
-  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); color: #f59e0b;
 }
 .zeus-btn-mic.recording {
-  background: rgba(239, 68, 68, 0.25) !important;
-  border-color: #ef4444 !important;
-  color: #ef4444 !important;
-  animation: avatarPulseListening 1s infinite alternate ease-in-out;
+  background: rgba(239, 68, 68, 0.25) !important; border-color: #ef4444 !important;
+  color: #ef4444 !important; animation: avatarPulseListening 1s infinite alternate ease-in-out;
 }

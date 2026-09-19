@@ -5,9 +5,10 @@
  */
 
 const STATE_COLORS = {
-  IDLE: { hex: '#00ff66', num: 0x00ff66 },
+  OFF: { hex: '#ef4444', num: 0xef4444 },
+  IDLE: { hex: '#ef4444', num: 0xef4444 },
   READY: { hex: '#00ff66', num: 0x00ff66 },
-  LISTENING: { hex: '#00e5ff', num: 0x00e5ff },
+  LISTENING: { hex: '#00ff66', num: 0x00ff66 },
   THINKING: { hex: '#a855f7', num: 0xa855f7 },
   DISPATCHING_WORKER: { hex: '#f59e0b', num: 0xf59e0b },
   TESTING: { hex: '#06b6d4', num: 0x06b6d4 },
@@ -42,6 +43,8 @@ export class TacticalAvatar3D {
     this.disposed = false;
     this.container = containerElement;
     this.container.classList.add('avatar-3d-container', 'tactical-avatar-viewport');
+    const initialAttr = containerElement.getAttribute?.('data-state') || containerElement.dataset?.state || options.initialState;
+    if (initialAttr && STATE_COLORS[initialAttr]) this.state = initialAttr;
     this.container.setAttribute('data-state', this.state);
 
     const rect = containerElement.getBoundingClientRect?.() || { width: 300, height: 200 };
@@ -102,13 +105,26 @@ export class TacticalAvatar3D {
   }
 
   setState(stateName, metadata = {}) {
-    const validState = STATE_COLORS[stateName] ? stateName : 'IDLE';
+    const validState = STATE_COLORS[stateName] ? stateName : 'OFF';
     this.state = validState;
     this.stateMetadata = metadata;
     if (this.container) this.container.setAttribute('data-state', validState);
 
+    const badge = this.container?.querySelector?.('.avatar-state-badge') || (typeof document !== 'undefined' && typeof document?.getElementById === 'function' ? document.getElementById('avatar-state-badge') : null);
+    if (badge) {
+      badge.textContent = validState === 'OFF' ? 'DESLIGADO' : (validState === 'LISTENING' ? 'OUVINDO' : validState);
+    }
+    const icon = this.container?.querySelector?.('.avatar-voice-icon') || (typeof document !== 'undefined' && typeof document?.getElementById === 'function' ? document.getElementById('avatar-voice-icon') : null);
+    if (icon) {
+      icon.textContent = validState === 'LISTENING' ? '🎙️' : (validState === 'OFF' ? '🔇' : '⚡');
+    }
+    const hint = this.container?.querySelector?.('.avatar-voice-hint') || (typeof document !== 'undefined' && typeof document?.getElementById === 'function' ? document.getElementById('avatar-voice-hint') : null);
+    if (hint) {
+      hint.textContent = validState === 'LISTENING' ? 'Ouvindo...' : (validState === 'OFF' ? 'Clique p/ Falar' : validState);
+    }
+
     if (this.isThree && typeof window !== 'undefined' && window.THREE) {
-      const col = STATE_COLORS[validState]?.num || STATE_COLORS.IDLE.num;
+      const col = STATE_COLORS[validState]?.num || STATE_COLORS.OFF.num;
       [this.core, this.ring, this.particles].forEach(obj => obj?.material?.color?.setHex?.(col));
     }
     if (this.container?.dispatchEvent && typeof CustomEvent === 'function') {
@@ -129,8 +145,12 @@ export class TacticalAvatar3D {
 
   _animate() {
     if (this.disposed) return;
-    this.time += 0.03;
-    this.audioLevel += (this.targetAudioLevel - this.audioLevel) * 0.25;
+    if (this.state !== 'OFF') {
+      this.time += 0.03;
+      this.audioLevel += (this.targetAudioLevel - this.audioLevel) * 0.25;
+    } else {
+      this.audioLevel = 0.0;
+    }
 
     if (this.isThree && this.renderer && this.scene && this.camera) {
       this._updateThreeDynamics();
@@ -146,7 +166,8 @@ export class TacticalAvatar3D {
     const s = this.state, a = this.audioLevel;
     let speed = 0.015, coreScale = 1.0, ringScale = 1.0;
 
-    if (s === 'LISTENING') { ringScale = 1.0 + a * 0.9; speed = 0.02; }
+    if (s === 'OFF') { speed = 0.0; }
+    else if (s === 'LISTENING') { ringScale = 1.0 + a * 0.9; speed = 0.02; }
     else if (s === 'THINKING') { coreScale = 0.88 + Math.sin(this.time * 6) * 0.04; speed = 0.06; }
     else if (s === 'DISPATCHING_WORKER') { speed = 0.04; this.particles?.scale?.setScalar?.(1.1 + (this.time % 1) * 0.5); }
     else if (s === 'TESTING') { coreScale = 1.0 + Math.sin(this.time * 5) * 0.12; speed = 0.025; }
@@ -170,10 +191,25 @@ export class TacticalAvatar3D {
 
   _render2DFallback() {
     const w = this.canvas.width || 300, h = this.canvas.height || 200, cx = w / 2, cy = h / 2, ctx = this.ctx;
-    const color = STATE_COLORS[this.state]?.hex || STATE_COLORS.IDLE.hex;
+    const color = STATE_COLORS[this.state]?.hex || (this.state === 'OFF' ? '#ef4444' : '#00ff66');
     ctx.clearRect(0, 0, w, h);
     ctx.save();
     ctx.translate(cx, cy);
+
+    if (this.state === 'OFF') {
+      ctx.strokeStyle = '#ef4444'; ctx.fillStyle = 'rgba(239, 68, 68, 0.2)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 44, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-32, 0); ctx.lineTo(-12, 0);
+      ctx.moveTo(12, 0); ctx.lineTo(32, 0);
+      ctx.moveTo(0, -32); ctx.lineTo(0, -12);
+      ctx.moveTo(0, 12); ctx.lineTo(0, 32);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
 
     let ringR = 48 + (this.state === 'LISTENING' ? this.audioLevel * 35 : 0);
     let coreR = 24 * (this.state === 'THINKING' ? 0.85 + Math.sin(this.time * 6) * 0.06 : 1);

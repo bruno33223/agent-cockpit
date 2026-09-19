@@ -112,21 +112,25 @@ class TestVoiceControllerIntegration(unittest.TestCase):
         for st in expected_states:
             self.assertIn(st, ["IDLE", "LISTENING", "THINKING", "DISPATCHING_WORKER", "TESTING", "SPEAKING", "READY"])
 
-    def test_07_sidebar_voice_card_and_downsample(self):
-        """Valida o card de voz na barra lateral esquerda e downsampling de sample-rate."""
+    def test_07_avatar_voice_dock_and_downsample(self):
+        """Valida controle de voz no robô/avatar 2D, remoção de card do topo e downsampling."""
         with open(self.index_path, "r", encoding="utf-8") as f:
             html = f.read()
 
-        self.assertIn('id="zeus-sidebar-voice-card"', html)
-        self.assertIn('id="btn-zeus-sidebar-mic"', html)
-        self.assertIn('class="btn-zeus-sidebar-mic zeus-btn-mic"', html)
+        # Botão do topo não deve existir na barra lateral
+        self.assertNotIn('id="zeus-sidebar-voice-card"', html)
+        # Controle deve estar diretamente no avatar
+        self.assertIn('id="zeus-avatar-dock"', html)
+        self.assertIn('data-state="OFF"', html)
+        self.assertIn('id="avatar-state-badge"', html)
+        self.assertIn('id="avatar-voice-control"', html)
 
         with open(self.voice_ctrl_path, "r", encoding="utf-8") as f:
             js = f.read()
 
         self.assertIn("downsampleTo16k", js)
         self.assertIn("ensureChatOpen", js)
-        self.assertIn("btn-zeus-sidebar-mic", js)
+        self.assertIn("zeus-avatar-dock", js)
 
         # Simulação matemática da função pura downsampleTo16k (48kHz -> 16kHz = 1/3)
         def downsample(samples, in_rate, out_rate=16000):
