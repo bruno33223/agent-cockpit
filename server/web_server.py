@@ -29,7 +29,7 @@ except ImportError:
     except ImportError:
         opencode_manager = None
 
-from routers import telemetry, settings, omniroute, models, pty, orchestrator, zeus_chat
+from routers import telemetry, settings, omniroute, models, pty, orchestrator, zeus_chat, auth as auth_router
 from routers.telemetry import SwitchProjectPayload, post_switch_project, get_state
 from routers.settings import get_customizations_mgr, set_customizations_mgr
 from routers.omniroute import get_opencode_credentials
@@ -66,14 +66,6 @@ async def add_no_cache_for_static_assets(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
-
-
-@app.get("/api/auth/status")
-async def auth_status_endpoint(request: Request):
-    """Endpoint público de verificação de status de autenticação."""
-    req = auth_manager.is_auth_required()
-    tok = auth_manager.extract_token_from_request(request) if req else None
-    return {"auth_required": req, "authenticated": auth_manager.verify_token(tok) if req else True}
 
 
 async def file_watch_loop():
@@ -178,7 +170,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-for _r in (telemetry.router, settings.router, omniroute.router, models.router, pty.router, orchestrator.router, zeus_chat.router):
+for _r in (telemetry.router, settings.router, omniroute.router, models.router, pty.router, orchestrator.router, zeus_chat.router, auth_router.router):
     app.include_router(_r)
 
 # Compatibilidade FastAPI 0.141+ para inspeção direta de app.routes

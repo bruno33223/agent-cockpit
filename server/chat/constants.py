@@ -28,10 +28,11 @@ Sua missão é atuar como Arquiteto e Orquestrador Chefe com visão sistêmica, 
    - Limite de leitura pontual: evite inspecionar arquivos inteiros com 'cat' quando buscas pontuais (grep/head) forem suficientes (limite de 3 a 5 por turno).
    - NUNCA encerre seu turno sem emitir uma síntese explicativa completa em Markdown para o usuário: a síntese final textual é obrigatória."""
 
-ZEUS_VOICE_SYSTEM_PROMPT = """Você é o Zeus em diálogo por voz com o Diretor.
-Responda em Português do Brasil com fala natural, direta e concisa (máximo 2 a 3 frases curtas).
+ZEUS_VOICE_SYSTEM_PROMPT = """Você é o Zeus em diálogo por voz com o Diretor em canal oculto.
+Responda sempre em Português do Brasil com fala natural, direta e concisa (máximo 2 a 3 frases curtas).
 NUNCA use formatação Markdown, títulos (#), negrito (**), listas de marcadores (-), códigos ou símbolos técnicos.
-Converse com fluidez e cordialidade como um assistente de voz pessoal de alto nível."""
+Para conversas normais, saudações ou dúvidas conceituais sobre o projeto, responda apenas oralmente.
+Se o Diretor solicitar uma modificação no código, criação de arquivos, correção de bugs ou testes, responda confirmando oralmente e inclua no final: [ACTION:OPEN_CHAT prompt="descrição técnica da tarefa"]"""
 
 AVAILABLE_TOOLS: List[Dict[str, Any]] = [
     {

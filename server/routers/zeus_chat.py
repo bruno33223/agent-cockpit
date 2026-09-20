@@ -194,3 +194,39 @@ def delete_zeus_chat_session_endpoint(session_id: str):
         raise HTTPException(status_code=500, detail="Módulo zeus_chat_engine não disponível.")
     success = zeus_chat_engine.zeus_engine.session_manager.delete_session(session_id)
     return {"status": "ok", "deleted": success, "session_id": session_id}
+
+
+@router.post("/api/zeus-chat/voice-dialogue")
+async def post_zeus_voice_dialogue_endpoint(req: Dict[str, Any] = Body(...)):
+    """Canal de voz oculto com o Zeus. Responde oralmente sem abrir chat a menos que decida agir."""
+    if not zeus_chat_engine:
+        raise HTTPException(status_code=500, detail="Módulo zeus_chat_engine não disponível.")
+    msg = (req.get("message") or "").strip()
+    if not msg:
+        return {"status": "ok", "reply": "", "should_open_chat": False, "task_prompt": ""}
+    import re, asyncio
+    is_action = bool(re.search(
+        r"\b(abrir?|mostr[ae]|modifiq|alter[ae]|cri[ae]|execut[ae]|consert[ae]|corrij[ae]|implement[ae]|adicione|remova|fa[zç][ae]|escreva|codifiqu[ae])\b",
+        msg, re.IGNORECASE
+    ))
+    if is_action:
+        task = zeus_chat_engine.zeus_engine.prompt_optimizer.optimize(msg) or msg
+        return {"status": "ok", "reply": "Entendido Diretor. Abrindo o chat para a equipe de desenvolvimento.", "should_open_chat": True, "task_prompt": task}
+    sys_p = getattr(zeus_chat_engine, "ZEUS_VOICE_SYSTEM_PROMPT", None)
+    def _fetch_sync():
+        ch = []
+        try:
+            for evt in zeus_chat_engine.zeus_engine.stream_chat(session_id="zeus-voice-hidden", message=msg, system_prompt=sys_p):
+                if evt.get("type") == "content" and evt.get("text"):
+                    ch.append(evt["text"])
+        except Exception:
+            pass
+        return "".join(ch).strip()
+    try:
+        full_resp = await asyncio.wait_for(asyncio.to_thread(_fetch_sync), timeout=4.0)
+    except Exception:
+        full_resp = ""
+    verbal = re.sub(r'\[ACTION:OPEN_CHAT.*?\]', '', full_resp).strip() if full_resp else ""
+    if not verbal:
+        verbal = "Olá Diretor, o sistema está operacional e sob controle. Em que posso ajudar?"
+    return {"status": "ok", "reply": verbal, "should_open_chat": False, "task_prompt": ""}

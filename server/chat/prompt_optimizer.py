@@ -44,9 +44,12 @@ class PromptOptimizer:
     def optimize(self, transcription: str) -> str:
         """Converte a transcrição em instrução técnica concisa e bem estruturada."""
         if not transcription or not transcription.strip():
-            return "Nenhuma instrução informada para otimização."
+            return ""
 
         text = transcription.strip()
+        t_lower = text.lower()
+        if any(ign in t_lower for ign in ("inaudível", "silêncio detectado", "nenhum áudio", "não consegui compreender")):
+            return ""
 
         # Remove vícios de linguagem e expressões vazias
         cleaned = text

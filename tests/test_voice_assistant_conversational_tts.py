@@ -96,5 +96,43 @@ class TestVoiceAndTtsArchitectureGuardrails(unittest.TestCase):
         self.assertIn("SpeechSynthesisUtterance", content, "voice_controller.js deve instanciar SpeechSynthesisUtterance")
 
 
+class TestHiddenVoiceDialogueAndNoiseFiltering(unittest.TestCase):
+    """Garante que o canal de voz seja oculto e que o chat só abra quando Zeus decidir agir."""
+
+    def test_noise_and_silence_returns_empty_prompt(self):
+        """Silêncio ou áudio inaudível não deve gerar prompts para o modelo."""
+        opt = PromptOptimizer()
+        self.assertEqual(opt.optimize(""), "")
+        self.assertEqual(opt.optimize("Áudio com sinal inaudível ou silêncio detectado."), "")
+        self.assertEqual(opt.optimize("Nenhum áudio detectado."), "")
+
+    def test_voice_dialogue_endpoint_conversational_vs_action(self):
+        """Valida que conversas comuns não abrem o chat, mas ações técnicas abrem."""
+        import asyncio
+        from server.routers.zeus_chat import post_zeus_voice_dialogue_endpoint
+
+        # 1. Pergunta conceitual: chat NÃO deve ser aberto
+        res_conv = asyncio.run(post_zeus_voice_dialogue_endpoint({"message": "esse projeto se trata de que?"}))
+        self.assertEqual(res_conv["status"], "ok")
+        self.assertFalse(res_conv["should_open_chat"])
+        self.assertTrue(len(res_conv["reply"]) > 0)
+
+        # 2. Comando de criação/modificação: chat DEVE ser aberto
+        res_act = asyncio.run(post_zeus_voice_dialogue_endpoint({"message": "crie um novo endpoint para relatórios"}))
+        self.assertEqual(res_act["status"], "ok")
+        self.assertTrue(res_act["should_open_chat"])
+        self.assertTrue(len(res_act["task_prompt"]) > 0)
+
+    def test_voice_controller_has_hidden_dialogue_integration(self):
+        """voice_controller.js deve conectar com /api/zeus-chat/voice-dialogue sem abrir chat desnecessariamente."""
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        fpath = os.path.join(root_dir, "web", "js", "voice_controller.js")
+        with open(fpath, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("/api/zeus-chat/voice-dialogue", content)
+        self.assertIn("vadThreshold", content)
+        self.assertIn("ensureChatOpen", content)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,9 @@ class AuthManager:
     PUBLIC_API_PATHS = {
         "/api/health",
         "/api/ping",
-        "/api/auth/status"
+        "/api/auth/status",
+        "/api/auth/verify",
+        "/api/auth/config"
     }
 
     def __init__(self, token_storage_dir: Optional[str] = None):
@@ -40,6 +42,15 @@ class AuthManager:
         if os.environ.get("COCKPIT_AUTH_TOKEN"):
             return True
         return False
+
+    def get_token_source(self) -> Optional[str]:
+        """Retorna a origem do token ativo: 'env', 'file' ou None (sem expor o valor)."""
+        if os.environ.get("COCKPIT_AUTH_TOKEN", "").strip():
+            return "env"
+        token_file = os.path.join(self.token_storage_dir, "session_token.txt")
+        if os.path.isfile(token_file):
+            return "file"
+        return None
 
     def get_or_create_session_token(self) -> str:
         """Retorna token de ambiente ou lê/cria arquivo states/session_token.txt."""
