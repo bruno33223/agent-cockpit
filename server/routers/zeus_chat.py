@@ -141,7 +141,7 @@ async def post_audio_synthesize_endpoint(req: Dict[str, Any] = Body(...)):
     text = (req.get("text") or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Parâmetro 'text' não pode ser vazio.")
-    voice = req.get("voice") or "pt-BR-FranciscaNeural"
+    voice = req.get("voice") or "pt-BR-AntonioNeural"
     try:
         from server.chat.audio_synthesizer import AudioSynthesizer
     except ImportError:

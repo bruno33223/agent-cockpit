@@ -51,14 +51,20 @@ class PromptOptimizer:
         if any(ign in t_lower for ign in ("inaudível", "silêncio detectado", "nenhum áudio", "não consegui compreender")):
             return ""
 
+        # Remove comandos meta de abertura de chat e delegação
+        cleaned = re.sub(r"\b(?:abra|abrir|abre)\s+o\s+chat\s+(?:e\s+)?(?:pe[çc]a|mande|solicite|diga)?\s*(?:(?:para\s+a|pra\s+a|para|pra|a|à)\s+equipe)?\s*(?:para\s+|pra\s+)?", "", text, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"\b(?:pe[çc]a|mande|solicite|diga)\s+(?:(?:para\s+a|pra\s+a|para|pra|a|à)\s+equipe)\s+(?:para\s+|pra\s+)?", "", cleaned, flags=re.IGNORECASE).strip()
+        if not cleaned:
+            cleaned = text
+
         # Remove vícios de linguagem e expressões vazias
-        cleaned = text
         for filler in self.FILLER_WORDS:
             cleaned = re.sub(filler, "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
         if not cleaned:
             cleaned = text
+
 
         # Preserva perguntas conversacionais e saudações sem forçar prefixos imperativos
         if self.is_conversational_or_query(cleaned):

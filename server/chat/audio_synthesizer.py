@@ -7,7 +7,7 @@ import math
 import struct
 from typing import Any, AsyncGenerator, Dict, Optional, Tuple
 
-DEFAULT_VOICE = "pt-BR-FranciscaNeural"
+DEFAULT_VOICE = "pt-BR-AntonioNeural"
 
 VISEME_MAP: Dict[str, Tuple[str, int]] = {
     'a': ('viseme_aa', 2), 'á': ('viseme_aa', 2), 'à': ('viseme_aa', 2), 'ã': ('viseme_aa', 2), 'â': ('viseme_aa', 2),

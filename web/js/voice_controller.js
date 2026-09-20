@@ -57,8 +57,7 @@ export class VoiceController {
       this.recognition.onresult = (evt) => {
         let interim = '', final = '';
         for (let i = evt.resultIndex; i < evt.results.length; i++) {
-          const t = evt.results[i][0].transcript;
-          if (evt.results[i].isFinal) final += t; else interim += t;
+          if (evt.results[i].isFinal) final += evt.results[i][0].transcript; else interim += evt.results[i][0].transcript;
         }
         const captured = (final || interim).trim();
         if (captured) {
@@ -113,6 +112,7 @@ export class VoiceController {
   startPtt() { this.isPttPressed = true; this.pcmBuffer = []; this.startListening(); this._getAvatar()?.setState('LISTENING'); this._notifyState('ptt_start'); }
   stopPtt() { if (!this.isPttPressed) return; this.isPttPressed = false; this._getAvatar()?.updateAudioLevel(0); this._notifyState('ptt_end'); this._handleSpeechEnd(); }
 
+
   async _handleSpeechEnd() {
     if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
     if (this.lastCapturedText) { const t = this.lastCapturedText; this.lastCapturedText = ''; return this._handleSpeechText(t); }
@@ -136,25 +136,27 @@ export class VoiceController {
     const promptText = text.trim(); this.lastCapturedText = '';
     if (this.silenceTimer) { clearTimeout(this.silenceTimer); this.silenceTimer = null; }
     const av = this._getAvatar(); av?.setState('THINKING');
-    const ensureChatOpen = (taskPrompt) => {
-      window?.switchTab?.('view-terminal');
-      const sess = window?.openOrCreateChatSession?.();
-      const s = sess?.chatController || window.zeusChatWorkspace?.getActiveSession?.();
-      if (s && taskPrompt) {
-        if (s.chatInput) { s.chatInput.value = taskPrompt; s.chatInput.dispatchEvent(new Event('input', { bubbles: true })); }
-        if (typeof s.sendMessage === 'function' && !s.isProcessing) s.sendMessage();
+    const ensureChatOpen = async (tp) => {
+      window?.switchTab?.('view-terminal'); window?.openOrCreateChatSession?.();
+      for (let i = 0; i < 25; i++) {
+        const s = window.zeusChatWorkspace?.getActiveSession?.() || (window.terminalWorkspace?.sessions ? Array.from(window.terminalWorkspace.sessions.values()).find(x => x.role === 'visual-chat')?.chatController : null);
+        if (s && s.chatInput && typeof s.sendMessage === 'function') {
+          s.chatInput.value = tp; s.chatInput.dispatchEvent(new Event('input', { bubbles: true })); s.focusInput?.();
+          if (!s.isProcessing) await s.sendMessage();
+          return;
+        }
+        await new Promise(r => setTimeout(r, 100));
       }
     };
     try {
       const base = (typeof window !== 'undefined' && window.location?.port === '8765') ? '' : 'http://127.0.0.1:8765';
       const pid = (typeof localStorage !== 'undefined' && localStorage.getItem('cockpit_project_id')) || 'default';
       const res = await fetch(`${base}/api/zeus-chat/voice-dialogue`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: promptText, project_id: pid })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: promptText, project_id: pid })
       });
       const data = await res.json(), reply = (data?.reply || data?.content || '').trim();
-      if (reply) await this.playTts(reply);
       if (data?.should_open_chat) ensureChatOpen(data.task_prompt || promptText);
+      if (reply) await this.playTts(reply);
     } catch (_) {} finally {
       av?.setState(this.isListening ? 'LISTENING' : 'OFF'); this._isHandlingSpeech = false;
     }
@@ -166,10 +168,7 @@ export class VoiceController {
       const fd = new FormData(); fd.append('audio', audioBlob, 'voice_input.wav');
       const res = await fetch(`${base}/api/audio/transcribe-and-optimize`, { method: 'POST', body: fd }), data = await res.json();
       const text = (data?.optimized_prompt || data?.prompt || data?.transcription || '').trim();
-      if (!text || /^(silêncio|nenhum áudio|não consegui)/i.test(text)) {
-        if (this.isListening) this._getAvatar()?.setState('LISTENING');
-        return;
-      }
+      if (!text || /^(silêncio|nenhum áudio|não consegui)/i.test(text)) { if (this.isListening) this._getAvatar()?.setState('LISTENING'); return; }
       await this._handleSpeechText(text);
     } catch (_) { if (this.isListening) this._getAvatar()?.setState('LISTENING'); }
   }
@@ -186,6 +185,9 @@ export class VoiceController {
     if (typeof window === 'undefined' || !window.speechSynthesis) { this.isPlayingTts = false; av?.updateAudioLevel(0); av?.setState(this.isListening ? 'LISTENING' : 'OFF'); return false; }
     try { window.speechSynthesis.cancel(); } catch (_) {}
     const utter = new SpeechSynthesisUtterance(cleanText); utter.lang = 'pt-BR'; utter.rate = 1.05;
+    const vList = window.speechSynthesis.getVoices?.() || [];
+    const maleV = vList.find(v => v.lang?.startsWith('pt') && /antonio|male|felipe|daniel|homem/i.test(v.name)) || vList.find(v => v.lang?.startsWith('pt'));
+    if (maleV) utter.voice = maleV;
     this.isPlayingTts = true; av?.setState('SPEAKING');
     const interval = setInterval(() => { if (!this.isPlayingTts) { clearInterval(interval); return; } av?.updateAudioLevel(0.3 + Math.random() * 0.5); }, 120);
     return new Promise(resolve => {
@@ -200,7 +202,7 @@ export class VoiceController {
     const av = this._getAvatar(); this.isPlayingTts = true; av?.setState('SPEAKING');
     try {
       const base = (typeof window !== 'undefined' && window.location?.port === '8765') ? '' : 'http://127.0.0.1:8765';
-      const res = await fetch(`${base}/api/audio/synthesize`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, voice: opt.voice || 'pt-BR-FranciscaNeural' }) });
+      const res = await fetch(`${base}/api/audio/synthesize`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, voice: opt.voice || 'pt-BR-AntonioNeural' }) });
       if (!res.ok) throw new Error('Falha síntese');
       const blob = await res.blob(); if (!blob || blob.size < 50) throw new Error('Áudio vazio');
       const audioUrl = URL.createObjectURL(blob), audio = new Audio(audioUrl);
@@ -218,13 +220,14 @@ export class VoiceController {
     if (typeof window === 'undefined') return;
     window.addEventListener('keydown', (e) => {
       const inp = e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA' || e.target?.isContentEditable;
-      if (e.altKey && e.key.toLowerCase() === 'v') { e.preventDefault(); if (this.isListening) this.stopListening(); else this.startListening(); return; }
-      if (this.mode === 'ptt' && !inp && e.code === 'Space' && !e.repeat && !this.isPttPressed) { e.preventDefault(); this.startPtt(); }
+      if (e.altKey && e.key.toLowerCase() === 'v') { e.preventDefault(); if (this.isListening) this.stopListening(); else this.startListening(); }
+      else if (this.mode === 'ptt' && !inp && e.code === 'Space' && !e.repeat && !this.isPttPressed) { e.preventDefault(); this.startPtt(); }
     });
     window.addEventListener('keyup', (e) => { if (this.mode === 'ptt' && this.isPttPressed && e.code === 'Space') { e.preventDefault(); this.stopPtt(); } });
   }
 
   _notifyState(evt, meta = {}) {
+
     if (typeof document !== 'undefined') {
       const rec = evt === 'listening_started' || evt === 'ptt_start' || evt === 'speech_start';
       document.querySelectorAll('.zeus-btn-mic').forEach(b => b.classList.toggle('recording', rec));
@@ -233,7 +236,6 @@ export class VoiceController {
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('voice:state', { detail: { event: evt, ...meta } }));
   }
 }
-
 export const voiceController = new VoiceController();
 export function initAvatarAndVoice() {
   const dock = document.getElementById('zeus-avatar-dock');
@@ -242,8 +244,7 @@ export function initAvatarAndVoice() {
     dock.addEventListener('click', async (e) => { e.stopPropagation(); if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening(); });
   }
   document.addEventListener('click', async (e) => {
-    const btnMic = e.target.closest('.zeus-btn-mic');
-    if (btnMic) { if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening(); }
+    if (e.target.closest('.zeus-btn-mic')) { if (voiceController.isListening) voiceController.stopListening(); else await voiceController.startListening(); }
   });
 }
 if (typeof window !== 'undefined') { window.VoiceController = VoiceController; window.voiceController = voiceController; window.initAvatarAndVoice = initAvatarAndVoice; }
