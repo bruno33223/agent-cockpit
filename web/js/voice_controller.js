@@ -31,7 +31,7 @@ export class VoiceController {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
-        try { this.audioContext = new AudioCtx({ sampleRate: 16000 }); } catch (_) { this.audioContext = new AudioCtx(); }
+        this.audioContext = new AudioCtx();
         if (this.audioContext.state === 'suspended') await this.audioContext.resume().catch(() => {});
         const source = this.audioContext.createMediaStreamSource(this.mediaStream);
         this.analyser = this.audioContext.createAnalyser(); this.analyser.fftSize = 512;
@@ -45,7 +45,7 @@ export class VoiceController {
       this.isListening = true; this._getAvatar()?.setState('LISTENING');
       this._notifyState('listening_started');
       return true;
-    } catch (_) { this.isListening = false; return false; }
+    } catch (err) { console.error('[VoiceController] Erro ao iniciar escuta:', err); this.isListening = false; return false; }
   }
 
   _startWebSpeechRecognition() {
@@ -155,8 +155,9 @@ export class VoiceController {
 
   async _sendAudio(audioBlob) {
     try {
+      const base = (typeof window !== 'undefined' && window.location?.port === '8765') ? '' : 'http://127.0.0.1:8765';
       const fd = new FormData(); fd.append('audio', audioBlob, 'voice_input.wav');
-      const res = await fetch('/api/audio/transcribe-and-optimize', { method: 'POST', body: fd }), data = await res.json();
+      const res = await fetch(`${base}/api/audio/transcribe-and-optimize`, { method: 'POST', body: fd }), data = await res.json();
       const text = data?.optimized_prompt || data?.prompt || data?.transcription || '';
       if (text) await this._handleSpeechText(text);
     } catch (_) {}
@@ -187,7 +188,8 @@ export class VoiceController {
     const clean = this.cleanTextForTts(text); if (!clean) return false;
     const av = this._getAvatar(); this.isPlayingTts = true; av?.setState('SPEAKING');
     try {
-      const res = await fetch('/api/audio/synthesize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, voice: opt.voice || 'pt-BR-FranciscaNeural' }) });
+      const base = (typeof window !== 'undefined' && window.location?.port === '8765') ? '' : 'http://127.0.0.1:8765';
+      const res = await fetch(`${base}/api/audio/synthesize`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, voice: opt.voice || 'pt-BR-FranciscaNeural' }) });
       if (!res.ok) throw new Error('Falha síntese');
       const blob = await res.blob(); if (!blob || blob.size < 50) throw new Error('Áudio vazio');
       const audioUrl = URL.createObjectURL(blob), audio = new Audio(audioUrl);

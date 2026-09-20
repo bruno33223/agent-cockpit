@@ -206,7 +206,8 @@ export class ZeusChatCore {
   }
 
   async sendStreamMessage({ endpoint = '/api/zeus-chat/message', payload, signal, onEvent, onThinking, onToolCall, onSubagentSpawn, onContent, onDone, onError }) {
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }, body: JSON.stringify(payload), signal });
+    const targetUrl = endpoint.startsWith('http') ? endpoint : (((typeof window !== 'undefined' && window.location?.port === '8765') ? '' : 'http://127.0.0.1:8765') + endpoint);
+    const response = await fetch(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }, body: JSON.stringify(payload), signal });
     if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.message || `Erro HTTP ${response.status}: ${response.statusText}`); }
     const reader = response.body.getReader(), decoder = new TextDecoder('utf-8');
     let buffer = '';
