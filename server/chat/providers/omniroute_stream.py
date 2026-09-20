@@ -25,7 +25,8 @@ def stream_omniroute(
     model_id: str = "auto",
     history: Optional[List[Dict[str, Any]]] = None,
     images: Optional[List[str]] = None,
-    system_prompt: Optional[str] = None
+    system_prompt: Optional[str] = None,
+    include_tools: bool = True
 ) -> Iterator[Dict[str, Any]]:
     """Streaming de eventos a partir do endpoint compatível com OpenAI do OmniRoute."""
     url = f"{omniroute_url.rstrip('/')}/chat/completions"
@@ -52,13 +53,15 @@ def stream_omniroute(
     if not messages or messages[-1]["role"] != "user":
         messages.append({"role": "user", "content": user_content})
 
-    payload = {
+    payload: Dict[str, Any] = {
         "model": effective_model,
         "messages": messages,
-        "stream": True,
-        "tools": AVAILABLE_TOOLS,
-        "tool_choice": "auto"
+        "stream": True
     }
+    if include_tools:
+        payload["tools"] = AVAILABLE_TOOLS
+        payload["tool_choice"] = "auto"
+
 
     headers = {
         "Content-Type": "application/json",

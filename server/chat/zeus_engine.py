@@ -101,7 +101,8 @@ class ZeusChatEngine:
         backend: str = "auto",
         images: Optional[List[str]] = None,
         system_prompt: Optional[str] = None,
-        broadcast_callback: Optional[Callable[[str, Dict[str, Any], Optional[str]], None]] = None
+        broadcast_callback: Optional[Callable[[str, Dict[str, Any], Optional[str]], None]] = None,
+        include_tools: bool = True
     ) -> Iterator[Dict[str, Any]]:
         """Geração streaming com emissão de eventos estruturados e telemetria do avatar."""
         start_time = time.time()
@@ -138,7 +139,7 @@ class ZeusChatEngine:
                 stream_gen = self._stream_opencode(session_id, message, model_id, images, effective_sys)
             elif effective_backend == "omniroute":
                 clean_m = model_id[len("omniroute/"):] if model_id and model_id.startswith("omniroute/") else model_id
-                stream_gen = self._stream_omniroute(session_id, message, clean_m, images, effective_sys)
+                stream_gen = self._stream_omniroute(session_id, message, clean_m, images, effective_sys, include_tools=include_tools)
             elif effective_backend == "ollama":
                 clean_m = model_id[len("ollama/"):] if model_id and model_id.startswith("ollama/") else model_id
                 stream_gen = self._stream_ollama(session_id, message, clean_m, effective_sys)
@@ -205,8 +206,8 @@ class ZeusChatEngine:
         for event in self.stream_chat(session_id, message, model_id, backend, images, system_prompt, broadcast_callback):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
-    def _stream_omniroute(self, session_id: str, message: str, model_id: str, images=None, system_prompt=None):
-        return stream_omniroute(self.omniroute_url, session_id, message, model_id, self.get_history(session_id), images, system_prompt)
+    def _stream_omniroute(self, session_id: str, message: str, model_id: str, images=None, system_prompt=None, include_tools: bool = True):
+        return stream_omniroute(self.omniroute_url, session_id, message, model_id, self.get_history(session_id), images, system_prompt, include_tools=include_tools)
 
     def _stream_ollama(self, session_id: str, message: str, model_id: str, system_prompt=None):
         return stream_ollama(self.ollama_url, session_id, message, model_id, self.get_history(session_id), system_prompt)

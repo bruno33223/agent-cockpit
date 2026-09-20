@@ -216,17 +216,25 @@ async def post_zeus_voice_dialogue_endpoint(req: Dict[str, Any] = Body(...)):
     def _fetch_sync():
         ch = []
         try:
-            for evt in zeus_chat_engine.zeus_engine.stream_chat(session_id="zeus-voice-hidden", message=msg, system_prompt=sys_p):
+            for evt in zeus_chat_engine.zeus_engine.stream_chat(
+                session_id="zeus-voice-hidden", message=msg, system_prompt=sys_p, include_tools=False
+            ):
                 if evt.get("type") == "content" and evt.get("text"):
                     ch.append(evt["text"])
         except Exception:
             pass
         return "".join(ch).strip()
     try:
-        full_resp = await asyncio.wait_for(asyncio.to_thread(_fetch_sync), timeout=4.0)
+        full_resp = await asyncio.wait_for(asyncio.to_thread(_fetch_sync), timeout=10.0)
     except Exception:
         full_resp = ""
-    verbal = re.sub(r'\[ACTION:OPEN_CHAT.*?\]', '', full_resp).strip() if full_resp else ""
+    action_match = re.search(r'\[ACTION:OPEN_CHAT(?:\s+prompt=["\'](.*?)["\'])?.*?\]', full_resp, re.DOTALL) if full_resp else None
+    if action_match:
+        extracted = action_match.group(1) or msg
+        verbal = re.sub(r'[*#_`]', '', re.sub(r'\[ACTION:OPEN_CHAT.*?\]', '', full_resp)).strip()
+        return {"status": "ok", "reply": verbal or "Entendido Diretor. Abrindo o chat para a equipe de desenvolvimento.", "should_open_chat": True, "task_prompt": extracted}
+    verbal = re.sub(r'[*#_`]', '', full_resp).strip() if full_resp else ""
     if not verbal:
         verbal = "Olá Diretor, o sistema está operacional e sob controle. Em que posso ajudar?"
     return {"status": "ok", "reply": verbal, "should_open_chat": False, "task_prompt": ""}
+

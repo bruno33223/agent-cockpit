@@ -12,6 +12,7 @@ import os
 try:
     from server.chat import (
         DEFAULT_ZEUS_SYSTEM_PROMPT,
+        ZEUS_VOICE_SYSTEM_PROMPT,
         AVAILABLE_TOOLS,
         ZEUS_TOOLS,
         VISION_MODEL_PATTERNS,
@@ -35,6 +36,7 @@ try:
 except ImportError:
     from chat import (
         DEFAULT_ZEUS_SYSTEM_PROMPT,
+        ZEUS_VOICE_SYSTEM_PROMPT,
         AVAILABLE_TOOLS,
         ZEUS_TOOLS,
         VISION_MODEL_PATTERNS,
@@ -58,6 +60,7 @@ except ImportError:
 
 __all__ = [
     "DEFAULT_ZEUS_SYSTEM_PROMPT",
+    "ZEUS_VOICE_SYSTEM_PROMPT",
     "AVAILABLE_TOOLS",
     "ZEUS_TOOLS",
     "VISION_MODEL_PATTERNS",
@@ -78,3 +81,4 @@ __all__ = [
     "ZeusChatEngine",
     "zeus_engine",
 ]
+

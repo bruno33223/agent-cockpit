@@ -154,9 +154,14 @@ class TestLocalBuilder(unittest.TestCase):
 
     def test_execute_local_builder_circuit_breaker(self):
         # Configura duas tentativas consecutivas já falhas
+        db.switch_current_project("default")
+        db.set_local_worker_config({"enabled": True, "circuit_breaker_threshold": 2, "omniroute_fallback": False})
+        if hasattr(db, "reset_local_worker_attempts"):
+            db.reset_local_worker_attempts(self.slice_id)
         db.increment_local_worker_attempts(self.slice_id)
         db.increment_local_worker_attempts(self.slice_id)
         self.assertEqual(db.get_local_worker_attempts(self.slice_id), 2)
+
 
         res = execute_local_builder(
             slice_id=self.slice_id,
